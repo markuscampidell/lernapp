@@ -149,7 +149,7 @@ export function SettingsView() {
         </button>
       </div>
 
-      <p className="muted small center-text">Lernapp · Version 0.4</p>
+      <p className="muted small center-text">Lernapp · Version 0.5</p>
 
       {pendingImport && (
         <Sheet title="Backup importieren" onClose={() => setPendingImport(null)}>

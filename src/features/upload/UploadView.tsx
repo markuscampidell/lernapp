@@ -30,6 +30,7 @@ export function UploadView() {
   const pickInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const videoInput = useRef<HTMLInputElement>(null);
+  const galleryInput = useRef<HTMLInputElement>(null);
 
   const folder = target ? folders.find((f) => f.id === target) : undefined;
   const busy = done !== null;
@@ -118,7 +119,13 @@ export function UploadView() {
             <Icon name="video" size={18} /> Video aufnehmen
           </button>
         </div>
+        {isTouchDevice && (
+          <button className="link gallery-link" onClick={() => galleryInput.current?.click()} disabled={busy}>
+            Fotos & Videos aus der Galerie
+          </button>
+        )}
         <input ref={pickInput} type="file" multiple accept={DOCUMENT_ACCEPT} hidden onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
+        <input ref={galleryInput} type="file" multiple accept="image/*,video/*" hidden onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
         <input ref={videoInput} type="file" accept="video/*" capture="environment" hidden onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
         <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
       </div>
