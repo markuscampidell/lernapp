@@ -109,3 +109,35 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+// ---------- Dateiauswahl ----------
+const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+export const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
+/**
+ * Chrome auf Android zeigt bei <input type="file"> ohne `accept` nur "Kamera" und "Fotos und Videos".
+ * Sobald auch Dokument-Typen erlaubt sind, öffnet es stattdessen den Dateimanager (mit Zugriff auf
+ * Downloads, Google Drive, Fotos usw.). Am PC bleibt `accept` leer, damit alle Dateien wählbar sind.
+ */
+export const DOCUMENT_ACCEPT = isAndroid
+  ? [
+      'application/pdf', '.pdf',
+      'application/msword', '.doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.docx',
+      'application/vnd.ms-powerpoint', '.ppt',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation', '.pptx',
+      'application/vnd.ms-excel', '.xls',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx',
+      'application/vnd.oasis.opendocument.text', '.odt',
+      'application/vnd.oasis.opendocument.presentation', '.odp',
+      'application/vnd.oasis.opendocument.spreadsheet', '.ods',
+      'application/rtf', '.rtf',
+      'text/plain', '.txt', 'text/markdown', '.md', 'text/csv', '.csv', 'text/html', 'application/json',
+      'application/zip', '.zip',
+      'application/octet-stream',
+      'image/*', 'video/*', 'audio/*',
+    ].join(',')
+  : undefined;
+
+/** Nur Fotos und Videos (öffnet auf Handys die Galerie). */
+export const MEDIA_ACCEPT = 'image/*,video/*';

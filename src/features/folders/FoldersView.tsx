@@ -4,7 +4,7 @@ import { MAX_DEPTH } from '../../domain/types';
 import { childFolders, depthOf, filesIn, pathOf, subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { afterBack, goUp, openFolder, replace } from '../../lib/router';
-import { fileKind, KIND_LABEL } from '../../lib/files';
+import { DOCUMENT_ACCEPT, fileKind, KIND_LABEL } from '../../lib/files';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { SearchBox } from '../../components/SearchBox';
@@ -202,6 +202,7 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
       <input
         ref={fileInput}
         type="file"
+        accept={DOCUMENT_ACCEPT}
         multiple
         hidden
         onChange={(e) => {
