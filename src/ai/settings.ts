@@ -1,42 +1,35 @@
 import { useEffect, useState } from 'react';
 
-// Der Gemini-Schlüssel bleibt nur auf diesem Gerät (localStorage) und geht nur direkt an Google.
-const KEY = 'lernapp/gemini-key';
-const MODEL = 'lernapp/gemini-model';
+export type ModelKey = 'mini' | 'standard' | 'stark';
+
+const KEY = 'lernapp/ai-model';
 const EVENT = 'lernapp:ai-settings';
 
-const read = (k: string) => {
+export function getModelKey(): ModelKey {
   try {
-    return localStorage.getItem(k) ?? '';
+    const v = localStorage.getItem(KEY);
+    if (v === 'mini' || v === 'standard' || v === 'stark') return v;
   } catch {
-    return '';
+    /* egal */
   }
-};
-const store = (k: string, v: string) => {
+  return 'standard';
+}
+
+export function setModelKey(v: ModelKey) {
   try {
-    if (v) localStorage.setItem(k, v);
-    else localStorage.removeItem(k);
+    localStorage.setItem(KEY, v);
   } catch {
-    /* privates Surfen o. ä. */
+    /* egal */
   }
   window.dispatchEvent(new Event(EVENT));
-};
+}
 
-export const getApiKey = () => read(KEY);
-export const setApiKey = (v: string) => store(KEY, v.trim());
-export const getModel = () => read(MODEL);
-export const setModel = (v: string) => store(MODEL, v);
-
-export function useAiSettings() {
-  const [state, setState] = useState(() => ({ apiKey: getApiKey(), model: getModel() }));
+export function useModelKey(): ModelKey {
+  const [k, setK] = useState(getModelKey);
   useEffect(() => {
-    const on = () => setState({ apiKey: getApiKey(), model: getModel() });
+    const on = () => setK(getModelKey());
     window.addEventListener(EVENT, on);
-    window.addEventListener('storage', on);
-    return () => {
-      window.removeEventListener(EVENT, on);
-      window.removeEventListener('storage', on);
-    };
+    return () => window.removeEventListener(EVENT, on);
   }, []);
-  return state;
+  return k;
 }

@@ -115,7 +115,7 @@ export function SettingsView() {
         {persisted && <p className="muted small">✓ Daten sind als dauerhaft markiert.</p>}
       </div>
 
-      <h3 className="section-title">KI (Google Gemini)</h3>
+      <h3 className="section-title">KI</h3>
       <AiSettings />
 
       <h3 className="section-title">Backup</h3>
@@ -153,7 +153,7 @@ export function SettingsView() {
         </button>
       </div>
 
-      <p className="muted small center-text">Lernapp · Version 0.9</p>
+      <p className="muted small center-text">Lernapp · Version 0.10</p>
 
       {pendingImport && (
         <Sheet title="Backup importieren" onClose={() => setPendingImport(null)}>
