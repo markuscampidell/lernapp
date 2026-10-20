@@ -4,7 +4,7 @@ import { MAX_DEPTH } from '../../domain/types';
 import { childFolders, depthOf, filesIn, pathOf, subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { afterBack, goUp, openFolder, replace } from '../../lib/router';
-import { DOCUMENT_ACCEPT, fileKind, KIND_LABEL } from '../../lib/files';
+import { DOCUMENT_ACCEPT, fileKind, isTouchDevice, KIND_LABEL, MEDIA_ACCEPT } from '../../lib/files';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { SearchBox } from '../../components/SearchBox';
@@ -75,7 +75,14 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
     return { folders: fs, files: fi };
   }, [query, folders, files, folder]);
 
-  const pickFiles = () => fileInput.current?.click();
+  // Ein Eingabefeld für beide Knöpfe; nur der erlaubte Dateityp wechselt.
+  const pickFiles = (accept: string | undefined = DOCUMENT_ACCEPT) => {
+    const el = fileInput.current;
+    if (!el) return;
+    if (accept) el.accept = accept;
+    else el.removeAttribute('accept');
+    el.click();
+  };
 
   return (
     <section className="view">
@@ -106,9 +113,14 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
             </div>
           </header>
           <div className="action-row">
-            <button className="btn primary" onClick={pickFiles}>
+            <button className="btn primary" onClick={() => pickFiles()}>
               <Icon name="upload" size={18} /> Dateien
             </button>
+            {isTouchDevice && (
+              <button className="btn ghost" onClick={() => pickFiles(MEDIA_ACCEPT)}>
+                <Icon name="image" size={18} /> Fotos
+              </button>
+            )}
             <button className="btn ghost" onClick={() => setSheet('newFolder')} disabled={!canSub} title={canSub ? undefined : 'Maximale Tiefe erreicht'}>
               <Icon name="folderPlus" size={18} /> Unterordner
             </button>
@@ -202,7 +214,6 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
       <input
         ref={fileInput}
         type="file"
-        accept={DOCUMENT_ACCEPT}
         multiple
         hidden
         onChange={(e) => {
@@ -224,7 +235,7 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
       )}
       {sheet === 'note' && folder && <NoteSheet folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'add' && folder && (
-        <AddFilesSheet folder={folder} items={staged} onChange={setStaged} onMore={pickFiles} onClose={() => setSheet(null)} />
+        <AddFilesSheet folder={folder} items={staged} onChange={setStaged} onMore={() => pickFiles()} onClose={() => setSheet(null)} />
       )}
       {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}
     </section>
