@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLibrary } from '../../state/Library';
 import { Sheet } from '../../components/Sheet';
+import { TextLine } from '../../components/TextLine';
 
 /** Schnell eine Textnotiz als .txt-Datei im Ordner anlegen. */
 export function NoteSheet({ folderId, onClose }: { folderId: string; onClose: () => void }) {
@@ -32,14 +33,14 @@ export function NoteSheet({ folderId, onClose }: { folderId: string; onClose: ()
         <div className="field-label">
           <span>Name</span>
         </div>
-        <input autoFocus autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Zusammenfassung Kapitel 2" />
+        <TextLine autoFocus value={name} onChange={setName} placeholder="z. B. Zusammenfassung Kapitel 2" enterKeyHint="next" />
       </div>
       <div className="field">
         <div className="field-label">
           <span>Beschreibung</span>
           <span className="muted small">optional</span>
         </div>
-        <input autoComplete="off" value={description} onChange={(e) => setDescription(e.target.value)} />
+        <TextLine value={description} onChange={setDescription} enterKeyHint="next" />
       </div>
       <div className="field">
         <div className="field-label">

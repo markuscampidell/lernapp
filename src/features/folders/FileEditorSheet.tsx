@@ -4,6 +4,7 @@ import { pathOf } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { Sheet } from '../../components/Sheet';
 import { Icon } from '../../components/Icon';
+import { TextLine } from '../../components/TextLine';
 import { FolderPicker } from '../../components/FolderPicker';
 
 export function FileEditorSheet({ file, onClose }: { file: FileItem; onClose: () => void }) {
@@ -47,7 +48,7 @@ export function FileEditorSheet({ file, onClose }: { file: FileItem; onClose: ()
             <span>Name</span>
           </div>
           <div className="input-row">
-            <input autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
+            <TextLine value={name} onChange={setName} maxLength={200} enterKeyHint="done" onEnter={() => name.trim() && save()} />
             {file.ext && <span className="unit">.{file.ext}</span>}
           </div>
         </div>

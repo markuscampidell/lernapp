@@ -5,6 +5,7 @@ import { useLibrary } from '../../state/Library';
 import { useBlobUrl } from '../../hooks/useBlobUrl';
 import { Sheet } from '../../components/Sheet';
 import { Icon } from '../../components/Icon';
+import { TextLine } from '../../components/TextLine';
 import { FolderPicker } from '../../components/FolderPicker';
 
 interface Props {
@@ -98,12 +99,12 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
           <div className="field-label">
             <span>Name</span>
           </div>
-          <input
-            autoComplete="off"
+          <TextLine
             autoFocus={!folder}
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && name.trim() && save()}
+            onChange={setName}
+            enterKeyHint="done"
+            onEnter={() => name.trim() && save()}
             placeholder={isSub ? 'z. B. Kapitel 3' : 'z. B. Analysis 1'}
             maxLength={120}
           />

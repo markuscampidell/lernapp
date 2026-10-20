@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './Icon';
+import { TextLine } from './TextLine';
 import { kindIcon } from './Thumbs';
 import { formatSize, kindOf, KIND_LABEL, splitName } from '../lib/files';
 
@@ -31,12 +32,14 @@ export function FileStager({ items, onChange, disabled }: { items: StagedFile[];
               <StagedThumb file={it.file} icon={kindIcon(kind)} isImage={kind === 'image'} />
               <div className="staged-name">
                 <div className="input-row">
-                  <input
+                  <TextLine
                     aria-label="Dateiname"
                     value={it.name}
                     disabled={disabled}
-                    onChange={(e) => patch(it.key, { name: e.target.value })}
+                    onChange={(v) => patch(it.key, { name: v })}
                     placeholder="Name"
+                    enterKeyHint="done"
+                    onEnter={() => (document.activeElement as HTMLElement | null)?.blur()}
                   />
                   {ext && <span className="unit">.{ext}</span>}
                 </div>
