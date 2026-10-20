@@ -1173,3 +1173,95 @@ textarea.text-line::-webkit-scrollbar {
 .staged-name textarea.text-line {
   padding: 7px 10px !important;
 }
+
+/* ---------- Einträge mit Löschen-Knopf & Auswahl ---------- */
+.item-card {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+.item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 6px 10px 10px;
+  text-align: left;
+  border-radius: var(--radius);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.item-card.selecting .item-main {
+  padding-right: 14px;
+}
+.item-main:active {
+  transform: scale(0.995);
+}
+.item-delete {
+  margin-right: 6px;
+  color: var(--text-3);
+}
+.item-delete:hover {
+  color: var(--critical);
+  background: var(--critical-bg);
+}
+.item-card.selected {
+  border-color: var(--accent);
+}
+.tick {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+}
+.tick.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.select-bar {
+  /* Schwebt über der Seite, damit sich die Liste beim Einblenden nicht verschiebt. */
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  max-width: 736px;
+  margin: 0 auto;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  animation: fade 0.15s ease-out;
+}
+.btn.danger-fill {
+  background: var(--critical);
+  color: #fff;
+}
+
+@media (min-width: 900px) {
+  .select-bar {
+    left: 240px;
+    right: 20px;
+  }
+}
+.item-action {
+  color: var(--text-3);
+}
+.item-action + .item-delete {
+  margin-left: -6px;
+}
+.danger-icon {
+  color: var(--critical);
+}

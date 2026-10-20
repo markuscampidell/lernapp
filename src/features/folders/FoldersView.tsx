@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FileItem, Folder } from '../../domain/types';
 import { MAX_DEPTH } from '../../domain/types';
-import { childFolders, depthOf, filesIn, pathOf, subtreeIds } from '../../domain/tree';
+import { canMoveFolder, childFolders, depthOf, filesIn, pathOf, subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
-import { afterBack, goUp, openFolder, replace } from '../../lib/router';
-import { DOCUMENT_ACCEPT, fileKind, KIND_LABEL } from '../../lib/files';
+import { afterBack, goUp, openFolder, replace, useBackToClose } from '../../lib/router';
+import { DOCUMENT_ACCEPT, fileKind, fullName, isTouchDevice, KIND_LABEL } from '../../lib/files';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { SearchBox } from '../../components/SearchBox';
 import { FolderThumb } from '../../components/Thumbs';
 import { FileStager, stage, type StagedFile } from '../../components/FileStager';
 import { Sheet } from '../../components/Sheet';
+import { FolderPicker } from '../../components/FolderPicker';
 import { FileCard, FolderCard } from './Cards';
 import { FolderEditorSheet } from './FolderEditorSheet';
 import { FileViewer } from './FileViewer';
@@ -36,8 +37,18 @@ export function FoldersView({ folderId }: { folderId: string | null }) {
   return <FolderPage key={folderId ?? 'root'} folder={folder ?? null} folders={folders} files={files} />;
 }
 
+interface Selection {
+  folders: Set<string>;
+  files: Set<string>;
+}
+
 function FolderPage({ folder, folders, files }: { folder: Folder | null; folders: Folder[]; files: FileItem[] }) {
+  const { deleteMany, moveMany } = useLibrary();
+  // Was gerade verschoben wird (öffnet die Ordnerauswahl).
+  const [moving, setMoving] = useState<{ folders: string[]; files: string[]; fromSelection: boolean } | null>(null);
   const [query, setQuery] = useState('');
+  // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
+  const [sel, setSel] = useState<Selection | null>(null);
   const [sheet, setSheet] = useState<'newFolder' | 'edit' | 'note' | 'add' | null>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
   const [staged, setStaged] = useState<StagedFile[]>([]);
@@ -75,6 +86,50 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
     return { folders: fs, files: fi };
   }, [query, folders, files, folder]);
 
+  // Aktuell sichtbare Einträge (für "Alle auswählen").
+  const visibleFolders = results ? results.folders.map((r) => r.f) : subfolders;
+  const visibleFiles = results ? results.files.map((r) => r.f) : ownFiles;
+
+  /** Fragt nach und löscht. Nennt mitgelöschte Unterordner/Dateien. */
+  const confirmAndDelete = async (folderIds: string[], fileIds: string[]) => {
+    const inFolders = new Set<string>();
+    folderIds.forEach((fid) => subtreeIds(folders, fid).forEach((x) => inFolders.add(x)));
+    const fileSet = new Set(fileIds);
+    const totalFiles = files.filter((f) => fileSet.has(f.id) || inFolders.has(f.folderId)).length;
+    const subCount = inFolders.size - folderIds.length;
+    let msg: string;
+    if (folderIds.length + fileIds.length === 1) {
+      const name = folderIds.length ? folders.find((f) => f.id === folderIds[0])?.name : fullName(files.find((f) => f.id === fileIds[0])!);
+      msg = `„${name}“ löschen?`;
+    } else {
+      const parts = [folderIds.length && `${folderIds.length} Ordner`, fileIds.length && `${fileIds.length} Datei${fileIds.length === 1 ? '' : 'en'}`].filter(Boolean);
+      msg = `${parts.join(' und ')} löschen?`;
+    }
+    const extraFiles = totalFiles - fileIds.length;
+    const extra = [subCount > 0 && `${subCount} Unterordner`, extraFiles > 0 && `${extraFiles} Datei${extraFiles === 1 ? '' : 'en'}`].filter(Boolean);
+    if (extra.length) msg += ` Darin enthalten sind ${extra.join(' und ')}, die ebenfalls gelöscht werden.`;
+    if (!confirm(msg)) return false;
+    await deleteMany(folderIds, fileIds);
+    return true;
+  };
+
+  const toggle = (kind: 'folders' | 'files', itemId: string) =>
+    setSel((prev) => {
+      const next: Selection = { folders: new Set(prev?.folders), files: new Set(prev?.files) };
+      if (next[kind].has(itemId)) next[kind].delete(itemId);
+      else next[kind].add(itemId);
+      return next.folders.size + next.files.size === 0 ? null : next;
+    });
+
+  const itemProps = (kind: 'folders' | 'files', itemId: string, open: () => void) => ({
+    selecting: !!sel,
+    selected: !!sel?.[kind].has(itemId),
+    onClick: sel ? () => toggle(kind, itemId) : open,
+    onLongPress: isTouchDevice ? () => toggle(kind, itemId) : undefined,
+    onDelete: () => confirmAndDelete(kind === 'folders' ? [itemId] : [], kind === 'files' ? [itemId] : []),
+    onMove: () => setMoving({ folders: kind === 'folders' ? [itemId] : [], files: kind === 'files' ? [itemId] : [], fromSelection: false }),
+  });
+
   // Ein Eingabefeld für beide Knöpfe; nur der erlaubte Dateityp wechselt.
   const pickFiles = (accept: string | undefined = DOCUMENT_ACCEPT) => {
     const el = fileInput.current;
@@ -86,6 +141,20 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
 
   return (
     <section className="view">
+      {sel && (
+        <SelectionBar
+          count={sel.folders.size + sel.files.size}
+          allSelected={visibleFolders.every((f) => sel.folders.has(f.id)) && visibleFiles.every((f) => sel.files.has(f.id))}
+          onAll={(all) =>
+            setSel(all ? { folders: new Set(visibleFolders.map((f) => f.id)), files: new Set(visibleFiles.map((f) => f.id)) } : null)
+          }
+          onDelete={async () => {
+            if (await confirmAndDelete([...sel.folders], [...sel.files])) setSel(null);
+          }}
+          onMove={() => setMoving({ folders: [...sel.folders], files: [...sel.files], fromSelection: true })}
+          onClose={() => setSel(null)}
+        />
+      )}
       {folder ? (
         <>
           <div className="folder-top">
@@ -149,7 +218,7 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
                 <ul className="list">
                   {results.folders.map(({ f, path }) => (
                     <li key={f.id}>
-                      <FolderCard folder={f} path={path || undefined} onClick={() => openFolder(f.id)} />
+                      <FolderCard folder={f} path={path || undefined} {...itemProps('folders', f.id, () => openFolder(f.id))} />
                     </li>
                   ))}
                 </ul>
@@ -161,7 +230,7 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
                 <ul className="list">
                   {results.files.map(({ f, path }) => (
                     <li key={f.id}>
-                      <FileCard file={f} path={path || undefined} onClick={() => setViewing(f)} />
+                      <FileCard file={f} path={path || undefined} {...itemProps('files', f.id, () => setViewing(f))} />
                     </li>
                   ))}
                 </ul>
@@ -185,7 +254,7 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
               <ul className="list">
                 {subfolders.map((f) => (
                   <li key={f.id}>
-                    <FolderCard folder={f} onClick={() => openFolder(f.id)} />
+                    <FolderCard folder={f} {...itemProps('folders', f.id, () => openFolder(f.id))} />
                   </li>
                 ))}
               </ul>
@@ -197,7 +266,7 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
               <ul className="list">
                 {ownFiles.map((f) => (
                   <li key={f.id}>
-                    <FileCard file={f} onClick={() => setViewing(f)} />
+                    <FileCard file={f} {...itemProps('files', f.id, () => setViewing(f))} />
                   </li>
                 ))}
               </ul>
@@ -231,6 +300,29 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
       {sheet === 'note' && folder && <NoteSheet folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'add' && folder && (
         <AddFilesSheet folder={folder} items={staged} onChange={setStaged} onMore={() => pickFiles()} onClose={() => setSheet(null)} />
+      )}
+      {moving && (
+        <FolderPicker
+          title={`${moving.folders.length + moving.files.length === 1 ? '' : `${moving.folders.length + moving.files.length} Einträge `}verschieben nach`}
+          startId={id}
+          allowRoot={moving.files.length === 0}
+          isDisabled={(target) =>
+            (target === null && moving.files.length > 0) ||
+            moving.folders.some((fid) => !canMoveFolder(folders, fid, target))
+          }
+          confirmLabel={(f) => (f ? `Nach „${f.name}“ verschieben` : 'Auf oberste Ebene verschieben')}
+          onPick={async (target) => {
+            const m = moving;
+            setMoving(null);
+            try {
+              await moveMany(m.folders, m.files, target);
+              if (m.fromSelection) setSel(null);
+            } catch (e) {
+              alert(e instanceof Error ? e.message : 'Verschieben fehlgeschlagen.');
+            }
+          }}
+          onClose={() => setMoving(null)}
+        />
       )}
       {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}
     </section>
@@ -295,5 +387,41 @@ function AddFilesSheet({
       <FileStager items={items} onChange={onChange} disabled={busy} />
       {err && <p className="notice critical">{err}</p>}
     </Sheet>
+  );
+}
+
+function SelectionBar({
+  count,
+  allSelected,
+  onAll,
+  onDelete,
+  onMove,
+  onClose,
+}: {
+  count: number;
+  allSelected: boolean;
+  onAll: (all: boolean) => void;
+  onDelete: () => void;
+  onMove: () => void;
+  onClose: () => void;
+}) {
+  // Zurück-Taste beendet den Auswahlmodus.
+  useBackToClose(onClose);
+  return (
+    <div className="select-bar" role="toolbar" aria-label="Auswahl">
+      <button className="icon-btn" aria-label="Auswahl beenden" onClick={onClose}>
+        <Icon name="close" />
+      </button>
+      <strong className="grow">{count} ausgewählt</strong>
+      <button className="btn ghost small" onClick={() => onAll(!allSelected)}>
+        {allSelected ? 'Keine' : 'Alle'}
+      </button>
+      <button className="icon-btn" aria-label="Verschieben" title="Verschieben" onClick={onMove}>
+        <Icon name="move" />
+      </button>
+      <button className="icon-btn danger-icon" aria-label="Löschen" title="Löschen" onClick={onDelete}>
+        <Icon name="trash" />
+      </button>
+    </div>
   );
 }

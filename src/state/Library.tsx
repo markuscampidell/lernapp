@@ -33,6 +33,10 @@ interface LibraryValue {
   addFiles: (folderId: string, items: NewFileInput[], onProgress?: (done: number) => void) => Promise<void>;
   updateFile: (file: FileItem, patch: Partial<Pick<FileItem, 'name' | 'description' | 'folderId'>>) => Promise<void>;
   deleteFile: (id: string) => Promise<void>;
+  /** Mehrere Ordner (samt Inhalt) und Dateien in einem Schritt löschen. */
+  deleteMany: (folderIds: string[], fileIds: string[]) => Promise<void>;
+  /** Ordner und Dateien in einen anderen Ordner verschieben (null = oberste Ebene, nur für Ordner). */
+  moveMany: (folderIds: string[], fileIds: string[], targetId: string | null) => Promise<void>;
   reload: () => Promise<void>;
 }
 
@@ -193,9 +197,55 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [files],
   );
 
+  const deleteMany = useCallback<LibraryValue['deleteMany']>(
+    async (folderIds, fileIds) => {
+      const goneFolderIds = new Set<string>();
+      folderIds.forEach((id) => subtreeIds(folders, id).forEach((x) => goneFolderIds.add(x)));
+      const fileIdSet = new Set(fileIds);
+      const goneFolders = folders.filter((f) => goneFolderIds.has(f.id));
+      const goneFiles = files.filter((f) => fileIdSet.has(f.id) || goneFolderIds.has(f.folderId));
+      const goneFileIds = new Set(goneFiles.map((f) => f.id));
+      await write(['folders', 'files', 'blobs'], (s) => {
+        goneFolders.forEach((f) => {
+          s.folders.delete(f.id);
+          if (f.imageId) s.blobs.delete(f.imageId);
+        });
+        goneFiles.forEach((f) => {
+          s.files.delete(f.id);
+          s.blobs.delete(f.blobId);
+          if (f.thumbId) s.blobs.delete(f.thumbId);
+        });
+      });
+      setFolders((prev) => prev.filter((f) => !goneFolderIds.has(f.id)));
+      setFiles((prev) => prev.filter((f) => !goneFileIds.has(f.id)));
+    },
+    [folders, files],
+  );
+
+  const moveMany = useCallback<LibraryValue['moveMany']>(
+    async (folderIds, fileIds, targetId) => {
+      if (targetId === null && fileIds.length) throw new Error('Dateien können nur in Ordnern liegen.');
+      for (const id of folderIds) {
+        if (!canMoveFolder(folders, id, targetId)) throw new Error('Ein Ordner kann dorthin nicht verschoben werden (zu tief verschachtelt oder in sich selbst).');
+      }
+      const t = now();
+      const movedFolders = folders.filter((f) => folderIds.includes(f.id)).map((f) => ({ ...f, parentId: targetId, updatedAt: t }));
+      const movedFiles = targetId ? files.filter((f) => fileIds.includes(f.id)).map((f) => ({ ...f, folderId: targetId, updatedAt: t })) : [];
+      await write(['folders', 'files'], (s) => {
+        movedFolders.forEach((f) => s.folders.put(f));
+        movedFiles.forEach((f) => s.files.put(f));
+      });
+      const fm = new Map(movedFolders.map((f) => [f.id, f]));
+      const im = new Map(movedFiles.map((f) => [f.id, f]));
+      setFolders((prev) => prev.map((f) => fm.get(f.id) ?? f));
+      setFiles((prev) => prev.map((f) => im.get(f.id) ?? f));
+    },
+    [folders, files],
+  );
+
   const value = useMemo<LibraryValue>(
-    () => ({ ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, reload }),
-    [ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, reload],
+    () => ({ ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, deleteMany, moveMany, reload }),
+    [ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, deleteMany, moveMany, reload],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
