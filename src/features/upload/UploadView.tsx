@@ -4,7 +4,7 @@ import { useLibrary } from '../../state/Library';
 import { db } from '../../storage/db';
 import { openFolder } from '../../lib/router';
 import { Icon } from '../../components/Icon';
-import { DOCUMENT_ACCEPT, isTouchDevice, MEDIA_ACCEPT } from '../../lib/files';
+import { DOCUMENT_ACCEPT, isTouchDevice } from '../../lib/files';
 import { FileStager, stage, type StagedFile } from '../../components/FileStager';
 import { FolderPicker } from '../../components/FolderPicker';
 import { FolderThumb } from '../../components/Thumbs';
@@ -29,7 +29,7 @@ export function UploadView() {
   const [drag, setDrag] = useState(false);
   const pickInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
-  const mediaInput = useRef<HTMLInputElement>(null);
+  const videoInput = useRef<HTMLInputElement>(null);
 
   const folder = target ? folders.find((f) => f.id === target) : undefined;
   const busy = done !== null;
@@ -111,17 +111,15 @@ export function UploadView() {
           <button className="btn primary" onClick={() => pickInput.current?.click()} disabled={busy}>
             <Icon name="file" size={18} /> {isTouchDevice ? 'Dateien' : 'Dateien auswählen'}
           </button>
-          {isTouchDevice && (
-            <button className="btn ghost" onClick={() => mediaInput.current?.click()} disabled={busy}>
-              <Icon name="image" size={18} /> Fotos & Videos
-            </button>
-          )}
           <button className="btn ghost" onClick={() => cameraInput.current?.click()} disabled={busy}>
             <Icon name="camera" size={18} /> Foto aufnehmen
           </button>
+          <button className="btn ghost" onClick={() => videoInput.current?.click()} disabled={busy}>
+            <Icon name="video" size={18} /> Video aufnehmen
+          </button>
         </div>
         <input ref={pickInput} type="file" multiple accept={DOCUMENT_ACCEPT} hidden onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
-        <input ref={mediaInput} type="file" multiple accept={MEDIA_ACCEPT} hidden onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
+        <input ref={videoInput} type="file" accept="video/*" capture="environment" hidden onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
         <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
       </div>
 

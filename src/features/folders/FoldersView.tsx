@@ -4,7 +4,7 @@ import { MAX_DEPTH } from '../../domain/types';
 import { childFolders, depthOf, filesIn, pathOf, subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { afterBack, goUp, openFolder, replace } from '../../lib/router';
-import { DOCUMENT_ACCEPT, fileKind, isTouchDevice, KIND_LABEL, MEDIA_ACCEPT } from '../../lib/files';
+import { DOCUMENT_ACCEPT, fileKind, KIND_LABEL } from '../../lib/files';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { SearchBox } from '../../components/SearchBox';
@@ -116,11 +116,6 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
             <button className="btn primary" onClick={() => pickFiles()}>
               <Icon name="upload" size={18} /> Dateien
             </button>
-            {isTouchDevice && (
-              <button className="btn ghost" onClick={() => pickFiles(MEDIA_ACCEPT)}>
-                <Icon name="image" size={18} /> Fotos
-              </button>
-            )}
             <button className="btn ghost" onClick={() => setSheet('newFolder')} disabled={!canSub} title={canSub ? undefined : 'Maximale Tiefe erreicht'}>
               <Icon name="folderPlus" size={18} /> Unterordner
             </button>

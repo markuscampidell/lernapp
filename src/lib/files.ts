@@ -117,7 +117,7 @@ export const isTouchDevice = typeof window !== 'undefined' && window.matchMedia(
 /**
  * Chrome auf Android zeigt bei <input type="file"> ohne `accept` (oder sobald Bild-/Video-/Audio-Typen
  * erlaubt sind) nur "Kamera" und "Fotos und Videos". Nur mit reinen Dokument-Typen öffnet es direkt den
- * Dateimanager (Downloads, Google Drive usw.). Fotos/Videos gibt es deshalb über einen eigenen Knopf.
+ * Dateimanager (Downloads, Google Drive usw.).
  * Am PC bleibt `accept` leer, damit alle Dateien wählbar sind.
  */
 export const DOCUMENT_ACCEPT = isAndroid
@@ -140,6 +140,3 @@ export const DOCUMENT_ACCEPT = isAndroid
       'application/octet-stream',
     ].join(',')
   : undefined;
-
-/** Nur Fotos und Videos (öffnet auf Handys die Galerie). */
-export const MEDIA_ACCEPT = 'image/*,video/*';
