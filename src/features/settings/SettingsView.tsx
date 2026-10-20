@@ -5,6 +5,7 @@ import { exportBackup, importBackup } from '../../storage/backup';
 import { downloadBlob, formatSize } from '../../lib/files';
 import { Icon } from '../../components/Icon';
 import { Sheet } from '../../components/Sheet';
+import { AiSettings } from './AiSettings';
 
 export function SettingsView() {
   const { folders, files, reload } = useLibrary();
@@ -114,6 +115,9 @@ export function SettingsView() {
         {persisted && <p className="muted small">✓ Daten sind als dauerhaft markiert.</p>}
       </div>
 
+      <h3 className="section-title">KI (Google Gemini)</h3>
+      <AiSettings />
+
       <h3 className="section-title">Backup</h3>
       <div className="card stack">
         <p className="muted small">
@@ -149,7 +153,7 @@ export function SettingsView() {
         </button>
       </div>
 
-      <p className="muted small center-text">Lernapp · Version 0.8</p>
+      <p className="muted small center-text">Lernapp · Version 0.9</p>
 
       {pendingImport && (
         <Sheet title="Backup importieren" onClose={() => setPendingImport(null)}>

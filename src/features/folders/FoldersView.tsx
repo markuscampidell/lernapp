@@ -3,7 +3,7 @@ import type { FileItem, Folder } from '../../domain/types';
 import { MAX_DEPTH } from '../../domain/types';
 import { canMoveFolder, childFolders, depthOf, filesIn, pathOf, subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
-import { afterBack, goUp, openFolder, replace, useBackToClose } from '../../lib/router';
+import { afterBack, goUp, navigate, openFolder, replace, useBackToClose } from '../../lib/router';
 import { DOCUMENT_ACCEPT, fileKind, fullName, isTouchDevice, KIND_LABEL } from '../../lib/files';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
@@ -190,6 +190,9 @@ function FolderPage({ folder, folders, files }: { folder: Folder | null; folders
             </button>
             <button className="btn ghost" onClick={() => setSheet('note')}>
               <Icon name="text" size={18} /> Notiz
+            </button>
+            <button className="btn ghost" onClick={() => navigate(`#ki/${encodeURIComponent(folder.id)}`)}>
+              <Icon name="ai" size={18} /> KI fragen
             </button>
           </div>
           {!canSub && <p className="muted small">Maximale Ordnertiefe ({MAX_DEPTH} Ebenen) erreicht – hier sind keine weiteren Unterordner möglich.</p>}

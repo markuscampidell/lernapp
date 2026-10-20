@@ -80,7 +80,7 @@ export function App() {
           <ErrorBoundary>
             {tab === 'ordner' && <FoldersView folderId={route.folderId} />}
             {tab === 'hochladen' && <UploadView />}
-            {tab === 'ki' && <AiView />}
+            {tab === 'ki' && <AiView initialFolderId={route.folderId} />}
             {tab === 'einstellungen' && <SettingsView />}
           </ErrorBoundary>
         )}
