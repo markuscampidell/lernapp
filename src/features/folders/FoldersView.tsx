@@ -26,7 +26,11 @@ export function FoldersView({ folderId }: { folderId: string | null }) {
   useEffect(() => {
     if (folderId && !folder) replace('#ordner');
   }, [folderId, folder]);
-  useEffect(() => window.scrollTo({ top: 0 }), [folderId]);
+  // Geschweifte Klammern sind wichtig: Neuere Browser geben bei scrollTo ein Promise zurück,
+  // das React sonst als Aufräumfunktion aufrufen würde (-> Absturz beim Tabwechsel).
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [folderId]);
 
   if (folderId && !folder) return null;
   return <FolderPage key={folderId ?? 'root'} folder={folder ?? null} folders={folders} files={files} />;

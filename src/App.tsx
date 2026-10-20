@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Icon, type IconName } from './components/Icon';
 import { InstallBanner } from './components/InstallBanner';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { FoldersView } from './features/folders/FoldersView';
 import { UploadView } from './features/upload/UploadView';
 import { AiView } from './features/ai/AiView';
@@ -76,12 +77,12 @@ export function App() {
         {!ready ? (
           <p className="muted">Lädt …</p>
         ) : (
-          <>
+          <ErrorBoundary>
             {tab === 'ordner' && <FoldersView folderId={route.folderId} />}
             {tab === 'hochladen' && <UploadView />}
             {tab === 'ki' && <AiView />}
             {tab === 'einstellungen' && <SettingsView />}
-          </>
+          </ErrorBoundary>
         )}
       </main>
     </div>
