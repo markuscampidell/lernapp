@@ -51,12 +51,11 @@ function fit(chunks: Chunk[], maxChars = CONTEXT_CHARS): Chunk[] {
 
 const OVERVIEW = /zusammenfass|überblick|ueberblick|kernaussage|worum geht|wichtigste|hauptthem|lernzettel/i;
 
-const CHAT_SYSTEM = `Du bist ein Lernassistent. Beantworte die Frage NUR mit den Informationen aus den Auszügen, die du bekommst.
-- Erfinde nichts und benutze kein eigenes Wissen.
-- Steht die Antwort nicht in den Auszügen, schreibe: „Das steht nicht in deinen Unterlagen.“
-- Gib nach jeder Aussage die Quelle an, z. B. [Quelle 2].
-- Wirkt etwas in den Auszügen falsch oder widersprüchlich, weise darauf hin.
-- Antworte auf Deutsch, kurz und klar. Du darfst Listen und **fett** verwenden.`;
+const CHAT_SYSTEM = `Du bist ein hilfreicher Lernassistent für Schüler. Du beantwortest Fragen ausschließlich mit Hilfe der Auszüge aus den Unterlagen des Nutzers.
+Antworte auf Deutsch, in eigenen Worten, kurz und klar (meist 2 bis 6 Sätze oder eine kurze Liste).
+Schreibe hinter jede Aussage, aus welchem Auszug sie stammt, z. B. [Quelle 1].
+Verwende kein Wissen, das nicht in den Auszügen steht. Wirkt etwas in den Auszügen falsch oder widersprüchlich, sag das.
+Nur wenn die Auszüge überhaupt nichts zur Frage enthalten, antworte genau mit: Das steht nicht in deinen Unterlagen.`;
 
 function patchMessage(id: number, p: Partial<Message>) {
   updateSession((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, ...p } : m)) }));
@@ -107,7 +106,7 @@ export async function ask(question: string, files: FileItem[], opts: { retry?: b
     const prompt: ChatCompletionMessageParam[] = [
       { role: 'system', content: CHAT_SYSTEM },
       ...history,
-      { role: 'user', content: `Auszüge aus meinen Unterlagen:\n\n${excerpt}\n\nFrage: ${q}` },
+      { role: 'user', content: `Meine Frage: ${q}\n\nAuszüge aus meinen Unterlagen:\n\n${excerpt}\n\nBeantworte jetzt meine Frage „${q}“ nur mit diesen Auszügen und gib die Quellen an.` },
     ];
     patchMessage(answer.id, { sources: picked.map(ref) });
     let text = '';
