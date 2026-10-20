@@ -201,7 +201,7 @@ export async function* chatStream(messages: ChatCompletionMessageParam[], maxTok
 }
 
 /** Erzeugt JSON nach einem Schema (eingeschränkte Ausgabe, damit auch kleine Modelle gültiges JSON liefern). */
-export async function generateJson<T>(messages: ChatCompletionMessageParam[], schema: object, maxTokens = 600): Promise<T | null> {
+export async function generateJson<T>(messages: ChatCompletionMessageParam[], schema: object, temperature = 0.5, maxTokens = 600): Promise<T | null> {
   const e = await ensureEngine();
   const parse = (txt: string | null | undefined): T | null => {
     if (!txt) return null;
@@ -216,7 +216,7 @@ export async function generateJson<T>(messages: ChatCompletionMessageParam[], sc
   try {
     const r = await e.chat.completions.create({
       messages,
-      temperature: 0.5,
+      temperature,
       max_tokens: maxTokens,
       response_format: { type: 'json_object', schema: JSON.stringify(schema) },
       extra_body: { enable_thinking: false },
@@ -226,6 +226,6 @@ export async function generateJson<T>(messages: ChatCompletionMessageParam[], sc
   } catch (err) {
     console.warn('JSON-Modus fehlgeschlagen, versuche ohne', err);
   }
-  const r = await e.chat.completions.create({ messages, temperature: 0.5, max_tokens: maxTokens, extra_body: { enable_thinking: false } });
+  const r = await e.chat.completions.create({ messages, temperature, max_tokens: maxTokens, extra_body: { enable_thinking: false } });
   return parse(r.choices[0]?.message?.content);
 }

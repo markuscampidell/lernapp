@@ -159,15 +159,25 @@ function shuffle<T>(a: T[]): T[] {
 }
 
 /** Abschnitte für das Quiz: gleichmäßig über die Dateien, zufällig, nicht zu kurz. */
-function pickQuizChunks(chunks: Chunk[], n: number): Chunk[] {
+function pickQuizChunks(chunks: Chunk[], n: number): { c: Chunk; focus?: string }[] {
   const byFile = new Map<string, Chunk[]>();
   for (const c of chunks) if (c.text.length >= 200) byFile.set(c.fileId, [...(byFile.get(c.fileId) ?? []), c]);
   // Notfalls auch kürzere Abschnitte
   if (byFile.size === 0) for (const c of chunks) if (c.text.length >= 60) byFile.set(c.fileId, [...(byFile.get(c.fileId) ?? []), c]);
   const lists = shuffle([...byFile.values()].map((l) => shuffle(l)));
-  const out: Chunk[] = [];
-  // doppelt so viele Kandidaten wie nötig, falls eine Frage misslingt
-  for (let round = 0; out.length < n * 2 && lists.some((l) => l.length > round); round++) for (const l of lists) if (l[round]) out.push(l[round]);
+  const base: Chunk[] = [];
+  for (let round = 0; base.length < n * 2 && lists.some((l) => l.length > round); round++) for (const l of lists) if (l[round]) base.push(l[round]);
+  const out: { c: Chunk; focus?: string }[] = base.map((c) => ({ c }));
+  // Wenig Text: dieselben Abschnitte erneut verwenden, aber mit Fokus auf einen anderen Satz –
+  // so entstehen unterschiedliche Fragen statt Wiederholungen.
+  const sentences = new Map(base.map((c) => [c, shuffle(c.text.split(/(?<=[.!?])\s+|\n+/).filter((x) => x.trim().length >= 40))]));
+  for (let pass = 0; base.length && out.length < n * 2 && pass < 20; pass++) {
+    for (const c of base) {
+      const list = sentences.get(c)!;
+      if (pass < list.length && out.length < n * 2) out.push({ c, focus: list[pass].trim() });
+    }
+    if (base.every((c) => pass >= sentences.get(c)!.length)) break;
+  }
   return out;
 }
 
@@ -200,7 +210,7 @@ export async function runQuiz(count: number, files: FileItem[]) {
     await ensureEngine();
 
     const made: string[] = [];
-    for (const c of candidates) {
+    for (const { c, focus } of candidates) {
       const quiz = getSession().quiz;
       if (cancelled || !quiz || quiz.questions.length >= count) break;
       updateSession({ status: `Frage ${quiz.questions.length + 1} von ${count} wird erstellt …` });
@@ -215,7 +225,7 @@ export async function runQuiz(count: number, files: FileItem[]) {
 ${c.text}
 """
 
-Erstelle genau EINE Multiple-Choice-Frage auf Deutsch zu einer wichtigen Information aus diesem Text.
+Erstelle genau EINE Multiple-Choice-Frage auf Deutsch zu einer wichtigen Information aus diesem Text.${focus ? `\n- Die Frage soll sich auf diese Stelle beziehen: „${focus}“` : ''}
 - Die richtige Antwort muss eindeutig im Text stehen.
 - Genau 4 kurze Antwortmöglichkeiten, genau eine davon richtig.
 - Die falschen Antworten sollen plausibel klingen, laut Text aber falsch sein.
@@ -226,6 +236,7 @@ Antworte nur als JSON: {"frage": "...", "antworten": ["...", "...", "...", "..."
           },
         ],
         QUIZ_SCHEMA,
+        focus ? 0.7 : 0.5,
       );
       if (cancelled) break;
       const q = validate(raw);
