@@ -3,7 +3,7 @@
 Lernmaterial in Ordnern sammeln – Texte, Bilder, PDFs, Präsentationen, Videos, Audio und jede andere Datei.
 Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten bleiben **nur auf dem Gerät** (IndexedDB im Browser).
 
-## 👉 [App öffnen & installieren](https://markuscampidell.github.io/lernapp/)
+## [App öffnen & installieren](https://markuscampidell.github.io/lernapp/)
 
 **https://markuscampidell.github.io/lernapp/**
 
