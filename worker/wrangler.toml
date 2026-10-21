@@ -2,6 +2,8 @@
 name = "lernapp-ki"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
+workers_dev = true
+preview_urls = false
 
 [vars]
 # Webseiten, die den Worker benutzen dürfen (kommagetrennt, ohne Schrägstrich am Ende).
