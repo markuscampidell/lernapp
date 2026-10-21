@@ -17,8 +17,7 @@ export function QuizPanel({ files, renderSource }: { files: FileItem[]; renderSo
           <h2>Quiz erstellen</h2>
           <p className="muted small">
             Die KI erstellt Multiple-Choice-Fragen aus deinen Unterlagen – verteilt über alle gewählten Dateien. Jede Frage zeigt,
-            aus welcher Datei sie stammt. Das dauert pro Frage etwas (auf Handys ca. 10–30 Sekunden); du kannst schon antworten,
-            während die nächsten entstehen.
+            aus welcher Datei sie stammt. Das dauert meist nur einige Sekunden.
           </p>
         </div>
         <div className="field">

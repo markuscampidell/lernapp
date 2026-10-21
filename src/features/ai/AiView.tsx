@@ -9,7 +9,6 @@ import { FileThumb, FolderThumb } from '../../components/Thumbs';
 import { Markdown } from '../../ai/Markdown';
 import { FileViewer } from '../folders/FileViewer';
 import { SourcePicker } from './SourcePicker';
-import { ModelGate } from './ModelGate';
 import { QuizPanel } from './QuizPanel';
 import { ask, cancel } from './runner';
 import { getSession, updateSession, useSession, type SourceRef } from './session';
@@ -96,7 +95,7 @@ export function AiView({ initialFolderId }: { initialFolderId: string | null }) 
         )}
       </header>
 
-      <ModelGate>
+      <>
         <div className="segmented mode-switch">
           <button className={mode === 'chat' ? 'on' : ''} onClick={() => updateSession({ mode: 'chat' })}>
             Fragen
@@ -116,7 +115,7 @@ export function AiView({ initialFolderId }: { initialFolderId: string | null }) 
           {sources.length === 0 ? (
             <button className="empty source-empty" onClick={() => setPicking(true)}>
               <span className="empty-title">Ordner oder Dateien wählen</span>
-              <span className="muted small">Die KI arbeitet nur mit diesen Unterlagen.</span>
+              <span className="muted small">Die KI arbeitet nur mit diesen Unterlagen. Ihr Text wird dafür an Google Gemini gesendet.</span>
             </button>
           ) : (
             <>
@@ -249,7 +248,7 @@ export function AiView({ initialFolderId }: { initialFolderId: string | null }) 
             )}
           </>
         )}
-      </ModelGate>
+      </>
 
       {picking && <SourcePicker folderIds={folderIds} fileIds={fileIds} onDone={setSources} onClose={() => setPicking(false)} />}
       {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}

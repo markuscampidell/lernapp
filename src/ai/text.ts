@@ -80,7 +80,7 @@ export async function fileText(file: FileItem): Promise<FileText> {
     try {
       if (kind === 'text' || ext === 'csv') segments = [{ loc: '', text: (await blob.text()).slice(0, 2_000_000) }];
       else if (kind === 'pdf') segments = await pdfSegments(blob);
-      else if (kind === 'image') return { ok: false, reason: 'Bild – Text in Bildern kann die lokale KI noch nicht lesen' };
+      else if (kind === 'image') return { ok: false, reason: 'Bild – Text in Bildern kann die KI noch nicht lesen' };
       else if (kind === 'video' || kind === 'audio') return { ok: false, reason: 'Video/Audio wird nicht unterstützt' };
       else {
         const t = await extractOfficeText(blob, ext);

@@ -1,25 +1,26 @@
-import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import type { FileItem } from '../../domain/types';
 import { fullName } from '../../lib/files';
-import { chatStream, ensureEngine, generateJson, interrupt } from '../../ai/local';
+import { generateJson, streamText, type Turn } from '../../ai/gemini';
 import { fileText, type Chunk } from '../../ai/text';
 import { buildIndex, search, spread, type Index } from '../../ai/search';
 import { getSession, newId, updateSession, type Message, type QuizQuestion, type SourceRef } from './session';
 
 /*
- * Ablauf der lokalen KI:
+ * Ablauf der KI (Google Gemini über unseren Worker):
  *  1. Text aus den gewählten Dateien lesen und in Abschnitte teilen.
- *  2. Fragen: passende Abschnitte suchen und nur diese dem Modell geben (es hat wenig "Gedächtnis").
- *  3. Quiz: Abschnitte über alle Dateien verteilt wählen und je eine Frage daraus erzeugen.
+ *  2. Fragen: Passen alle Unterlagen in die Anfrage, bekommt die KI alles; sonst nur die passendsten Abschnitte.
+ *  3. Quiz: Abschnitte über alle Dateien verteilt wählen, die KI erstellt alle Fragen in einem Durchgang.
  */
 
-const CONTEXT_CHARS = 5500; // passt mit Anweisungen und Antwort in das Kontextfenster (4096 Tokens)
+const CONTEXT_CHARS = 60_000; // ca. 15 000 Tokens Unterlagen pro Anfrage
+const QUIZ_CHARS = 40_000;
 
-let cancelled = false;
+let controller: AbortController | null = null;
 let indexCache: { signature: string; chunks: Chunk[]; index: Index } | null = null;
 
 const signatureOf = (files: FileItem[]) => files.map((f) => `${f.id}:${f.updatedAt}`).join('|');
 const ref = (c: Chunk): SourceRef => ({ fileId: c.fileId, loc: c.loc });
+const isAbort = (e: unknown) => (e as Error)?.name === 'AbortError';
 
 async function loadChunks(files: FileItem[]) {
   const sig = signatureOf(files);
@@ -37,7 +38,7 @@ async function loadChunks(files: FileItem[]) {
   return indexCache;
 }
 
-/** Nimmt Abschnitte, solange sie ins Kontextfenster passen. */
+/** Nimmt Abschnitte, solange sie in die Anfrage passen. */
 function fit(chunks: Chunk[], maxChars = CONTEXT_CHARS): Chunk[] {
   const out: Chunk[] = [];
   let total = 0;
@@ -49,28 +50,33 @@ function fit(chunks: Chunk[], maxChars = CONTEXT_CHARS): Chunk[] {
   return out;
 }
 
+const totalChars = (chunks: Chunk[]) => chunks.reduce((s, c) => s + c.text.length, 0);
 const OVERVIEW = /zusammenfass|überblick|ueberblick|kernaussage|worum geht|wichtigste|hauptthem|lernzettel/i;
 
-const CHAT_SYSTEM = `Du bist ein hilfreicher Lernassistent für Schüler. Du beantwortest Fragen ausschließlich mit Hilfe der Auszüge aus den Unterlagen des Nutzers.
-Antworte auf Deutsch, in eigenen Worten, kurz und klar (meist 2 bis 6 Sätze oder eine kurze Liste).
-Schreibe hinter jede Aussage, aus welchem Auszug sie stammt, z. B. [Quelle 1].
-Verwende kein Wissen, das nicht in den Auszügen steht. Wirkt etwas in den Auszügen falsch oder widersprüchlich, sag das.
-Nur wenn die Auszüge überhaupt nichts zur Frage enthalten, antworte genau mit: Das steht nicht in deinen Unterlagen.`;
+const CHAT_SYSTEM = `Du bist der Lernassistent der App „Lernapp“. Du bekommst Auszüge aus den Unterlagen des Nutzers – jeder ist als [Quelle N] nummeriert – und beantwortest Fragen dazu.
+
+Regeln:
+1. Verwende ausschließlich Informationen aus den Auszügen. Fülle keine Lücken mit Allgemeinwissen und rate nie.
+2. Steht die Antwort nicht in den Auszügen, sag klar: „Das steht nicht in deinen Unterlagen.“ Du darfst nennen, was es an verwandten Informationen gibt.
+3. Belege deine Aussagen mit Quellenangaben im Format [Quelle N].
+4. Wirken Unterlagen widersprüchlich oder offensichtlich fehlerhaft, weise auf die Stelle hin, statt sie still aus eigenem Wissen zu korrigieren.
+5. Antworte in der Sprache der Frage (meist Deutsch), klar und gut strukturiert. Markdown ist erlaubt (Überschriften, Listen, **fett**). Formeln schreibst du lesbar, z. B. a² + b² = c².
+6. Aufgaben wie „fasse zusammen“, „erstelle Lernfragen“ oder „erkläre“ sind erlaubt – aber nur auf Basis der Auszüge.`;
 
 function patchMessage(id: number, p: Partial<Message>) {
   updateSession((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, ...p } : m)) }));
 }
 
 export function cancel() {
-  cancelled = true;
-  interrupt();
+  controller?.abort();
 }
 
 /** Eine Frage stellen (Chat). */
 export async function ask(question: string, files: FileItem[], opts: { retry?: boolean } = {}) {
   const q = question.trim();
   if (!q || getSession().busy || files.length === 0) return;
-  cancelled = false;
+  const ctrl = new AbortController();
+  controller = ctrl;
   let messages = getSession().messages.filter((m) => m.role !== 'error');
   if (!opts.retry) messages = [...messages, { id: newId(), role: 'user', text: q }];
   const answer: Message = { id: newId(), role: 'model', text: '', pending: true };
@@ -80,51 +86,48 @@ export async function ask(question: string, files: FileItem[], opts: { retry?: b
     const { chunks, index } = await loadChunks(files);
     if (!chunks.length) throw new Error('Aus den gewählten Dateien konnte kein Text gelesen werden.');
 
-    // Passende Stellen finden (vorherige Frage hilft bei Rückfragen wie "und warum?")
-    const prevUser = messages.filter((m) => m.role === 'user').slice(-2, -1)[0]?.text ?? '';
-    let picked = OVERVIEW.test(q) ? spread(chunks, 8) : search(index, q, 8);
-    if (!picked.length && prevUser) picked = search(index, `${q} ${prevUser}`, 8);
-    picked = fit(picked);
-    if (!picked.length) {
-      patchMessage(answer.id, {
-        pending: false,
-        text: 'Dazu habe ich in deinen Unterlagen nichts gefunden. Versuche es mit anderen Stichwörtern, die im Text vorkommen.',
-      });
-      return;
+    // Alles mitschicken, wenn es passt – sonst die passendsten Stellen (vorherige Frage hilft bei Rückfragen).
+    let picked: Chunk[];
+    if (totalChars(chunks) <= CONTEXT_CHARS) picked = chunks;
+    else {
+      const prevUser = messages.filter((m) => m.role === 'user').slice(-2, -1)[0]?.text ?? '';
+      picked = OVERVIEW.test(q) ? spread(chunks, 80) : search(index, q, 50);
+      if (!picked.length && prevUser) picked = search(index, `${q} ${prevUser}`, 50);
+      if (!picked.length) picked = spread(chunks, 80);
+      picked = fit(picked);
     }
-
     updateSession({ status: null });
-    await ensureEngine();
 
     const excerpt = picked.map((c, i) => `[Quelle ${i + 1}] aus „${c.fileName}“${c.loc ? `, ${c.loc}` : ''}:\n${c.text}`).join('\n\n');
-    // Kurzer Verlauf (nur Text), damit Rückfragen funktionieren, ohne das Kontextfenster zu sprengen.
-    const history: ChatCompletionMessageParam[] = messages
+    // Bisheriger Verlauf (nur Text), damit Rückfragen funktionieren.
+    const history: Turn[] = messages
       .slice(0, -1)
       .filter((m) => m.role === 'user' || m.role === 'model')
-      .slice(-4)
-      .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text.slice(0, 400) }));
-    const prompt: ChatCompletionMessageParam[] = [
-      { role: 'system', content: CHAT_SYSTEM },
+      .slice(-8)
+      .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text.slice(0, 3000) }] }));
+    const contents: Turn[] = [
       ...history,
-      { role: 'user', content: `Meine Frage: ${q}\n\nAuszüge aus meinen Unterlagen:\n\n${excerpt}\n\nBeantworte jetzt meine Frage „${q}“ nur mit diesen Auszügen und gib die Quellen an.` },
+      { role: 'user', parts: [{ text: `Auszüge aus meinen Unterlagen:\n\n${excerpt}\n\nMeine Frage: ${q}` }] },
     ];
     patchMessage(answer.id, { sources: picked.map(ref) });
     let text = '';
-    for await (const t of chatStream(prompt)) {
+    for await (const t of streamText(CHAT_SYSTEM, contents, { signal: ctrl.signal })) {
       text = t;
       patchMessage(answer.id, { text });
     }
-    patchMessage(answer.id, { pending: false, text: text || (cancelled ? '_(Abgebrochen)_' : 'Keine Antwort erhalten.') });
+    patchMessage(answer.id, { pending: false, text: text || 'Keine Antwort erhalten.' });
   } catch (e) {
     const cur = getSession().messages.find((m) => m.id === answer.id);
-    if (cancelled && cur?.text) patchMessage(answer.id, { pending: false, text: `${cur.text}\n\n_(Abgebrochen)_` });
+    const aborted = isAbort(e) || ctrl.signal.aborted;
+    if (aborted && cur?.text) patchMessage(answer.id, { pending: false, text: `${cur.text}\n\n_(Abgebrochen)_` });
     else
       updateSession((s) => ({
         messages: s.messages
           .filter((m) => m.id !== answer.id)
-          .concat({ id: newId(), role: 'error', text: cancelled ? 'Abgebrochen.' : e instanceof Error ? e.message : 'Unbekannter Fehler.' }),
+          .concat({ id: newId(), role: 'error', text: aborted ? 'Abgebrochen.' : e instanceof Error ? e.message : 'Unbekannter Fehler.' }),
       }));
   } finally {
+    if (controller === ctrl) controller = null;
     updateSession({ busy: false, status: null });
   }
 }
@@ -132,14 +135,24 @@ export async function ask(question: string, files: FileItem[], opts: { retry?: b
 // ---------- Quiz ----------
 
 const QUIZ_SCHEMA = {
-  type: 'object',
+  type: 'OBJECT',
   properties: {
-    frage: { type: 'string' },
-    antworten: { type: 'array', items: { type: 'string' }, minItems: 4, maxItems: 4 },
-    richtig: { type: 'integer', minimum: 0, maximum: 3 },
-    erklaerung: { type: 'string' },
+    fragen: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          frage: { type: 'STRING' },
+          antworten: { type: 'ARRAY', items: { type: 'STRING' } },
+          richtig: { type: 'INTEGER' },
+          erklaerung: { type: 'STRING' },
+          abschnitt: { type: 'INTEGER' },
+        },
+        required: ['frage', 'antworten', 'richtig', 'erklaerung', 'abschnitt'],
+      },
+    },
   },
-  required: ['frage', 'antworten', 'richtig', 'erklaerung'],
+  required: ['fragen'],
 };
 
 interface RawQuestion {
@@ -147,6 +160,7 @@ interface RawQuestion {
   antworten?: unknown;
   richtig?: unknown;
   erklaerung?: unknown;
+  abschnitt?: unknown;
 }
 
 function shuffle<T>(a: T[]): T[] {
@@ -158,35 +172,23 @@ function shuffle<T>(a: T[]): T[] {
   return b;
 }
 
-/** Abschnitte für das Quiz: gleichmäßig über die Dateien, zufällig, nicht zu kurz. */
-function pickQuizChunks(chunks: Chunk[], n: number): { c: Chunk; focus?: string }[] {
+/** Abschnitte für das Quiz: abwechselnd aus allen Dateien, zufällig, bis die Textmenge erreicht ist. */
+function pickQuizChunks(chunks: Chunk[]): Chunk[] {
   const byFile = new Map<string, Chunk[]>();
-  for (const c of chunks) if (c.text.length >= 200) byFile.set(c.fileId, [...(byFile.get(c.fileId) ?? []), c]);
-  // Notfalls auch kürzere Abschnitte
-  if (byFile.size === 0) for (const c of chunks) if (c.text.length >= 60) byFile.set(c.fileId, [...(byFile.get(c.fileId) ?? []), c]);
+  for (const c of chunks) if (c.text.trim().length >= 40) byFile.set(c.fileId, [...(byFile.get(c.fileId) ?? []), c]);
   const lists = shuffle([...byFile.values()].map((l) => shuffle(l)));
-  const base: Chunk[] = [];
-  for (let round = 0; base.length < n * 2 && lists.some((l) => l.length > round); round++) for (const l of lists) if (l[round]) base.push(l[round]);
-  const out: { c: Chunk; focus?: string }[] = base.map((c) => ({ c }));
-  // Wenig Text: dieselben Abschnitte erneut verwenden, aber mit Fokus auf einen anderen Satz –
-  // so entstehen unterschiedliche Fragen statt Wiederholungen.
-  const sentences = new Map(base.map((c) => [c, shuffle(c.text.split(/(?<=[.!?])\s+|\n+/).filter((x) => x.trim().length >= 40))]));
-  for (let pass = 0; base.length && out.length < n * 2 && pass < 20; pass++) {
-    for (const c of base) {
-      const list = sentences.get(c)!;
-      if (pass < list.length && out.length < n * 2) out.push({ c, focus: list[pass].trim() });
-    }
-    if (base.every((c) => pass >= sentences.get(c)!.length)) break;
-  }
-  return out;
+  const out: Chunk[] = [];
+  for (let round = 0; lists.some((l) => l.length > round); round++) for (const l of lists) if (l[round]) out.push(l[round]);
+  return fit(out, QUIZ_CHARS);
 }
 
-function validate(raw: RawQuestion | null): Omit<QuizQuestion, 'id' | 'source'> | null {
-  if (!raw || typeof raw.frage !== 'string' || !Array.isArray(raw.antworten)) return null;
+function validate(raw: RawQuestion, sections: Chunk[]): Omit<QuizQuestion, 'id'> | null {
+  if (typeof raw.frage !== 'string' || !raw.frage.trim() || !Array.isArray(raw.antworten)) return null;
   const answers = raw.antworten.map((a) => String(a ?? '').trim()).filter(Boolean);
   const correct = Number(raw.richtig);
   if (answers.length !== 4 || new Set(answers.map((a) => a.toLowerCase())).size !== 4) return null;
   if (!Number.isInteger(correct) || correct < 0 || correct > 3) return null;
+  const sec = sections[Number(raw.abschnitt) - 1] ?? sections[0];
   const right = answers[correct];
   const mixed = shuffle(answers);
   return {
@@ -194,55 +196,61 @@ function validate(raw: RawQuestion | null): Omit<QuizQuestion, 'id' | 'source'> 
     antworten: mixed,
     richtig: mixed.indexOf(right),
     erklaerung: typeof raw.erklaerung === 'string' ? raw.erklaerung.trim() : '',
+    source: ref(sec),
   };
 }
 
 export async function runQuiz(count: number, files: FileItem[]) {
   if (getSession().busy || files.length === 0) return;
-  cancelled = false;
+  const ctrl = new AbortController();
+  controller = ctrl;
   updateSession({ busy: true, quiz: { target: count, questions: [], done: false } });
   try {
     const { chunks } = await loadChunks(files);
     if (!chunks.length) throw new Error('Aus den gewählten Dateien konnte kein Text gelesen werden.');
-    const candidates = pickQuizChunks(chunks, count);
-    if (!candidates.length) throw new Error('Die Unterlagen enthalten zu wenig Text für ein Quiz.');
-    updateSession({ status: 'KI wird gestartet …' });
-    await ensureEngine();
+    const sections = pickQuizChunks(chunks);
+    if (!sections.length) throw new Error('Die Unterlagen enthalten zu wenig Text für ein Quiz.');
+    const text = sections.map((c, i) => `[Abschnitt ${i + 1}] aus „${c.fileName}“${c.loc ? `, ${c.loc}` : ''}:\n${c.text}`).join('\n\n');
+    const fileCount = new Set(sections.map((c) => c.fileId)).size;
 
     const made: string[] = [];
-    for (const { c, focus } of candidates) {
-      const quiz = getSession().quiz;
-      if (cancelled || !quiz || quiz.questions.length >= count) break;
-      updateSession({ status: `Frage ${quiz.questions.length + 1} von ${count} wird erstellt …` });
-      const avoid = made.length ? `\nStelle KEINE dieser schon gestellten Fragen noch einmal:\n${made.slice(-5).map((m) => `- ${m}`).join('\n')}` : '';
-      const raw = await generateJson<RawQuestion>(
+    // Höchstens zwei Durchgänge: falls beim ersten ungültige Fragen dabei waren, wird der Rest nachgefordert.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const have = getSession().quiz?.questions.length ?? 0;
+      const need = count - have;
+      if (need <= 0 || ctrl.signal.aborted) break;
+      updateSession({ status: attempt === 0 ? `${count} Fragen werden erstellt …` : `Noch ${need} Fragen werden erstellt …` });
+      const avoid = made.length ? `\n\nDiese Fragen gibt es schon – stelle sie NICHT noch einmal:\n${made.map((m) => `- ${m}`).join('\n')}` : '';
+      const raw = await generateJson<{ fragen?: RawQuestion[] }>(
+        'Du erstellst Quizfragen für Schüler und Studierende. Du verwendest ausschließlich die gegebenen Unterlagen.',
         [
-          { role: 'system', content: 'Du erstellst Quizfragen für Schüler. Du verwendest ausschließlich den gegebenen Text und antwortest nur mit JSON.' },
           {
             role: 'user',
-            content: `Text aus „${c.fileName}“${c.loc ? `, ${c.loc}` : ''}:
-"""
-${c.text}
-"""
-
-Erstelle genau EINE Multiple-Choice-Frage auf Deutsch zu einer wichtigen Information aus diesem Text.${focus ? `\n- Die Frage soll sich auf diese Stelle beziehen: „${focus}“` : ''}
-- Die richtige Antwort muss eindeutig im Text stehen.
-- Genau 4 kurze Antwortmöglichkeiten, genau eine davon richtig.
-- Die falschen Antworten sollen plausibel klingen, laut Text aber falsch sein.
+            parts: [
+              {
+                text: `Unterlagen:\n\n${text}\n\nErstelle genau ${need} Multiple-Choice-Fragen auf Deutsch zu wichtigen Inhalten dieser Unterlagen.
+- Verteile die Fragen über möglichst viele verschiedene Abschnitte${fileCount > 1 ? ` und über alle ${fileCount} Dateien` : ''}.
+- Die richtige Antwort muss eindeutig in den Unterlagen stehen. Frage nach Verständnis, nicht nur nach einzelnen Wörtern.
+- Je Frage genau 4 kurze Antwortmöglichkeiten, genau eine davon richtig. Die falschen sollen plausibel klingen, laut Unterlagen aber falsch sein.
 - "richtig" ist die Nummer (0 bis 3) der richtigen Antwort in "antworten".
-- "erklaerung" ist ein kurzer Satz, warum die Antwort laut Text stimmt.${avoid}
-
-Antworte nur als JSON: {"frage": "...", "antworten": ["...", "...", "...", "..."], "richtig": 0, "erklaerung": "..."}`,
+- "erklaerung" ist ein kurzer Satz, warum die Antwort laut Unterlagen stimmt.
+- "abschnitt" ist die Nummer des Abschnitts, aus dem die Frage stammt.${avoid}`,
+              },
+            ],
           },
         ],
         QUIZ_SCHEMA,
-        focus ? 0.7 : 0.5,
+        { temperature: 0.7, maxOutputTokens: Math.min(8192, 600 + need * 350), signal: ctrl.signal },
       );
-      if (cancelled) break;
-      const q = validate(raw);
-      if (!q || made.some((m) => m.toLowerCase() === q.frage.toLowerCase())) continue;
-      made.push(q.frage);
-      updateSession((s) => (s.quiz ? { quiz: { ...s.quiz, questions: [...s.quiz.questions, { ...q, id: newId(), source: ref(c) }] } } : {}));
+      const fresh: QuizQuestion[] = [];
+      for (const r of raw?.fragen ?? []) {
+        const q = validate(r, sections);
+        if (!q || made.some((m) => m.toLowerCase() === q.frage.toLowerCase())) continue;
+        made.push(q.frage);
+        fresh.push({ ...q, id: newId() });
+        if (have + fresh.length >= count) break;
+      }
+      updateSession((s) => (s.quiz ? { quiz: { ...s.quiz, questions: [...s.quiz.questions, ...fresh] } } : {}));
     }
     const got = getSession().quiz?.questions.length ?? 0;
     updateSession((s) =>
@@ -251,20 +259,23 @@ Antworte nur als JSON: {"frage": "...", "antworten": ["...", "...", "...", "..."
             quiz: {
               ...s.quiz,
               done: true,
-              note: cancelled
-                ? 'Erstellung abgebrochen.'
-                : got < count
-                  ? `Es konnten nur ${got} von ${count} Fragen erstellt werden – die Unterlagen sind dafür zu kurz oder die KI hatte Probleme.`
+              note:
+                got < count
+                  ? `Es konnten nur ${got} von ${count} Fragen erstellt werden – die Unterlagen sind dafür vielleicht zu kurz.`
                   : undefined,
             },
           }
         : {},
     );
   } catch (e) {
+    const aborted = isAbort(e) || ctrl.signal.aborted;
     updateSession((s) => ({
-      quiz: s.quiz ? { ...s.quiz, done: true, note: e instanceof Error ? e.message : 'Quiz konnte nicht erstellt werden.' } : null,
+      quiz: s.quiz
+        ? { ...s.quiz, done: true, note: aborted ? 'Erstellung abgebrochen.' : e instanceof Error ? e.message : 'Quiz konnte nicht erstellt werden.' }
+        : null,
     }));
   } finally {
+    if (controller === ctrl) controller = null;
     updateSession({ busy: false, status: null });
   }
 }
