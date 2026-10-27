@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Folder } from '../domain/types';
-import { childFolders, pathOf } from '../domain/tree';
+import { SHARED_ROOT } from '../domain/types';
+import { childFolders, pathOf, scopeOf } from '../domain/tree';
 import { useLibrary } from '../state/Library';
 import { Sheet } from './Sheet';
 import { Icon } from './Icon';
@@ -23,13 +24,18 @@ interface Props {
 
 /** Durch die Ordner navigieren und einen Zielordner wählen. */
 export function FolderPicker({ title, startId = null, allowRoot, isDisabled, confirmLabel, onPick, onClose }: Props) {
-  const { folders } = useLibrary();
+  const { folders, canAddIn } = useLibrary();
   const [current, setCurrent] = useState<string | null>(startId);
   const [query, setQuery] = useState('');
 
-  const folder = current ? folders.find((f) => f.id === current) ?? null : null;
-  const path = pathOf(folders, current);
+  const inShared = current === SHARED_ROOT;
+  const folder = current && !inShared ? folders.find((f) => f.id === current) ?? null : null;
+  const path = inShared ? [] : pathOf(folders, current);
   const kids = childFolders(folders, current);
+  const sharedTops = childFolders(folders, SHARED_ROOT);
+  const scope = scopeOf(folders, current);
+  // Gesperrt: vom Aufrufer ausgeschlossen oder (geteilt & offline) nicht beschreibbar.
+  const blocked = (id: string | null) => !!isDisabled?.(id) || (id !== null && !canAddIn(id));
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -40,7 +46,7 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
       .sort((a, b) => a.path.localeCompare(b.path, 'de'));
   }, [folders, query]);
 
-  const canPick = (current !== null || allowRoot) && !isDisabled?.(current);
+  const canPick = !inShared && (current !== null || allowRoot) && !blocked(current);
 
   return (
     <Sheet
@@ -48,14 +54,14 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
       onClose={onClose}
       leading={
         current !== null && !results ? (
-          <button className="icon-btn" aria-label="Zurück" onClick={() => setCurrent(folder?.parentId ?? null)}>
+          <button className="icon-btn" aria-label="Zurück" onClick={() => setCurrent(inShared ? null : folder?.parentId ?? null)}>
             <Icon name="back" />
           </button>
         ) : undefined
       }
       footer={
         <button className="btn primary grow" disabled={!canPick} onClick={() => onPick(current)}>
-          {confirmLabel ? confirmLabel(folder) : folder ? `„${folder.name}“ wählen` : 'Oberste Ebene wählen'}
+          {inShared ? 'Einen geteilten Ordner öffnen' : confirmLabel ? confirmLabel(folder) : folder ? `„${folder.name}“ wählen` : 'Oberste Ebene wählen'}
         </button>
       }
     >
@@ -92,6 +98,12 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
               <button onClick={() => setCurrent(null)}>
                 <Icon name="home" size={16} /> Ordner
               </button>
+              {scope === 'shared' && (
+                <span className="crumb">
+                  <Icon name="chevron" size={14} />
+                  <button onClick={() => setCurrent(SHARED_ROOT)}>Geteilte Ordner</button>
+                </span>
+              )}
               {path.map((p) => (
                 <span key={p.id} className="crumb">
                   <Icon name="chevron" size={14} />
@@ -99,6 +111,18 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
                 </span>
               ))}
             </nav>
+            {current === null && sharedTops.length > 0 && (
+              <button className="card card-btn row-card" onClick={() => setCurrent(SHARED_ROOT)}>
+                <span className="thumb folder-thumb">
+                  <Icon name="users" size={22} />
+                </span>
+                <div className="card-main">
+                  <strong className="ellipsis">Geteilte Ordner</strong>
+                  <span className="muted small ellipsis">{sharedTops.length} geteilt mit dir</span>
+                </div>
+                <Icon name="chevron" />
+              </button>
+            )}
             {kids.length === 0 ? (
               <EmptyState title={current ? 'Keine Unterordner' : 'Noch keine Ordner'}>
                 {current ? 'Du kannst diesen Ordner wählen.' : 'Lege zuerst im Tab „Ordner“ einen Ordner an.'}
@@ -106,7 +130,7 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
             ) : (
               <ul className="list">
                 {kids.map((k) => {
-                  const disabled = isDisabled?.(k.id) && childFolders(folders, k.id).length === 0;
+                  const disabled = blocked(k.id) && childFolders(folders, k.id).length === 0;
                   return (
                     <li key={k.id}>
                       <button className="card card-btn row-card" disabled={disabled} onClick={() => setCurrent(k.id)}>

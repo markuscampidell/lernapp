@@ -2,13 +2,16 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { LibraryProvider } from './state/Library';
+import { AuthProvider } from './cloud/auth';
 import './styles/global.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LibraryProvider>
-      <App />
-    </LibraryProvider>
+    <AuthProvider>
+      <LibraryProvider>
+        <App />
+      </LibraryProvider>
+    </AuthProvider>
   </StrictMode>,
 );
 

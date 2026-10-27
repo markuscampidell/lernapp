@@ -10,13 +10,20 @@ export function NoteSheet({ folderId, onClose }: { folderId: string; onClose: ()
   const [description, setDescription] = useState('');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const save = async () => {
     setBusy(true);
+    setErr(null);
     const title = name.trim() || 'Notiz';
     const file = new File([text], `${title}.txt`, { type: 'text/plain' });
-    await addFiles(folderId, [{ file, filename: file.name, name: title, description }]);
-    onClose();
+    try {
+      await addFiles(folderId, [{ file, filename: file.name, name: title, description }]);
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.');
+      setBusy(false);
+    }
   };
 
   return (
@@ -48,6 +55,7 @@ export function NoteSheet({ folderId, onClose }: { folderId: string; onClose: ()
         </div>
         <textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} />
       </div>
+      {err && <p className="notice critical">{err}</p>}
     </Sheet>
   );
 }

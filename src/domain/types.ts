@@ -8,6 +8,11 @@ export interface Folder {
   imageId?: string;
   createdAt: string;
   updatedAt: string;
+  /** Nur bei geteilten Ordnern/Dateien (bzw. beim lokalen Platzhalter eines geteilten Ordners): ID des geteilten Ordners. */
+  shareId?: string;
+  /** Wer den Eintrag erstellt / zuletzt geändert hat (nur geteilt). */
+  createdBy?: string | null;
+  updatedBy?: string | null;
 }
 
 /** Eine Datei in einem Ordner. Der Inhalt liegt als Blob unter blobId. */
@@ -26,6 +31,11 @@ export interface FileItem {
   thumbId?: string;
   createdAt: string;
   updatedAt: string;
+  /** Nur bei geteilten Ordnern/Dateien (bzw. beim lokalen Platzhalter eines geteilten Ordners): ID des geteilten Ordners. */
+  shareId?: string;
+  /** Wer den Eintrag erstellt / zuletzt geändert hat (nur geteilt). */
+  createdBy?: string | null;
+  updatedBy?: string | null;
 }
 
 /** Datei, die per Android-"Teilen" ankam und noch einsortiert werden muss. */
@@ -36,6 +46,9 @@ export interface InboxItem {
   type: string;
   addedAt: number;
 }
+
+/** Pseudo-Elternordner für geteilte Ordner, die in „Geteilte Ordner“ erscheinen. */
+export const SHARED_ROOT = '__geteilt__';
 
 /** Ordner-Ebenen: 1 = Ordner im Ordner-Tab, 2–6 = Unterordner. */
 export const MAX_DEPTH = 6;

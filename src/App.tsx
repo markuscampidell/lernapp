@@ -16,7 +16,7 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 
 export function App() {
   const route = useRoute();
-  const { ready, error } = useLibrary();
+  const { ready, error, unread } = useLibrary();
   const tab = route.tab;
   // Richtung des letzten Tabwechsels (für die Einschub-Animation).
   const [slide, setSlide] = useState<'left' | 'right' | null>(null);
@@ -64,7 +64,10 @@ export function App() {
             aria-current={tab === t.id ? 'page' : undefined}
             onClick={() => go(t.id)}
           >
-            <Icon name={t.icon} size={22} />
+            <span className="nav-icon">
+              <Icon name={t.icon} size={22} />
+              {t.id === 'ordner' && unread.size > 0 && <span className="unread-dot" aria-label="Neues in geteilten Ordnern" />}
+            </span>
             <span>{t.label}</span>
           </button>
         ))}

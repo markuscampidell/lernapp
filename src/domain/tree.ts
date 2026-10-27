@@ -1,5 +1,5 @@
 import type { FileItem, Folder } from './types';
-import { MAX_DEPTH } from './types';
+import { MAX_DEPTH, SHARED_ROOT } from './types';
 
 const collator = new Intl.Collator('de', { numeric: true, sensitivity: 'base' });
 export const byName = <T extends { name: string }>(a: T, b: T) => collator.compare(a.name, b.name);
@@ -15,7 +15,7 @@ export function pathOf(folders: Folder[], id: string | null): Folder[] {
   const byId = new Map(folders.map((f) => [f.id, f]));
   const path: Folder[] = [];
   let cur = id ? byId.get(id) : undefined;
-  while (cur && path.length <= MAX_DEPTH + 2) {
+  while (cur && path.length <= 64 && !path.includes(cur)) {
     path.unshift(cur);
     cur = cur.parentId ? byId.get(cur.parentId) : undefined;
   }
@@ -61,6 +61,13 @@ export function counts(folders: Folder[], files: FileItem[], id: string) {
     folders: folders.filter((f) => f.parentId === id).length,
     files: files.filter((f) => f.folderId === id).length,
   };
+}
+
+/** Liegt der Ordner unter „Meine Ordner“ oder unter „Geteilte Ordner“? */
+export function scopeOf(folders: Folder[], id: string | null): 'mine' | 'shared' {
+  if (id === SHARED_ROOT) return 'shared';
+  const top = pathOf(folders, id)[0];
+  return top?.parentId === SHARED_ROOT ? 'shared' : 'mine';
 }
 
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;

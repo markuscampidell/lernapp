@@ -18,6 +18,8 @@ export interface ItemCardProps {
   selecting?: boolean;
   selected?: boolean;
   path?: string;
+  /** Seit dem letzten Öffnen des Ordners von jemand anderem hinzugefügt/geändert. */
+  isNew?: boolean;
 }
 
 function ItemCard({ onClick, onDelete, onMove, onLongPress, selecting, selected, thumb, children, deleteLabel }: ItemCardProps & { thumb: ReactNode; children: ReactNode; deleteLabel: string }) {
@@ -47,21 +49,53 @@ function ItemCard({ onClick, onDelete, onMove, onLongPress, selecting, selected,
   );
 }
 
-export function FolderCard({ folder, path, ...rest }: ItemCardProps & { folder: Folder }) {
-  const { folders, files } = useLibrary();
+/** "von Anna" bei geteilten Einträgen. */
+function ByChip({ id }: { id: string | null | undefined }) {
+  const { me, userName } = useLibrary();
+  return <span className="chip by-chip">von {id && id === me?.id ? 'dir' : userName(id)}</span>;
+}
+
+export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { folder: Folder }) {
+  const { folders, files, unread, isRoot, shareOf, me, userName, isOrphan } = useLibrary();
   const c = counts(folders, files, folder.id);
   const parts = [c.folders > 0 && plural(c.folders, 'Unterordner', 'Unterordner'), c.files > 0 && plural(c.files, 'Datei', 'Dateien')].filter(Boolean);
+  const root = isRoot(folder);
+  const share = root ? shareOf(folder) : undefined;
+  const thumb = (
+    <span className="thumb-wrap">
+      <FolderThumb folder={folder} />
+      {(root || isOrphan(folder.id)) && (
+        <span className="shared-mark" title="Geteilt">
+          <Icon name="users" size={12} />
+        </span>
+      )}
+      {unread.has(folder.id) && (
+        <span className="unread-dot" title="Neues von anderen">
+          !
+        </span>
+      )}
+    </span>
+  );
   return (
-    <ItemCard {...rest} thumb={<FolderThumb folder={folder} />} deleteLabel={`„${folder.name}“ löschen`}>
+    <ItemCard {...rest} thumb={thumb} deleteLabel={`„${folder.name}“ löschen`}>
       <strong className="ellipsis">{folder.name}</strong>
       {path && <span className="muted small ellipsis">{path}</span>}
       {folder.description && <span className="muted small clamp-2">{folder.description}</span>}
-      <span className="muted small">{parts.length ? parts.join(' · ') : 'Leer'}</span>
+      <span className="muted small">
+        {share && share.ownerId !== me?.id && `Von ${userName(share.ownerId)} geteilt · `}
+        {parts.length ? parts.join(' · ') : 'Leer'}
+      </span>
+      {(isNew || (folder.shareId && !root)) && (
+        <span className="chips">
+          {isNew && <span className="chip new-chip">Neu</span>}
+          {folder.shareId && !root && <ByChip id={folder.createdBy} />}
+        </span>
+      )}
     </ItemCard>
   );
 }
 
-export function FileCard({ file, path, ...rest }: ItemCardProps & { file: FileItem }) {
+export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file: FileItem }) {
   const kind = fileKind(file);
   return (
     <ItemCard {...rest} thumb={<FileThumb file={file} />} deleteLabel={`„${fullName(file)}“ löschen`}>
@@ -69,8 +103,10 @@ export function FileCard({ file, path, ...rest }: ItemCardProps & { file: FileIt
       {path && <span className="muted small ellipsis">{path}</span>}
       {file.description && <span className="muted small clamp-2">{file.description}</span>}
       <span className="chips">
+        {isNew && <span className="chip new-chip">Neu</span>}
         <span className={`chip kind-chip kind-${kind}`}>{KIND_LABEL[kind]}</span>
         <span className="chip">{formatSize(file.size)}</span>
+        {file.shareId && <ByChip id={file.createdBy} />}
       </span>
     </ItemCard>
   );

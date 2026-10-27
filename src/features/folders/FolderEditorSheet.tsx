@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Folder } from '../../domain/types';
-import { canMoveFolder, pathOf, subtreeIds } from '../../domain/tree';
+import { pathOf, scopeOf, subtreeIds } from '../../domain/tree';
+import { SHARED_ROOT } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
 import { useBlobUrl } from '../../hooks/useBlobUrl';
 import { Sheet } from '../../components/Sheet';
@@ -19,7 +20,7 @@ interface Props {
 }
 
 export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated, onDeleted }: Props) {
-  const { folders, files, createFolder, updateFolder, deleteFolder } = useLibrary();
+  const { folders, files, createFolder, updateFolder, deleteFolder, deleteProblem, moveProblem, isRoot, isOwner, canModify } = useLibrary();
   const [name, setName] = useState(folder?.name ?? '');
   const [description, setDescription] = useState(folder?.description ?? '');
   // undefined = unverändert, null = entfernt, Blob = neu gewählt
@@ -40,9 +41,14 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
   }, [image]);
   const preview = image === null ? undefined : newUrl ?? storedUrl;
 
-  const isSub = (folder ? folder.parentId : parentId) !== null;
+  const parent = folder ? folder.parentId : parentId;
+  const isSub = parent !== null && parent !== SHARED_ROOT;
   const noun = isSub ? 'Unterordner' : 'Ordner';
-  const targetPath = pathOf(folders, target).map((p) => p.name).join(' / ') || 'Oberste Ebene';
+  const targetPath =
+    target === SHARED_ROOT ? 'Geteilte Ordner' : pathOf(folders, target).map((p) => p.name).join(' / ') || (scopeOf(folders, target) === 'mine' ? 'Meine Ordner' : 'Oberste Ebene');
+  // Löschen/Verschieben nur, wenn erlaubt (geteilte Ordner: Besitzer oder eigene Einträge).
+  const canDelete = !!folder && !deleteProblem([folder.id], []);
+  const canMove = !!folder && (isRoot(folder) ? isOwner(folder.shareId) : canModify(folder));
 
   const save = async () => {
     setBusy(true);
@@ -70,11 +76,17 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
     const extra = [subCount > 0 && `${subCount} Unterordner`, fileCount > 0 && `${fileCount} Datei${fileCount === 1 ? '' : 'en'}`]
       .filter(Boolean)
       .join(' und ');
-    if (!confirm(`„${folder.name}“ löschen?${extra ? ` Dabei werden auch ${extra} gelöscht.` : ''}`)) return;
+    const forAll = isRoot(folder) ? '\n\nDer Ordner ist geteilt und wird für alle Mitglieder gelöscht.' : '';
+    if (!confirm(`„${folder.name}“ löschen?${extra ? ` Dabei werden auch ${extra} gelöscht.` : ''}${forAll}`)) return;
     setBusy(true);
-    await deleteFolder(folder.id);
-    onClose();
-    onDeleted?.();
+    try {
+      await deleteFolder(folder.id);
+      onClose();
+      onDeleted?.();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Löschen fehlgeschlagen.');
+      setBusy(false);
+    }
   };
 
   return (
@@ -84,7 +96,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
         onClose={onClose}
         footer={
           <>
-            {folder && (
+            {canDelete && (
               <button className="btn ghost danger" onClick={remove} disabled={busy}>
                 Löschen
               </button>
@@ -148,7 +160,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
             />
           </div>
         </div>
-        {folder && (
+        {folder && canMove && (
           <div className="field">
             <div className="field-label">
               <span>Ort</span>
@@ -169,7 +181,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
           title="Verschieben nach"
           startId={target}
           allowRoot
-          isDisabled={(id) => !canMoveFolder(folders, folder.id, id) || subtreeIds(folders, folder.id).has(id ?? '')}
+          isDisabled={(id) => id !== folder.parentId && (!!moveProblem([folder.id], [], id) || subtreeIds(folders, folder.id).has(id ?? ''))}
           confirmLabel={(f) => (f ? `Nach „${f.name}“` : 'Auf oberste Ebene')}
           onPick={(id) => {
             setTarget(id);

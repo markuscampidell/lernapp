@@ -63,6 +63,16 @@ export const db = {
     const d = await open();
     return wrap(d.transaction('blobs').objectStore('blobs').get(id) as IDBRequest<Blob | undefined>);
   },
+  putBlob: (id: string, blob: Blob) => write(['blobs'], (s) => s.blobs.put(blob, id)),
+  deleteBlobs: (ids: string[]) => write(['blobs'], (s) => ids.forEach((id) => s.blobs.delete(id))),
+  /** Löscht alle Blobs, deren Schlüssel mit prefix beginnt (z. B. zwischengespeicherte geteilte Dateien). */
+  deleteBlobsWithPrefix: (prefix: string) => write(['blobs'], (s) => s.blobs.delete(IDBKeyRange.bound(prefix, `${prefix}\uffff`))),
+  /** Beliebige Zusatzdaten (z. B. zwischengespeicherte geteilte Ordner) – liegen ebenfalls im Blob-Speicher. */
+  getMeta: async <T,>(key: string): Promise<T | undefined> => {
+    const d = await open();
+    return wrap(d.transaction('blobs').objectStore('blobs').get(`meta:${key}`) as IDBRequest<T | undefined>);
+  },
+  setMeta: (key: string, value: unknown) => write(['blobs'], (s) => s.blobs.put(value, `meta:${key}`)),
   inbox: () => getAll<InboxItem>('inbox'),
   removeInbox: (ids: string[]) => write(['inbox'], (s) => ids.forEach((id) => s.inbox.delete(id))),
   clearAll: () =>

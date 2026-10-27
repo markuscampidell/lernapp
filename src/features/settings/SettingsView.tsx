@@ -5,9 +5,15 @@ import { exportBackup, importBackup } from '../../storage/backup';
 import { downloadBlob, formatSize } from '../../lib/files';
 import { Icon } from '../../components/Icon';
 import { Sheet } from '../../components/Sheet';
+import { AccountCard } from '../account/AccountCard';
+import { cloudEnabled } from '../../cloud/supabase';
 
 export function SettingsView() {
-  const { folders, files, reload } = useLibrary();
+  const lib = useLibrary();
+  const { reload } = lib;
+  // Speicher-Übersicht: nur eigene Ordner/Dateien auf diesem Gerät.
+  const folders = lib.folders.filter((f) => !f.shareId);
+  const files = lib.files.filter((f) => !f.shareId);
   const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [status, setStatus] = useState<{ kind: 'good' | 'critical' | 'info'; text: string } | null>(null);
@@ -56,7 +62,7 @@ export function SettingsView() {
   };
 
   const wipe = async () => {
-    if (!confirm('Wirklich ALLE Ordner und Dateien löschen? Das kann nicht rückgängig gemacht werden.')) return;
+    if (!confirm('Wirklich ALLE Ordner und Dateien auf diesem Gerät löschen? Das kann nicht rückgängig gemacht werden. (Geteilte Ordner auf dem Server bleiben erhalten.)')) return;
     await db.clearAll();
     await reload();
     setStatus({ kind: 'good', text: 'Alle Daten wurden gelöscht.' });
@@ -100,8 +106,9 @@ export function SettingsView() {
           </div>
         )}
         <p className="muted small">
-          Alles wird nur auf diesem Gerät gespeichert (im Browser). Andere Geräte sehen diese Dateien nicht – nutze das
-          Backup, um Daten zu übertragen.
+          „Meine Ordner“ werden nur auf diesem Gerät gespeichert (im Browser) – nutze das Backup, um sie auf ein anderes Gerät zu
+          übertragen. Geteilte Ordner liegen auf dem Server; geöffnete Dateien daraus werden hier zwischengespeichert, damit du sie
+          auch offline ansehen kannst.
         </p>
         {persisted === false && (
           <div className="notice warning">
@@ -114,11 +121,19 @@ export function SettingsView() {
         {persisted && <p className="muted small">✓ Daten sind als dauerhaft markiert.</p>}
       </div>
 
+      {cloudEnabled && (
+        <>
+          <h3 className="section-title">Konto</h3>
+          <p className="muted small">Ein Konto brauchst du nur, um Ordner mit anderen zu teilen.</p>
+          <AccountCard />
+        </>
+      )}
+
       <h3 className="section-title">Backup</h3>
       <div className="card stack">
         <p className="muted small">
           Das Backup ist eine ZIP-Datei mit all deinen Dateien in ihrer Ordnerstruktur. Damit kannst du alles auf einem
-          anderen Gerät wiederherstellen.
+          anderen Gerät wiederherstellen. Geteilte Ordner sind nicht enthalten (die liegen auf dem Server).
         </p>
         <div className="input-row wrap">
           <button className="btn primary" onClick={doExport} disabled={busy || files.length + folders.length === 0}>
@@ -149,7 +164,7 @@ export function SettingsView() {
         </button>
       </div>
 
-      <p className="muted small center-text">Lernapp · Version 0.10</p>
+      <p className="muted small center-text">Lernapp · Version 0.12</p>
 
       {pendingImport && (
         <Sheet title="Backup importieren" onClose={() => setPendingImport(null)}>

@@ -57,11 +57,12 @@ export function UploadView() {
     if (!folder) return;
     setDone(0);
     setErr(null);
+    let saved = 0;
     try {
       await addFiles(
         folder.id,
         items.map((i) => ({ file: i.file, filename: i.file.name, name: i.name, description: i.description })),
-        setDone,
+        (n) => setDone((saved = n)),
       );
       if (inboxIds.length) await db.removeInbox(inboxIds).catch(() => {});
       setInboxIds([]);
@@ -74,7 +75,9 @@ export function UploadView() {
       }
     } catch (e) {
       console.error(e);
-      setErr('Speichern fehlgeschlagen – evtl. ist der Gerätespeicher voll.');
+      setErr(folder.shareId && e instanceof Error ? e.message : 'Speichern fehlgeschlagen – evtl. ist der Gerätespeicher voll.');
+      // Bereits Gespeichertes aus der Liste nehmen, damit es beim erneuten Versuch nicht doppelt landet.
+      if (saved) setItems((prev) => prev.slice(saved));
     } finally {
       setDone(null);
     }
@@ -161,9 +164,10 @@ export function UploadView() {
               {folder ? (
                 <>
                   <strong className="ellipsis">{folder.name}</strong>
-                  {folder.parentId && (
+                  {folder.parentId && pathOf(folders, folder.parentId).length > 0 && (
                     <span className="muted small ellipsis">{pathOf(folders, folder.parentId).map((p) => p.name).join(' / ')}</span>
                   )}
+                  {folder.shareId && <span className="muted small">Geteilter Ordner</span>}
                 </>
               ) : (
                 <strong>Ordner wählen …</strong>

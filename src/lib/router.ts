@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { SHARED_ROOT } from '../domain/types';
 
-// Hash-Routen: #ordner, #ordner/<id>, #hochladen, #einstellungen
+// Hash-Routen: #ordner (Meine Ordner), #geteilt (Geteilte Ordner), #ordner/<id>, #hochladen, #einstellungen
 export type Tab = 'ordner' | 'hochladen' | 'einstellungen';
 export interface Route {
   tab: Tab;
@@ -11,12 +12,14 @@ const TABS: Tab[] = ['ordner', 'hochladen', 'einstellungen'];
 
 export function parseHash(hash = window.location.hash): Route {
   const [tab, id] = hash.replace(/^#/, '').split('/');
+  if (tab === 'geteilt') return { tab: 'ordner', folderId: SHARED_ROOT };
   if (!TABS.includes(tab as Tab)) return { tab: 'ordner', folderId: null };
   // #ordner/<id> = geöffneter Ordner
   return { tab: tab as Tab, folderId: tab === 'ordner' && id ? decodeURIComponent(id) : null };
 }
 
-export const folderHash = (id: string | null) => (id ? `#ordner/${encodeURIComponent(id)}` : '#ordner');
+export const folderHash = (id: string | null) =>
+  id === SHARED_ROOT ? '#geteilt' : id ? `#ordner/${encodeURIComponent(id)}` : '#ordner';
 
 const EVENT = 'lernapp:route';
 const emit = () => window.dispatchEvent(new Event(EVENT));

@@ -8,24 +8,28 @@ import { TextLine } from '../../components/TextLine';
 import { FolderPicker } from '../../components/FolderPicker';
 
 export function FileEditorSheet({ file, onClose }: { file: FileItem; onClose: () => void }) {
-  const { folders, updateFile, deleteFile } = useLibrary();
+  const { folders, updateFile, deleteFile, deleteProblem, moveProblem } = useLibrary();
   const [name, setName] = useState(file.name);
   const [description, setDescription] = useState(file.description ?? '');
   const [folderId, setFolderId] = useState(file.folderId);
   const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const canDelete = !deleteProblem([], [file.id]);
 
-  const save = async () => {
+  const attempt = async (fn: () => Promise<void>) => {
     setBusy(true);
-    await updateFile(file, { name, description, folderId });
-    onClose();
+    setErr(null);
+    try {
+      await fn();
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Das hat nicht geklappt.');
+      setBusy(false);
+    }
   };
-  const remove = async () => {
-    if (!confirm(`„${file.name}“ löschen?`)) return;
-    setBusy(true);
-    await deleteFile(file.id);
-    onClose();
-  };
+  const save = () => attempt(() => updateFile(file, { name, description, folderId }));
+  const remove = () => confirm(`„${file.name}“ löschen?`) && attempt(() => deleteFile(file.id));
 
   return (
     <>
@@ -34,9 +38,11 @@ export function FileEditorSheet({ file, onClose }: { file: FileItem; onClose: ()
         onClose={onClose}
         footer={
           <>
-            <button className="btn ghost danger" onClick={remove} disabled={busy}>
-              Löschen
-            </button>
+            {canDelete && (
+              <button className="btn ghost danger" onClick={remove} disabled={busy}>
+                Löschen
+              </button>
+            )}
             <button className="btn primary grow" disabled={!name.trim() || busy} onClick={save}>
               Speichern
             </button>
@@ -71,11 +77,13 @@ export function FileEditorSheet({ file, onClose }: { file: FileItem; onClose: ()
             <span className="link">Verschieben</span>
           </button>
         </div>
+        {err && <p className="notice critical">{err}</p>}
       </Sheet>
       {picking && (
         <FolderPicker
           title="Verschieben nach"
           startId={folderId}
+          isDisabled={(id) => id !== file.folderId && !!moveProblem([], [file.id], id)}
           onPick={(id) => {
             if (id) setFolderId(id);
             setPicking(false);

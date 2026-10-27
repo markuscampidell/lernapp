@@ -1249,3 +1249,157 @@ textarea.text-line::-webkit-scrollbar {
 .danger-icon {
   color: var(--critical);
 }
+
+/* ---------- Meine / Geteilte Ordner ---------- */
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.segmented button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.segmented button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* "!" für Neues von anderen */
+.unread-dot {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--critical);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.thumb-wrap {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+}
+.thumb-wrap .unread-dot {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.thumb-wrap .shared-mark {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--info);
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.nav-item .nav-icon {
+  position: relative;
+  display: inline-flex;
+}
+.nav-item .nav-icon .unread-dot {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 10px;
+  height: 10px;
+  padding: 0;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.chip.new-chip {
+  background: var(--critical-bg);
+  color: var(--critical);
+  font-weight: 600;
+}
+.chip.by-chip {
+  color: var(--text-2);
+}
+.share-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--info-bg);
+  color: var(--info);
+  font-size: 0.9rem;
+  text-align: left;
+}
+.share-info .link {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* Personen */
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+button.person {
+  width: 100%;
+  text-align: left;
+}
+.person.selected {
+  background: var(--info-bg);
+}
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-2);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.person.selected .avatar {
+  background: var(--info);
+  color: #fff;
+}
+.people-scroll {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Konto */
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.account-form .segmented {
+  margin-bottom: 4px;
+}

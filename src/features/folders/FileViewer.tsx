@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { pathOf } from '../../domain/tree';
-import { db } from '../../storage/db';
+import { loadBlob } from '../../storage/blobs';
 import { useLibrary } from '../../state/Library';
 import { Icon } from '../../components/Icon';
 import { downloadBlob, fileKind, formatDate, formatSize, fullName, KIND_LABEL } from '../../lib/files';
@@ -13,7 +13,7 @@ const MAX_TEXT = 2 * 1024 * 1024;
 
 /** Vollbild-Ansicht einer Datei mit Vorschau und Aktionen. */
 export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose: () => void }) {
-  const { files, folders } = useLibrary();
+  const { files, folders, canModify, me, userName } = useLibrary();
   // Immer die aktuelle Version (nach Umbenennen/Verschieben).
   const file = files.find((f) => f.id === initial.id);
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -27,7 +27,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
 
   useEffect(() => {
     let u: string | undefined;
-    db.getBlob(initial.blobId).then(async (b) => {
+    loadBlob(initial.blobId).then(async (b) => {
       if (!b) return setMissing(true);
       setBlob(b);
       u = URL.createObjectURL(b);
@@ -73,7 +73,12 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const open = () => url && window.open(url, '_blank', 'noopener');
 
   let body: React.ReactNode;
-  if (missing) body = <p className="notice critical">Der Inhalt dieser Datei wurde nicht gefunden.</p>;
+  if (missing)
+    body = (
+      <p className="notice critical">
+        {file.shareId ? 'Die Datei konnte nicht geladen werden – bist du online?' : 'Der Inhalt dieser Datei wurde nicht gefunden.'}
+      </p>
+    );
   else if (!blob || !url) body = <p className="muted">Lädt …</p>;
   else if (kind === 'image') body = <img className="viewer-media" src={url} alt={file.name} />;
   else if (kind === 'video') body = <video className="viewer-media" src={url} controls playsInline />;
@@ -125,9 +130,11 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
         <button className="icon-btn" aria-label="Herunterladen" title="Herunterladen" onClick={() => blob && downloadBlob(blob, name)} disabled={!blob}>
           <Icon name="download" />
         </button>
-        <button className="icon-btn" aria-label="Bearbeiten" title="Bearbeiten" onClick={() => setEditing(true)}>
-          <Icon name="edit" />
-        </button>
+        {canModify(file) && (
+          <button className="icon-btn" aria-label="Bearbeiten" title="Bearbeiten" onClick={() => setEditing(true)}>
+            <Icon name="edit" />
+          </button>
+        )}
       </header>
       <div className="viewer-body">
         {(file.description || where) && (
@@ -135,6 +142,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
             {file.description && <p>{file.description}</p>}
             <p className="muted small">
               <Icon name="folder" size={14} /> {where}
+              {file.shareId && ` · hinzugefügt von ${file.createdBy === me?.id ? 'dir' : userName(file.createdBy)}`}
             </p>
           </div>
         )}

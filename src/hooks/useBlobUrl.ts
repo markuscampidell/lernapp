@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { db } from '../storage/db';
+import { loadBlob } from '../storage/blobs';
 
 // Kleine Bilder (Ordnerbilder, Vorschauen) bleiben im Speicher, damit Listen beim Zurückgehen nicht flackern.
 const cache = new Map<string, string>();
 
-/** Lädt einen Blob aus IndexedDB und liefert eine Objekt-URL dafür. */
+/** Lädt einen Blob (lokal oder geteilt) und liefert eine Objekt-URL dafür. */
 export function useBlobUrl(id: string | undefined, keep = true): string | undefined {
   const [url, setUrl] = useState<string | undefined>(() => (id ? cache.get(id) : undefined));
 
@@ -20,7 +20,7 @@ export function useBlobUrl(id: string | undefined, keep = true): string | undefi
     }
     let alive = true;
     let created: string | undefined;
-    db.getBlob(id).then((blob) => {
+    loadBlob(id).then((blob) => {
       if (!alive || !blob) return;
       created = URL.createObjectURL(blob);
       if (keep) cache.set(id, created);

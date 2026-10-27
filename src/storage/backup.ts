@@ -96,6 +96,8 @@ export async function importBackup(file: Blob, replaceAll: boolean): Promise<{ f
     id: map(f.id),
     parentId: f.parentId ? map(f.parentId) : null,
     imageId: f.imageId && m.blobs[f.imageId] ? map(f.imageId) : undefined,
+    // Platzhalter geteilter Ordner nur beim vollständigen Ersetzen behalten (sonst wären es neue, verwaiste IDs).
+    shareId: replaceAll ? f.shareId : undefined,
   }));
   await write(['folders', 'blobs'], (s) => {
     folders.forEach((f) => s.folders.put(f));
