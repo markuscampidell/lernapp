@@ -15,6 +15,7 @@ const KIND_ICON: Record<FileKind, IconName> = {
   archive: 'archive',
   flashcards: 'cards',
   quiz: 'quiz',
+  richtext: 'richdoc',
   other: 'file',
 };
 

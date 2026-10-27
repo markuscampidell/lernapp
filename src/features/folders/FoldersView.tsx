@@ -19,6 +19,11 @@ import { NoteSheet } from './NoteSheet';
 import { ShareSheet } from '../share/ShareSheet';
 import { CardsEditor } from '../study/CardsEditor';
 import { QuizEditor } from '../study/QuizEditor';
+import { DocEditor } from '../docs/DocEditor';
+import { FileEditorSheet } from './FileEditorSheet';
+import { parseCards, parseQuiz } from '../study/format';
+import { loadBlob } from '../../storage/blobs';
+import type { IconName } from '../../components/Icon';
 import { AccountCard } from '../account/AccountCard';
 import { cloudEnabled } from '../../cloud/supabase';
 
@@ -56,8 +61,13 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
-  const [sheet, setSheet] = useState<'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | null>(null);
+  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | null>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
+  // Bearbeiten direkt aus der Liste (ohne die Datei zu öffnen).
+  const [editing, setEditing] = useState<
+    { kind: 'folder'; folder: Folder } | { kind: 'file'; file: FileItem } | { kind: 'cards' | 'quiz' | 'doc'; file: FileItem; text: string } | null
+  >(null);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -179,6 +189,22 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   });
   const newProp = (item: Folder | FileItem) => ({ isNew: isNewSince(item, since) });
 
+  /** Karteikarten/Quiz/Dokumente öffnen direkt den Inhalts-Editor, andere Dateien Name/Beschreibung/Ort. */
+  const startEdit = async (item: Folder | FileItem) => {
+    if (!('folderId' in item)) return setEditing({ kind: 'folder', folder: item });
+    const k = fileKind(item);
+    const editor = k === 'flashcards' ? 'cards' : k === 'quiz' ? 'quiz' : k === 'richtext' ? 'doc' : null;
+    if (!editor) return setEditing({ kind: 'file', file: item });
+    const blob = await loadBlob(item.blobId);
+    if (!blob) return alert('Die Datei konnte nicht geladen werden – bist du online?');
+    setEditing({ kind: editor, file: item, text: await blob.text() });
+  };
+  const editProp = (item: Folder | FileItem) => ({
+    onEdit: ('folderId' in item ? canModify(item) && (!item.shareId || lib.online) : canEditFolder(item) && !isOrphan(item.id) && (!item.shareId || lib.online))
+      ? () => startEdit(item)
+      : undefined,
+  });
+
   // Ein Eingabefeld für beide Knöpfe; nur der erlaubte Dateityp wechselt.
   const pickFiles = (accept: string | undefined = DOCUMENT_ACCEPT) => {
     const el = fileInput.current;
@@ -244,20 +270,11 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
           </header>
           <SharedInfo folder={folder} onPeople={() => setSheet('share')} />
           <div className="action-row">
-            <button className="btn primary" onClick={() => pickFiles()} disabled={!canAdd}>
-              <Icon name="upload" size={18} /> Dateien
+            <button className="btn primary" onClick={() => setSheet('menu')} disabled={!canAdd}>
+              <Icon name="plus" size={18} /> Hinzufügen <Icon name="chevron" size={16} />
             </button>
             <button className="btn ghost" onClick={() => setSheet('newFolder')} disabled={!canAdd || !canSub} title={canSub ? undefined : 'Maximale Tiefe erreicht'}>
-              <Icon name="folderPlus" size={18} /> Unterordner
-            </button>
-            <button className="btn ghost" onClick={() => setSheet('note')} disabled={!canAdd}>
-              <Icon name="text" size={18} /> Notiz
-            </button>
-            <button className="btn ghost" onClick={() => setSheet('cards')} disabled={!canAdd}>
-              <Icon name="cards" size={18} /> Karteikarten
-            </button>
-            <button className="btn ghost" onClick={() => setSheet('quiz')} disabled={!canAdd}>
-              <Icon name="quiz" size={18} /> Quiz
+              <Icon name="folderPlus" size={18} /> Neuer Unterordner
             </button>
           </div>
           {!canSub && <p className="muted small">Maximale Ordnertiefe ({MAX_DEPTH} Ebenen) erreicht – hier sind keine weiteren Unterordner möglich.</p>}
@@ -292,7 +309,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
                 <ul className="list">
                   {results.folders.map(({ f, path }) => (
                     <li key={f.id}>
-                      <FolderCard folder={f} path={path || undefined} {...itemProps('folders', f.id, () => openFolder(f.id))} />
+                      <FolderCard folder={f} path={path || undefined} {...editProp(f)} {...itemProps('folders', f.id, () => openFolder(f.id))} />
                     </li>
                   ))}
                 </ul>
@@ -304,7 +321,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
                 <ul className="list">
                   {results.files.map(({ f, path }) => (
                     <li key={f.id}>
-                      <FileCard file={f} path={path || undefined} {...itemProps('files', f.id, () => setViewing(f))} />
+                      <FileCard file={f} path={path || undefined} {...editProp(f)} {...itemProps('files', f.id, () => setViewing(f))} />
                     </li>
                   ))}
                 </ul>
@@ -342,7 +359,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
               <ul className="list">
                 {subfolders.map((f) => (
                   <li key={f.id}>
-                    <FolderCard folder={f} {...newProp(f)} {...itemProps('folders', f.id, () => openFolder(f.id))} />
+                    <FolderCard folder={f} {...newProp(f)} {...editProp(f)} {...itemProps('folders', f.id, () => openFolder(f.id))} />
                   </li>
                 ))}
               </ul>
@@ -354,7 +371,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
               <ul className="list">
                 {ownFiles.map((f) => (
                   <li key={f.id}>
-                    <FileCard file={f} {...newProp(f)} {...itemProps('files', f.id, () => setViewing(f))} />
+                    <FileCard file={f} {...newProp(f)} {...editProp(f)} {...itemProps('files', f.id, () => setViewing(f))} />
                   </li>
                 ))}
               </ul>
@@ -379,6 +396,35 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
         }}
       />
 
+      <input
+        ref={cameraInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          const list = e.target.files;
+          if (list && list.length) {
+            setStaged(stage(list));
+            setSheet('add');
+          }
+          e.target.value = '';
+        }}
+      />
+
+      {sheet === 'menu' && folder && (
+        <AddMenu
+          onClose={() => setSheet(null)}
+          onPick={(choice) => {
+            // Dateiauswahl muss direkt im Klick geöffnet werden (sonst blockiert der Browser sie).
+            if (choice === 'files') pickFiles();
+            if (choice === 'camera') cameraInput.current?.click();
+            setSheet(null);
+            if (choice !== 'files' && choice !== 'camera') afterBack(() => setSheet(choice));
+          }}
+        />
+      )}
+      {sheet === 'doc' && folder && <DocEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'share' && shareTarget && <ShareSheet folder={shareTarget} onClose={() => setSheet(null)} />}
       {sheet === 'newFolder' && (
         <FolderEditorSheet parentId={folder?.id ?? null} onClose={() => setSheet(null)} onCreated={(f) => afterBack(() => openFolder(f.id))} />
@@ -413,6 +459,11 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
         />
       )}
       {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}
+      {editing?.kind === 'folder' && <FolderEditorSheet folder={editing.folder} onClose={() => setEditing(null)} />}
+      {editing?.kind === 'file' && <FileEditorSheet file={editing.file} onClose={() => setEditing(null)} />}
+      {editing?.kind === 'cards' && <CardsEditor file={editing.file} initial={parseCards(editing.text).cards} onClose={() => setEditing(null)} />}
+      {editing?.kind === 'quiz' && <QuizEditor file={editing.file} initial={parseQuiz(editing.text).questions} onClose={() => setEditing(null)} />}
+      {editing?.kind === 'doc' && <DocEditor file={editing.file} initial={editing.text} onClose={() => setEditing(null)} />}
     </section>
   );
 }
@@ -571,5 +622,37 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
         </p>
       )}
     </>
+  );
+}
+
+type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz';
+const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; text: string; touchOnly?: boolean }[] = [
+  { id: 'files', icon: 'upload', title: 'Dateien durchsuchen', text: 'PDFs, Bilder, Präsentationen, Videos … von deinem Gerät' },
+  { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', text: 'Direkt mit der Kamera', touchOnly: true },
+  { id: 'doc', icon: 'richdoc', title: 'Text-Dokument', text: 'Formatierter Text mit Überschriften, Listen und Bildern' },
+  { id: 'note', icon: 'text', title: 'Notiz', text: 'Schnell ein paar Zeilen reiner Text' },
+  { id: 'cards', icon: 'cards', title: 'Karteikarten', text: 'Vorder- und Rückseite, mit Lernmodus' },
+  { id: 'quiz', icon: 'quiz', title: 'Quiz', text: 'Multiple Choice mit Auswertung' },
+];
+
+/** Auswahl, was in den Ordner hinzugefügt werden soll. */
+function AddMenu({ onPick, onClose }: { onPick: (c: AddChoice) => void; onClose: () => void }) {
+  return (
+    <Sheet title="Hinzufügen" onClose={onClose}>
+      <div className="add-menu">
+        {ADD_OPTIONS.filter((o) => !o.touchOnly || isTouchDevice).map((o) => (
+          <button key={o.id} className="card card-btn row-card add-option" onClick={() => onPick(o.id)}>
+            <span className={`thumb add-icon add-${o.id}`}>
+              <Icon name={o.icon} size={22} />
+            </span>
+            <div className="card-main">
+              <strong>{o.title}</strong>
+              <span className="muted small">{o.text}</span>
+            </div>
+            <Icon name="chevron" />
+          </button>
+        ))}
+      </div>
+    </Sheet>
   );
 }

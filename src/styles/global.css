@@ -888,6 +888,8 @@ input.narrow {
 .file-thumb.kind-video,
 .file-thumb.kind-audio { color: #8a4fd1; background: color-mix(in srgb, #8a4fd1 14%, var(--surface)); }
 .file-thumb.kind-spreadsheet { color: var(--good); background: var(--good-bg); }
+.file-thumb.kind-richtext,
+.kind-chip.kind-richtext { color: var(--info); background: var(--info-bg); }
 .file-thumb.kind-flashcards,
 .kind-chip.kind-flashcards { color: var(--series-2); background: color-mix(in srgb, var(--series-2) 14%, var(--surface)); }
 .file-thumb.kind-quiz,
@@ -1760,4 +1762,124 @@ button.person {
 .chip.access-chip {
   color: var(--info);
   background: var(--info-bg);
+}
+
+/* ---------- Hinzufügen-Menü ---------- */
+.add-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.add-icon.add-files,
+.add-icon.add-camera { color: var(--good); background: var(--good-bg); }
+.add-icon.add-doc,
+.add-icon.add-note { color: var(--info); background: var(--info-bg); }
+.add-icon.add-cards { color: var(--series-2); background: color-mix(in srgb, var(--series-2) 14%, var(--surface)); }
+.add-icon.add-quiz { color: #8a4fd1; background: color-mix(in srgb, #8a4fd1 14%, var(--surface)); }
+
+/* ---------- Text-Dokumente ---------- */
+.doc-editor,
+.doc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.study-body > .doc-editor,
+.viewer-body > .doc-panel {
+  max-width: 820px;
+}
+textarea.text-line.doc-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  background: transparent;
+  padding-left: 4px;
+}
+.doc-toolbar {
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  scrollbar-width: none;
+}
+.doc-toolbar .icon-btn {
+  flex: none;
+}
+.doc-toolbar .icon-btn.on {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.doc-content {
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.doc-editable {
+  min-height: 55dvh;
+  outline: none;
+  cursor: text;
+}
+.doc-editable:focus {
+  box-shadow: 0 0 0 2px var(--info);
+}
+.doc-content > :first-child {
+  margin-top: 0;
+}
+.doc-content > :last-child {
+  margin-bottom: 0;
+}
+.doc-content p {
+  margin: 0 0 0.7em;
+}
+.doc-content h2 {
+  margin: 1.1em 0 0.4em;
+  font-size: 1.35rem;
+}
+.doc-content h3 {
+  margin: 1em 0 0.4em;
+  font-size: 1.12rem;
+}
+.doc-content ul,
+.doc-content ol {
+  margin: 0 0 0.7em;
+  padding-left: 1.4em;
+}
+.doc-content blockquote {
+  margin: 0 0 0.7em;
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--text-2);
+}
+.doc-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0;
+  border-radius: 10px;
+}
+.doc-content a {
+  color: var(--info);
+}
+.doc-content code,
+.doc-content pre {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+.doc-content pre {
+  padding: 10px 12px;
+  white-space: pre-wrap;
+}
+.doc-panel-actions {
+  display: flex;
+  justify-content: flex-end;
 }

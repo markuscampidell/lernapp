@@ -13,6 +13,8 @@ export interface ItemCardProps {
   onDelete?: () => void;
   /** Verschieben-Knopf rechts (ausgeblendet im Auswahlmodus). */
   onMove?: () => void;
+  /** Bearbeiten-Knopf rechts (nur wenn erlaubt). */
+  onEdit?: () => void;
   /** Langes Drücken (startet den Auswahlmodus, nur auf Touch-Geräten). */
   onLongPress?: () => void;
   selecting?: boolean;
@@ -22,7 +24,7 @@ export interface ItemCardProps {
   isNew?: boolean;
 }
 
-function ItemCard({ onClick, onDelete, onMove, onLongPress, selecting, selected, thumb, children, deleteLabel }: ItemCardProps & { thumb: ReactNode; children: ReactNode; deleteLabel: string }) {
+function ItemCard({ onClick, onDelete, onMove, onEdit, onLongPress, selecting, selected, thumb, children, deleteLabel }: ItemCardProps & { thumb: ReactNode; children: ReactNode; deleteLabel: string }) {
   const press = useLongPress(onLongPress);
   return (
     <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}`}>
@@ -35,6 +37,11 @@ function ItemCard({ onClick, onDelete, onMove, onLongPress, selecting, selected,
           </span>
         )}
       </button>
+      {!selecting && onEdit && (
+        <button className="icon-btn item-action" aria-label="Bearbeiten" title="Bearbeiten" onClick={onEdit}>
+          <Icon name="edit" size={19} />
+        </button>
+      )}
       {!selecting && onMove && (
         <button className="icon-btn item-action" aria-label="Verschieben" title="Verschieben" onClick={onMove}>
           <Icon name="move" size={19} />

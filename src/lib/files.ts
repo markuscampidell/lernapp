@@ -12,12 +12,14 @@ export type FileKind =
   | 'archive'
   | 'flashcards'
   | 'quiz'
+  | 'richtext'
   | 'other';
 
 const EXT: Record<string, FileKind> = {
   // Eigene Lern-Dateien der App (siehe src/features/study/format.ts)
   karten: 'flashcards',
   quiz: 'quiz',
+  dokument: 'richtext',
   pdf: 'pdf',
   ppt: 'presentation', pptx: 'presentation', odp: 'presentation', key: 'presentation', pps: 'presentation', ppsx: 'presentation',
   doc: 'document', docx: 'document', odt: 'document', rtf: 'document', pages: 'document',
@@ -58,6 +60,7 @@ export const KIND_LABEL: Record<FileKind, string> = {
   archive: 'Archiv',
   flashcards: 'Karteikarten',
   quiz: 'Quiz',
+  richtext: 'Text-Dokument',
   other: 'Datei',
 };
 

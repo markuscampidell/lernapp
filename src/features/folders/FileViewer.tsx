@@ -9,6 +9,7 @@ import { PdfView } from './PdfView';
 import { useBackToClose } from '../../lib/router';
 import { FileEditorSheet } from './FileEditorSheet';
 import { CardsPanel, QuizPanel } from '../study/StudyPanels';
+import { DocPanel } from '../docs/DocPanel';
 
 const MAX_TEXT = 2 * 1024 * 1024;
 
@@ -24,7 +25,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const [missing, setMissing] = useState(false);
 
   const kind = fileKind(initial);
-  const readsText = kind === 'text' || kind === 'flashcards' || kind === 'quiz';
+  const readsText = kind === 'text' || kind === 'flashcards' || kind === 'quiz' || kind === 'richtext';
   useBackToClose(onClose);
 
   // Neu laden, wenn sich der Inhalt ändert (z. B. Karteikarten bearbeitet).
@@ -39,13 +40,14 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
       setBlob(b);
       u = URL.createObjectURL(b);
       setUrl(u);
-      if (readsText && b.size <= MAX_TEXT) setText(await b.text());
+      // Eigene Lern-Dateien immer lesen (Dokumente mit Bildern können groß sein), andere Texte nur bis 2 MB.
+      if (readsText && (kind !== 'text' || b.size <= MAX_TEXT)) setText(await b.text());
     });
     return () => {
       alive = false;
       if (u) URL.revokeObjectURL(u);
     };
-  }, [blobId, version, readsText]);
+  }, [blobId, version, readsText, kind]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -95,6 +97,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   else if (kind === 'text' && text !== null) body = <pre className="viewer-text">{text}</pre>;
   else if (kind === 'flashcards' && text !== null) body = <CardsPanel file={file} text={text} />;
   else if (kind === 'quiz' && text !== null) body = <QuizPanel file={file} text={text} />;
+  else if (kind === 'richtext' && text !== null) body = <DocPanel file={file} text={text} />;
   else
     body = (
       <div className="empty viewer-fallback">
