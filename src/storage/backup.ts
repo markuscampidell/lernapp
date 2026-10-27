@@ -46,7 +46,7 @@ export async function exportBackup(onProgress?: (msg: string) => void): Promise<
     const path = unique(`Dateien/${dir}/${safe(fullName(f))}`);
     const kind = kindOf(f.mime, f.ext);
     // Bereits komprimierte Formate nur speichern, Text etc. komprimieren.
-    const level = kind === 'text' || kind === 'document' || kind === 'spreadsheet' || kind === 'other' ? 6 : 0;
+    const level = kind === 'text' || kind === 'flashcards' || kind === 'quiz' || kind === 'document' || kind === 'spreadsheet' || kind === 'other' ? 6 : 0;
     entries[path] = [new Uint8Array(await blob.arrayBuffer()), { level }];
     manifestFiles.push({ ...f, path });
   }

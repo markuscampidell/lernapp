@@ -108,6 +108,15 @@ export async function updateFile(file: FileItem, patch: { name?: string; descrip
   await write(['files'], (s) => s.files.put(next));
 }
 
+/** Inhalt einer Datei ersetzen (z. B. bearbeitete Karteikarten). */
+export async function replaceContent(file: FileItem, blob: Blob, name?: string): Promise<void> {
+  const next: FileItem = { ...file, name: name?.trim() || file.name, size: blob.size, updatedAt: now() };
+  await write(['files', 'blobs'], (s) => {
+    s.blobs.put(blob, file.blobId);
+    s.files.put(next);
+  });
+}
+
 export async function moveMany(data: LocalData, folderIds: string[], fileIds: string[], targetId: string | null): Promise<void> {
   const t = now();
   const movedFolders = data.folders.filter((f) => folderIds.includes(f.id)).map((f) => ({ ...f, parentId: targetId, updatedAt: t }));

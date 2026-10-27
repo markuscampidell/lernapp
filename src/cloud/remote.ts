@@ -232,6 +232,17 @@ export async function updateFile(file: FileItem, patch: { name?: string; descrip
   expectAll(check(await sb().from('files').update(row).eq('id', file.id).select('id')), 1);
 }
 
+/** Inhalt einer geteilten Datei ersetzen: neue Datei hochladen, Eintrag umstellen, alte Datei entfernen. */
+export async function replaceContent(file: FileItem, blob: Blob, name?: string): Promise<void> {
+  const blob_path = await upload(file.shareId!, blob, file.mime);
+  const res = await sb().from('files').update({ blob_path, size: blob.size, name: name?.trim() || file.name }).eq('id', file.id).select('id');
+  if (res.error || !res.data?.length) {
+    await removePaths([blob_path]);
+    throw new Error(res.error ? friendly(res.error.message) : 'Dazu hast du keine Berechtigung.');
+  }
+  if (isRemoteBlob(file.blobId)) await removePaths([remotePath(file.blobId)]);
+}
+
 export async function moveMany(folderIds: string[], fileIds: string[], targetId: string): Promise<void> {
   if (folderIds.length) expectAll(check(await sb().from('folders').update({ parent_id: targetId }).in('id', folderIds).select('id')), folderIds.length);
   if (fileIds.length) expectAll(check(await sb().from('files').update({ folder_id: targetId }).in('id', fileIds).select('id')), fileIds.length);

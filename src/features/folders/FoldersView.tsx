@@ -17,6 +17,8 @@ import { FolderEditorSheet } from './FolderEditorSheet';
 import { FileViewer } from './FileViewer';
 import { NoteSheet } from './NoteSheet';
 import { ShareSheet } from '../share/ShareSheet';
+import { CardsEditor } from '../study/CardsEditor';
+import { QuizEditor } from '../study/QuizEditor';
 import { AccountCard } from '../account/AccountCard';
 import { cloudEnabled } from '../../cloud/supabase';
 
@@ -54,7 +56,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
-  const [sheet, setSheet] = useState<'newFolder' | 'edit' | 'note' | 'add' | 'share' | null>(null);
+  const [sheet, setSheet] = useState<'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | null>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -251,6 +253,12 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
             <button className="btn ghost" onClick={() => setSheet('note')} disabled={!canAdd}>
               <Icon name="text" size={18} /> Notiz
             </button>
+            <button className="btn ghost" onClick={() => setSheet('cards')} disabled={!canAdd}>
+              <Icon name="cards" size={18} /> Karteikarten
+            </button>
+            <button className="btn ghost" onClick={() => setSheet('quiz')} disabled={!canAdd}>
+              <Icon name="quiz" size={18} /> Quiz
+            </button>
           </div>
           {!canSub && <p className="muted small">Maximale Ordnertiefe ({MAX_DEPTH} Ebenen) erreicht – hier sind keine weiteren Unterordner möglich.</p>}
         </>
@@ -379,6 +387,8 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
         <FolderEditorSheet folder={folder} onClose={() => setSheet(null)} onDeleted={() => afterBack(() => replace(folderHash(folder.parentId)))} />
       )}
       {sheet === 'note' && folder && <NoteSheet folderId={folder.id} onClose={() => setSheet(null)} />}
+      {sheet === 'cards' && folder && <CardsEditor folderId={folder.id} onClose={() => setSheet(null)} />}
+      {sheet === 'quiz' && folder && <QuizEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'add' && folder && (
         <AddFilesSheet folder={folder} items={staged} onChange={setStaged} onMore={() => pickFiles()} onClose={() => setSheet(null)} />
       )}

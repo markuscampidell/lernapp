@@ -28,6 +28,8 @@ interface LibraryValue {
   addFiles: (folderId: string, items: NewFileInput[], onProgress?: (done: number) => void) => Promise<void>;
   updateFile: (file: FileItem, patch: Partial<Pick<FileItem, 'name' | 'description' | 'folderId'>>) => Promise<void>;
   deleteFile: (id: string) => Promise<void>;
+  /** Inhalt einer Datei ersetzen (eigene Lern-Dateien wie Karteikarten/Quiz). */
+  replaceFileContent: (file: FileItem, blob: Blob, name?: string) => Promise<void>;
   /** Mehrere Ordner (samt Inhalt) und Dateien in einem Schritt löschen. */
   deleteMany: (folderIds: string[], fileIds: string[]) => Promise<void>;
   /** Ordner und Dateien in einen anderen Ordner verschieben (null = oberste Ebene, nur für Ordner). */
@@ -543,6 +545,21 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [moveMany, reload, requireOnline],
   );
 
+  const replaceFileContent = useCallback<LibraryValue['replaceFileContent']>(
+    async (file, blob, name) => {
+      if (file.shareId) {
+        requireOnline();
+        if (!canModify(file)) throw new Error('Nur die Person, die die Datei hinzugefügt hat, oder der Besitzer kann sie ändern.');
+        await remote.replaceContent(file, blob, name);
+        await refreshRemote();
+      } else {
+        await local.replaceContent(file, blob, name);
+        await reloadLocal();
+      }
+    },
+    [canModify, refreshRemote, reloadLocal, requireOnline],
+  );
+
   // ---------- Teilen ----------
   const shareFolder = useCallback<LibraryValue['shareFolder']>(
     async (folderId, userIds, onProgress) => {
@@ -637,6 +654,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       addFiles,
       updateFile,
       deleteFile,
+      replaceFileContent,
       deleteMany,
       moveMany,
       reload,
@@ -668,7 +686,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       refreshRemote,
     }),
     [
-      ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, deleteMany, moveMany, reload,
+      ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
       user, online, snap, userName, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canAddIn, deleteProblem, moveProblem,
       shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, stopSharing, addMembers, removeMember, leaveShare, refreshRemote,
     ],

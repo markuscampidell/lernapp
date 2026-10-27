@@ -13,6 +13,8 @@ const KIND_ICON: Record<FileKind, IconName> = {
   document: 'document',
   spreadsheet: 'spreadsheet',
   archive: 'archive',
+  flashcards: 'cards',
+  quiz: 'quiz',
   other: 'file',
 };
 
