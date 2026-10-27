@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Folder } from '../../domain/types';
 import { pathOf, scopeOf, subtreeIds } from '../../domain/tree';
-import { SHARED_ROOT } from '../../domain/types';
+import { SHARED_ROOT, type Access } from '../../domain/types';
+import { AccessPicker } from '../share/AccessPicker';
 import { useLibrary } from '../../state/Library';
 import { useBlobUrl } from '../../hooks/useBlobUrl';
 import { Sheet } from '../../components/Sheet';
@@ -20,7 +21,8 @@ interface Props {
 }
 
 export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated, onDeleted }: Props) {
-  const { folders, files, createFolder, updateFolder, deleteFolder, deleteProblem, moveProblem, isRoot, isOwner, canModify } = useLibrary();
+  const { folders, files, createFolder, updateFolder, deleteFolder, deleteProblem, moveProblem, isRoot, isOwner, canModify, setAccess } = useLibrary();
+  const [access, setAccessValue] = useState<Access | null>(folder?.access ?? null);
   const [name, setName] = useState(folder?.name ?? '');
   const [description, setDescription] = useState(folder?.description ?? '');
   // undefined = unverändert, null = entfernt, Blob = neu gewählt
@@ -55,6 +57,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
     setErr(null);
     try {
       if (folder) {
+        if (folder.shareId && access !== (folder.access ?? null)) await setAccess(folder, access);
         await updateFolder(folder, { name, description, image, parentId: target });
         onClose();
       } else {
@@ -174,6 +177,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
             </button>
           </div>
         )}
+        {folder?.shareId && <AccessPicker item={folder} value={access} onChange={setAccessValue} />}
         {err && <p className="notice critical">{err}</p>}
       </Sheet>
       {picking && folder && (

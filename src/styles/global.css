@@ -1724,3 +1724,40 @@ button.person {
   font-size: 0.9rem;
   color: var(--text-2);
 }
+
+/* ---------- Rechte ---------- */
+.access-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.access-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  text-align: left;
+  font-weight: 500;
+}
+.access-option.on {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.radio-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+}
+.access-option.on .radio-dot {
+  border: 5px solid var(--info);
+}
+.chip.access-chip {
+  color: var(--info);
+  background: var(--info-bg);
+}

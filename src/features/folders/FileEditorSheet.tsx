@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { FileItem } from '../../domain/types';
+import type { Access, FileItem } from '../../domain/types';
+import { AccessPicker } from '../share/AccessPicker';
 import { pathOf } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { Sheet } from '../../components/Sheet';
@@ -8,7 +9,8 @@ import { TextLine } from '../../components/TextLine';
 import { FolderPicker } from '../../components/FolderPicker';
 
 export function FileEditorSheet({ file, onClose }: { file: FileItem; onClose: () => void }) {
-  const { folders, updateFile, deleteFile, deleteProblem, moveProblem } = useLibrary();
+  const { folders, updateFile, deleteFile, deleteProblem, moveProblem, setAccess } = useLibrary();
+  const [access, setAccessValue] = useState<Access | null>(file.access ?? null);
   const [name, setName] = useState(file.name);
   const [description, setDescription] = useState(file.description ?? '');
   const [folderId, setFolderId] = useState(file.folderId);
@@ -28,7 +30,11 @@ export function FileEditorSheet({ file, onClose }: { file: FileItem; onClose: ()
       setBusy(false);
     }
   };
-  const save = () => attempt(() => updateFile(file, { name, description, folderId }));
+  const save = () =>
+    attempt(async () => {
+      if (file.shareId && access !== (file.access ?? null)) await setAccess(file, access);
+      await updateFile(file, { name, description, folderId });
+    });
   const remove = () => confirm(`„${file.name}“ löschen?`) && attempt(() => deleteFile(file.id));
 
   return (
@@ -77,6 +83,7 @@ export function FileEditorSheet({ file, onClose }: { file: FileItem; onClose: ()
             <span className="link">Verschieben</span>
           </button>
         </div>
+        {file.shareId && <AccessPicker item={file} value={access} onChange={setAccessValue} />}
         {err && <p className="notice critical">{err}</p>}
       </Sheet>
       {picking && (

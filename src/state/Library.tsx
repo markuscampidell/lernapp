@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { FileItem, Folder } from '../domain/types';
+import type { Access, FileItem, Folder } from '../domain/types';
 import { MAX_DEPTH, SHARED_ROOT } from '../domain/types';
 import { canMoveFolder, depthOf, subtreeIds } from '../domain/tree';
 import { db } from '../storage/db';
@@ -49,8 +49,18 @@ interface LibraryValue {
   isOwner: (shareId: string | undefined) => boolean;
   /** Platzhalter eines geteilten Ordners, der hier gerade nicht verfügbar ist (abgemeldet, gelöscht …). */
   isOrphan: (folderId: string) => boolean;
+  /** Darf ich den Eintrag ändern (umbenennen, Inhalt bearbeiten, verschieben)? */
   canModify: (item: Item) => boolean;
   canEditFolder: (folder: Folder) => boolean;
+  /** Darf ich den Eintrag löschen? (Bei Ordnern zählt zusätzlich der Inhalt, siehe deleteProblem.) */
+  canDeleteItem: (item: Item) => boolean;
+  /** Was andere Mitglieder mit dem Eintrag dürfen (inkl. Vererbung). */
+  accessOf: (item: Item) => Access;
+  /** Vererbter Wert, falls der Eintrag selbst nichts eingestellt hat. */
+  inheritedAccessOf: (item: Item) => Access;
+  /** Darf ich die Rechte des Eintrags einstellen (Ersteller oder Besitzer)? */
+  canSetAccess: (item: Item) => boolean;
+  setAccess: (item: Item, access: Access | null) => Promise<void>;
   canAddIn: (folderId: string | null) => boolean;
   /** null = erlaubt, sonst der Grund. */
   deleteProblem: (folderIds: string[], fileIds: string[]) => string | null;
@@ -228,8 +238,34 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const isOwner = useCallback((shareId: string | undefined) => !!shareId && !!me && shareMap.get(shareId)?.ownerId === me, [shareMap, me]);
   const isRoot = useCallback((f: Folder | undefined) => !!f?.shareId && shareMap.get(f.shareId)?.rootId === f.id, [shareMap]);
   const isOrphan = useCallback((id: string) => orphans.has(id), [orphans]);
-  const canModify = useCallback((item: Item) => !item.shareId || isOwner(item.shareId) || (!!me && item.createdBy === me), [isOwner, me]);
-  const canEditFolder = useCallback((f: Folder) => canModify(f) || isRoot(f), [canModify, isRoot]);
+  /** Rechte erben – nur über Ordner derselben Person; sonst "nur lesen". */
+  const inheritFrom = useCallback(
+    (folderId: string | null, creator: string | null | undefined): Access => {
+      let id = folderId;
+      for (let i = 0; id && i < 64; i++) {
+        const f = byId.get(id);
+        if (!f?.shareId || f.createdBy !== creator) return 'read';
+        if (f.access) return f.access;
+        if (isRoot(f)) return 'read';
+        id = f.parentId;
+      }
+      return 'read';
+    },
+    [byId, isRoot],
+  );
+  const inheritedAccessOf = useCallback(
+    (item: Item): Access => {
+      if ('folderId' in item) return inheritFrom(item.folderId, item.createdBy);
+      return isRoot(item) ? 'edit' : inheritFrom(item.parentId, item.createdBy);
+    },
+    [inheritFrom, isRoot],
+  );
+  const accessOf = useCallback((item: Item): Access => item.access ?? inheritedAccessOf(item), [inheritedAccessOf]);
+  const mine = useCallback((item: Item) => !item.shareId || isOwner(item.shareId) || (!!me && item.createdBy === me), [isOwner, me]);
+  const canModify = useCallback((item: Item) => mine(item) || accessOf(item) !== 'read', [mine, accessOf]);
+  const canDeleteItem = useCallback((item: Item) => mine(item) || (accessOf(item) === 'delete' && !('parentId' in item && isRoot(item))), [mine, accessOf, isRoot]);
+  const canEditFolder = canModify;
+  const canSetAccess = useCallback((item: Item) => !!item.shareId && !!me && (isOwner(item.shareId) || item.createdBy === me), [isOwner, me]);
   const canAddIn = useCallback(
     (id: string | null) => {
       if (id === null) return true;
@@ -248,15 +284,15 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [folders, byId, isRoot],
   );
 
-  /** Darf ich diesen geteilten Ordner samt Inhalt entfernen (Besitzer oder alles darin von mir)? */
+  /** Darf ich diesen geteilten Ordner samt Inhalt entfernen (Besitzer, oder alles darin darf ich löschen)? */
   const canRemoveRemoteFolder = useCallback(
     (f: Folder) => {
       if (isOwner(f.shareId)) return true;
-      if (!me || f.createdBy !== me) return false;
+      if (isRoot(f) || !canDeleteItem(f)) return false;
       const ids = subtreeIds(folders, f.id);
-      return folders.every((x) => !ids.has(x.id) || x.createdBy === me) && files.every((x) => !ids.has(x.folderId) || x.createdBy === me);
+      return folders.every((x) => !ids.has(x.id) || canDeleteItem(x)) && files.every((x) => !ids.has(x.folderId) || canDeleteItem(x));
     },
-    [folders, files, isOwner, me],
+    [folders, files, isOwner, isRoot, canDeleteItem],
   );
 
   const deleteProblem = useCallback(
@@ -273,21 +309,21 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         if (isRoot(f)) {
           if (!isOwner(f.shareId)) return `Nur ${userName(shareOf(f)?.ownerId)} (Besitzer) kann „${f.name}“ löschen. Du kannst den Ordner stattdessen verlassen.`;
         } else if (!canRemoveRemoteFolder(f)) {
-          return f.createdBy === me
-            ? `„${f.name}“ enthält Einträge von anderen – die kannst du nicht löschen.`
-            : `„${f.name}“ wurde von ${userName(f.createdBy)} erstellt – nur diese Person oder der Besitzer kann ihn löschen.`;
+          return canDeleteItem(f)
+            ? `„${f.name}“ enthält Einträge von anderen, die du nicht löschen darfst.`
+            : `„${f.name}“ wurde von ${userName(f.createdBy)} erstellt – du darfst ihn nicht löschen.`;
         }
       }
       for (const id of fileIds) {
         const f = files.find((x) => x.id === id);
         if (!f?.shareId) continue;
         remoteInvolved = true;
-        if (!canModify(f)) return `„${fullName(f)}“ wurde von ${userName(f.createdBy)} hinzugefügt – nur diese Person oder der Besitzer kann sie löschen.`;
+        if (!canDeleteItem(f)) return `„${fullName(f)}“ wurde von ${userName(f.createdBy)} hinzugefügt – du darfst sie nicht löschen.`;
       }
       if (remoteInvolved && !online) return offlineError().message;
       return null;
     },
-    [byId, files, containsSharedRoot, isRoot, isOwner, userName, shareOf, canRemoveRemoteFolder, canModify, me, online],
+    [byId, files, containsSharedRoot, isRoot, isOwner, userName, shareOf, canRemoveRemoteFolder, canDeleteItem, online],
   );
 
   const moveProblem = useCallback(
@@ -312,19 +348,23 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         }
         remoteInvolved = true;
         if (src === target ? !canModify(f) : !canRemoveRemoteFolder(f)) {
-          return `„${f.name}“ wurde von ${userName(f.createdBy)} erstellt – nur diese Person oder der Besitzer kann ihn verschieben.`;
+          return src === target
+            ? `„${f.name}“ wurde von ${userName(f.createdBy)} erstellt – du darfst ihn nicht verschieben.`
+            : `„${f.name}“ kann nur aus dem geteilten Ordner heraus, wenn du alles darin löschen darfst.`;
         }
       }
       for (const id of fileIds) {
         const f = files.find((x) => x.id === id);
         if (!f?.shareId) continue;
         remoteInvolved = true;
-        if (!canModify(f)) return `„${fullName(f)}“ wurde von ${userName(f.createdBy)} hinzugefügt – nur diese Person oder der Besitzer kann sie verschieben.`;
+        if (f.shareId === target ? !canModify(f) : !canDeleteItem(f)) {
+          return `„${fullName(f)}“ wurde von ${userName(f.createdBy)} hinzugefügt – du darfst sie ${f.shareId === target ? 'nicht verschieben' : 'nicht aus dem geteilten Ordner nehmen'}.`;
+        }
       }
       if (remoteInvolved && !online) return offlineError().message;
       return null;
     },
-    [byId, files, folders, storeOf, isRoot, isOwner, containsSharedRoot, canModify, canRemoveRemoteFolder, userName, online],
+    [byId, files, folders, storeOf, isRoot, isOwner, containsSharedRoot, canModify, canDeleteItem, canRemoveRemoteFolder, userName, online],
   );
 
   const shareProblem = useCallback(
@@ -560,6 +600,17 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [canModify, refreshRemote, reloadLocal, requireOnline],
   );
 
+  const setAccess = useCallback<LibraryValue['setAccess']>(
+    async (item, access) => {
+      if (!item.shareId) return;
+      requireOnline();
+      if (!canSetAccess(item)) throw new Error('Nur die Person, die den Eintrag erstellt hat, oder der Besitzer kann die Rechte ändern.');
+      await remote.setAccess('folderId' in item ? 'files' : 'folders', item.id, access);
+      await refreshRemote();
+    },
+    [canSetAccess, refreshRemote, requireOnline],
+  );
+
   // ---------- Teilen ----------
   const shareFolder = useCallback<LibraryValue['shareFolder']>(
     async (folderId, userIds, onProgress) => {
@@ -670,6 +721,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       isOrphan,
       canModify,
       canEditFolder,
+      canDeleteItem,
+      accessOf,
+      inheritedAccessOf,
+      canSetAccess,
+      setAccess,
       canAddIn,
       deleteProblem,
       moveProblem,
@@ -687,7 +743,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
-      user, online, snap, userName, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canAddIn, deleteProblem, moveProblem,
+      user, online, snap, userName, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
       shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, stopSharing, addMembers, removeMember, leaveShare, refreshRemote,
     ],
   );

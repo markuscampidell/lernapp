@@ -1,3 +1,6 @@
+/** Rechte der anderen Mitglieder: nur lesen / lesen & bearbeiten / lesen, bearbeiten & löschen. */
+export type Access = 'read' | 'edit' | 'delete';
+
 /** Ein Ordner. parentId === null heißt: oberste Ebene (Ordner-Tab). */
 export interface Folder {
   id: string;
@@ -13,6 +16,8 @@ export interface Folder {
   /** Wer den Eintrag erstellt / zuletzt geändert hat (nur geteilt). */
   createdBy?: string | null;
   updatedBy?: string | null;
+  /** Was andere Mitglieder dürfen (nur geteilt); null/undefined = wie der übergeordnete Ordner. */
+  access?: Access | null;
 }
 
 /** Eine Datei in einem Ordner. Der Inhalt liegt als Blob unter blobId. */
@@ -36,6 +41,8 @@ export interface FileItem {
   /** Wer den Eintrag erstellt / zuletzt geändert hat (nur geteilt). */
   createdBy?: string | null;
   updatedBy?: string | null;
+  /** Was andere Mitglieder dürfen (nur geteilt); null/undefined = wie der übergeordnete Ordner. */
+  access?: Access | null;
 }
 
 /** Datei, die per Android-"Teilen" ankam und noch einsortiert werden muss. */

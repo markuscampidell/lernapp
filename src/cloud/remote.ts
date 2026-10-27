@@ -1,6 +1,6 @@
 // Zugriff auf geteilte Ordner in Supabase. Alle Rechte prüft zusätzlich der Server (supabase/schema.sql).
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { FileItem, Folder } from '../domain/types';
+import type { Access, FileItem, Folder } from '../domain/types';
 import { subtreeIds } from '../domain/tree';
 import { newId } from '../lib/id';
 import { fullName, kindOf, makeThumbnail, splitName } from '../lib/files';
@@ -56,6 +56,7 @@ const toFolder = (r: Row): Folder => ({
   shareId: String(r.share_id),
   createdBy: (r.created_by as string | null) ?? null,
   updatedBy: (r.updated_by as string | null) ?? null,
+  access: (r.access as Access | null) ?? null,
 });
 
 const toFile = (r: Row): FileItem => ({
@@ -73,6 +74,7 @@ const toFile = (r: Row): FileItem => ({
   shareId: String(r.share_id),
   createdBy: (r.created_by as string | null) ?? null,
   updatedBy: (r.updated_by as string | null) ?? null,
+  access: (r.access as Access | null) ?? null,
 });
 
 /** Liest eine ganze Tabelle (Supabase liefert höchstens 1000 Zeilen pro Anfrage). */
@@ -241,6 +243,11 @@ export async function replaceContent(file: FileItem, blob: Blob, name?: string):
     throw new Error(res.error ? friendly(res.error.message) : 'Dazu hast du keine Berechtigung.');
   }
   if (isRemoteBlob(file.blobId)) await removePaths([remotePath(file.blobId)]);
+}
+
+/** Was andere Mitglieder mit einem Eintrag tun dürfen (null = wie der Ordner). */
+export async function setAccess(kind: 'folders' | 'files', id: string, access: Access | null): Promise<void> {
+  expectAll(check(await sb().from(kind).update({ access }).eq('id', id).select('id')), 1);
 }
 
 export async function moveMany(folderIds: string[], fileIds: string[], targetId: string): Promise<void> {

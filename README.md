@@ -19,7 +19,8 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
 - **Hochladen**: Dateien oder Fotos auswählen, benennen/beschreiben, Zielordner wählen.
   Auf Android erscheint die installierte App im **Teilen**-Menü anderer Apps.
 - **Teilen** (Konto mit Benutzername + Passwort): Ordner unter „Meine Ordner“ mit anderen teilen; sie erscheinen bei ihnen unter
-  „Geteilte Ordner“. Alle Mitglieder können hinzufügen, aber nur Eigenes ändern/löschen; der Besitzer darf alles, fügt Personen
+  „Geteilte Ordner“. Alle Mitglieder können hinzufügen; was andere mit einem Eintrag tun dürfen (nur lesen / bearbeiten / auch löschen),
+  stellt die Person ein, die ihn erstellt hat (Ordner vererben es). Der Besitzer darf alles, fügt Personen
   hinzu, entfernt sie oder beendet das Teilen. „!“ markiert Neues von anderen. Geöffnete geteilte Dateien sind offline lesbar.
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
@@ -45,7 +46,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
 
 1. Neues Projekt anlegen (Region z. B. Frankfurt).
 2. *Authentication → Sign In / Providers → Email*: **„Confirm email“ ausschalten** (Anmeldung nur mit Benutzername).
-3. *SQL Editor*: Inhalt von `supabase/schema.sql` einfügen und ausführen (Tabellen, Rechte, Dateispeicher).
+3. *SQL Editor*: Inhalt von `supabase/schema.sql` einfügen und ausführen (Tabellen, Rechte, Dateispeicher),
+   danach genauso `supabase/002_rechte.sql` (Rechte pro Datei/Ordner).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

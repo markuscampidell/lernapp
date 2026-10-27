@@ -55,6 +55,18 @@ function ByChip({ id }: { id: string | null | undefined }) {
   return <span className="chip by-chip">von {id && id === me?.id ? 'dir' : userName(id)}</span>;
 }
 
+/** Zeigt, wenn andere mehr als nur lesen dürfen. */
+function AccessChip({ item }: { item: Folder | FileItem }) {
+  const { accessOf } = useLibrary();
+  const a = accessOf(item);
+  if (a === 'read') return null;
+  return (
+    <span className="chip access-chip" title={a === 'delete' ? 'Alle dürfen bearbeiten und löschen' : 'Alle dürfen bearbeiten'}>
+      <Icon name={a === 'delete' ? 'trash' : 'edit'} size={12} /> {a === 'delete' ? 'alle: löschen' : 'alle: bearbeiten'}
+    </span>
+  );
+}
+
 export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { folder: Folder }) {
   const { folders, files, unread, isRoot, shareOf, me, userName, isOrphan } = useLibrary();
   const c = counts(folders, files, folder.id);
@@ -89,6 +101,7 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
         <span className="chips">
           {isNew && <span className="chip new-chip">Neu</span>}
           {folder.shareId && !root && <ByChip id={folder.createdBy} />}
+          {folder.shareId && !root && <AccessChip item={folder} />}
         </span>
       )}
     </ItemCard>
@@ -107,6 +120,7 @@ export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file:
         <span className={`chip kind-chip kind-${kind}`}>{KIND_LABEL[kind]}</span>
         <span className="chip">{formatSize(file.size)}</span>
         {file.shareId && <ByChip id={file.createdBy} />}
+        {file.shareId && <AccessChip item={file} />}
       </span>
     </ItemCard>
   );
