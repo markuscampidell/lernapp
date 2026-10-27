@@ -1858,11 +1858,68 @@ textarea.text-line.doc-title {
   color: var(--text-2);
 }
 .doc-content img {
-  display: block;
+  display: inline-block;
+  vertical-align: bottom;
   max-width: 100%;
   height: auto;
-  margin: 8px 0;
+  margin: 4px 0;
   border-radius: 10px;
+}
+.doc-editable img {
+  cursor: pointer;
+}
+.doc-edit-wrap {
+  position: relative;
+}
+.toolbar-sep {
+  flex: none;
+  width: 1px;
+  margin: 6px 3px;
+  background: var(--border);
+}
+/* Rahmen mit Anfassern um ein ausgewähltes Bild */
+.img-frame {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  border: 2px solid var(--info);
+  border-radius: 10px;
+}
+.img-handle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--info);
+  pointer-events: auto;
+  touch-action: none;
+}
+.img-handle.h-nw { left: 0; top: 0; cursor: nwse-resize; }
+.img-handle.h-n { left: 50%; top: 0; cursor: ns-resize; }
+.img-handle.h-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.img-handle.h-e { left: 100%; top: 50%; cursor: ew-resize; }
+.img-handle.h-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.img-handle.h-s { left: 50%; top: 100%; cursor: ns-resize; }
+.img-handle.h-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.img-handle.h-w { left: 0; top: 50%; cursor: ew-resize; }
+@media (pointer: coarse) {
+  .img-handle {
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+  }
+}
+.img-size {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.72rem;
 }
 .doc-content a {
   color: var(--info);
@@ -1882,4 +1939,11 @@ textarea.text-line.doc-title {
 .doc-panel-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+[hidden] {
+  display: none !important;
+}
+.details-meta {
+  margin: 0;
 }

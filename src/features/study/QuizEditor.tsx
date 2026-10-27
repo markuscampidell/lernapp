@@ -5,6 +5,7 @@ import { Icon } from '../../components/Icon';
 import { Pager, StudyScreen } from './StudyScreen';
 import { newAnswer, newQuestion, questionProblem, QUIZ_EXT, QUIZ_MIME, quizBlob, type Answer, type Question } from './format';
 import { useStudySave } from './useStudySave';
+import { DetailsButton } from './DetailsButton';
 
 const MAX_ANSWERS = 6;
 const LETTERS = 'ABCDEF';
@@ -63,9 +64,12 @@ export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileIt
       subtitle={`${filled} ${filled === 1 ? 'Frage' : 'Fragen'}`}
       onClose={close}
       actions={
-        <button className="btn primary small" onClick={submit} disabled={busy}>
-          {busy ? 'Speichert …' : 'Speichern'}
-        </button>
+        <>
+          {file && <DetailsButton file={file} onRenamed={setName} onDeleted={onClose} />}
+          <button className="btn primary small" onClick={submit} disabled={busy}>
+            {busy ? 'Speichert …' : 'Speichern'}
+          </button>
+        </>
       }
     >
       <div className="study-form">

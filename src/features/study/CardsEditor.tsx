@@ -5,6 +5,7 @@ import { Icon } from '../../components/Icon';
 import { Pager, StudyScreen } from './StudyScreen';
 import { CARDS_EXT, CARDS_MIME, cardsBlob, newCard, type Card } from './format';
 import { useStudySave } from './useStudySave';
+import { DetailsButton } from './DetailsButton';
 
 /** Karteikarten anlegen/bearbeiten: eine Karte pro Seite (Vorder- und Rückseite). */
 export function CardsEditor({ file, folderId, initial, onClose }: { file?: FileItem; folderId?: string; initial?: Card[]; onClose: () => void }) {
@@ -52,9 +53,12 @@ export function CardsEditor({ file, folderId, initial, onClose }: { file?: FileI
       subtitle={`${filled} ${filled === 1 ? 'Karte' : 'Karten'}`}
       onClose={close}
       actions={
-        <button className="btn primary small" onClick={submit} disabled={busy}>
-          {busy ? 'Speichert …' : 'Speichern'}
-        </button>
+        <>
+          {file && <DetailsButton file={file} onRenamed={setName} onDeleted={onClose} />}
+          <button className="btn primary small" onClick={submit} disabled={busy}>
+            {busy ? 'Speichert …' : 'Speichern'}
+          </button>
+        </>
       }
     >
       <div className="study-form">

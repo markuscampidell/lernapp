@@ -9,12 +9,10 @@ import { fileKind, formatSize, fullName, KIND_LABEL } from '../../lib/files';
 
 export interface ItemCardProps {
   onClick: () => void;
-  /** Löschen-Knopf rechts (ausgeblendet im Auswahlmodus). */
-  onDelete?: () => void;
-  /** Verschieben-Knopf rechts (ausgeblendet im Auswahlmodus). */
-  onMove?: () => void;
-  /** Bearbeiten-Knopf rechts (nur wenn erlaubt). */
+  /** ✏️ Inhalt bearbeiten (nur Karteikarten/Quiz/Dokumente und nur wenn erlaubt). */
   onEdit?: () => void;
+  /** ⓘ Details: Name, Beschreibung, Ort, Rechte, Löschen. */
+  onInfo?: () => void;
   /** Langes Drücken (startet den Auswahlmodus, nur auf Touch-Geräten). */
   onLongPress?: () => void;
   selecting?: boolean;
@@ -24,7 +22,7 @@ export interface ItemCardProps {
   isNew?: boolean;
 }
 
-function ItemCard({ onClick, onDelete, onMove, onEdit, onLongPress, selecting, selected, thumb, children, deleteLabel }: ItemCardProps & { thumb: ReactNode; children: ReactNode; deleteLabel: string }) {
+function ItemCard({ onClick, onEdit, onInfo, onLongPress, selecting, selected, thumb, children, label }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string }) {
   const press = useLongPress(onLongPress);
   return (
     <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}`}>
@@ -38,18 +36,13 @@ function ItemCard({ onClick, onDelete, onMove, onEdit, onLongPress, selecting, s
         )}
       </button>
       {!selecting && onEdit && (
-        <button className="icon-btn item-action" aria-label="Bearbeiten" title="Bearbeiten" onClick={onEdit}>
+        <button className="icon-btn item-action item-edit" aria-label={`„${label}“ bearbeiten`} title="Bearbeiten" onClick={onEdit}>
           <Icon name="edit" size={19} />
         </button>
       )}
-      {!selecting && onMove && (
-        <button className="icon-btn item-action" aria-label="Verschieben" title="Verschieben" onClick={onMove}>
-          <Icon name="move" size={19} />
-        </button>
-      )}
-      {!selecting && onDelete && (
-        <button className="icon-btn item-delete" aria-label={deleteLabel} title="Löschen" onClick={onDelete}>
-          <Icon name="trash" size={19} />
+      {!selecting && onInfo && (
+        <button className="icon-btn item-action item-info" aria-label={`Details zu „${label}“`} title="Details" onClick={onInfo}>
+          <Icon name="info" size={19} />
         </button>
       )}
     </div>
@@ -96,7 +89,7 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
     </span>
   );
   return (
-    <ItemCard {...rest} thumb={thumb} deleteLabel={`„${folder.name}“ löschen`}>
+    <ItemCard {...rest} thumb={thumb} label={folder.name}>
       <strong className="ellipsis">{folder.name}</strong>
       {path && <span className="muted small ellipsis">{path}</span>}
       {folder.description && <span className="muted small clamp-2">{folder.description}</span>}
@@ -118,7 +111,7 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
 export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file: FileItem }) {
   const kind = fileKind(file);
   return (
-    <ItemCard {...rest} thumb={<FileThumb file={file} />} deleteLabel={`„${fullName(file)}“ löschen`}>
+    <ItemCard {...rest} thumb={<FileThumb file={file} />} label={fullName(file)}>
       <strong className="ellipsis">{fullName(file)}</strong>
       {path && <span className="muted small ellipsis">{path}</span>}
       {file.description && <span className="muted small clamp-2">{file.description}</span>}

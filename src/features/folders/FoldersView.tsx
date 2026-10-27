@@ -55,7 +55,7 @@ interface Selection {
 
 function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Folder | null; scope: 'mine' | 'shared'; folders: Folder[]; files: FileItem[] }) {
   const lib = useLibrary();
-  const { deleteMany, moveMany, deleteProblem, moveProblem, canModify, canAddIn, canEditFolder, isRoot, isOwner, isOrphan, isNewSince, me } = lib;
+  const { deleteMany, moveMany, deleteProblem, moveProblem, canModify, canAddIn, isRoot, isOrphan, isNewSince, me } = lib;
   // Was gerade verschoben wird (öffnet die Ordnerauswahl).
   const [moving, setMoving] = useState<{ folders: string[]; files: string[]; fromSelection: boolean } | null>(null);
   const [query, setQuery] = useState('');
@@ -161,14 +161,6 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
     }
   };
 
-  const mayDelete = (kind: 'folders' | 'files', itemId: string) => !deleteProblem(kind === 'folders' ? [itemId] : [], kind === 'files' ? [itemId] : []);
-  const mayMove = (kind: 'folders' | 'files', itemId: string) => {
-    const item = kind === 'folders' ? folders.find((f) => f.id === itemId) : files.find((f) => f.id === itemId);
-    if (!item) return false;
-    if (kind === 'folders' && isRoot(item as Folder)) return isOwner(item.shareId);
-    return canModify(item) && (!item.shareId || lib.online);
-  };
-
   const toggle = (kind: 'folders' | 'files', itemId: string) =>
     setSel((prev) => {
       const next: Selection = { folders: new Set(prev?.folders), files: new Set(prev?.files) };
@@ -182,10 +174,11 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
     selected: !!sel?.[kind].has(itemId),
     onClick: sel ? () => toggle(kind, itemId) : open,
     onLongPress: isTouchDevice ? () => toggle(kind, itemId) : undefined,
-    onDelete: mayDelete(kind, itemId) ? () => confirmAndDelete(kind === 'folders' ? [itemId] : [], kind === 'files' ? [itemId] : []) : undefined,
-    onMove: mayMove(kind, itemId)
-      ? () => setMoving({ folders: kind === 'folders' ? [itemId] : [], files: kind === 'files' ? [itemId] : [], fromSelection: false })
-      : undefined,
+    onInfo: () => {
+      const item = kind === 'folders' ? folders.find((f) => f.id === itemId) : files.find((f) => f.id === itemId);
+      if (!item) return;
+      setEditing('folderId' in item ? { kind: 'file', file: item } : { kind: 'folder', folder: item });
+    },
   });
   const newProp = (item: Folder | FileItem) => ({ isNew: isNewSince(item, since) });
 
@@ -199,10 +192,12 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
     if (!blob) return alert('Die Datei konnte nicht geladen werden – bist du online?');
     setEditing({ kind: editor, file: item, text: await blob.text() });
   };
+  // ✏️ nur für Dateien mit bearbeitbarem Inhalt (Karteikarten, Quiz, Text-Dokumente).
   const editProp = (item: Folder | FileItem) => ({
-    onEdit: ('folderId' in item ? canModify(item) && (!item.shareId || lib.online) : canEditFolder(item) && !isOrphan(item.id) && (!item.shareId || lib.online))
-      ? () => startEdit(item)
-      : undefined,
+    onEdit:
+      'folderId' in item && ['flashcards', 'quiz', 'richtext'].includes(fileKind(item)) && canModify(item) && (!item.shareId || lib.online)
+        ? () => startEdit(item)
+        : undefined,
   });
 
   // Ein Eingabefeld für beide Knöpfe; nur der erlaubte Dateityp wechselt.
@@ -255,11 +250,9 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
                 <Icon name="users" />
               </button>
             )}
-            {canEditFolder(folder) && (
-              <button className="icon-btn" aria-label="Ordner bearbeiten" title="Bearbeiten" onClick={() => setSheet('edit')}>
-                <Icon name="edit" />
-              </button>
-            )}
+            <button className="icon-btn" aria-label="Ordner-Details" title="Details" onClick={() => setSheet('edit')}>
+              <Icon name="info" />
+            </button>
           </div>
           <header className="folder-head">
             <FolderThumb folder={folder} size="lg" />

@@ -7,6 +7,12 @@ export const DOC_MIME = 'application/vnd.lernapp.dokument+html';
 const BLOCK: Record<string, string> = { p: 'p', div: 'p', h1: 'h2', h2: 'h2', h3: 'h3', h4: 'h3', h5: 'h3', h6: 'h3', blockquote: 'blockquote', pre: 'pre', ul: 'ul', ol: 'ol', li: 'li' };
 const INLINE: Record<string, string> = { b: 'strong', strong: 'strong', i: 'em', em: 'em', u: 'u', s: 's', strike: 's', del: 's', code: 'code', sub: 'sub', sup: 'sup', mark: 'mark', span: '' };
 
+const ALIGNABLE = new Set(['p', 'h2', 'h3', 'li', 'blockquote']);
+const alignOf = (el: HTMLElement) => {
+  const a = (el.style.textAlign || el.getAttribute('align') || '').toLowerCase();
+  return a === 'center' || a === 'right' ? a : '';
+};
+
 const safeImage = (src: string) => /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(src);
 const safeLink = (href: string) => /^(https?:|mailto:)/i.test(href.trim());
 
@@ -30,6 +36,9 @@ function clean(node: Node, out: Node, doc: Document) {
         img.setAttribute('src', src);
         const alt = el.getAttribute('alt');
         if (alt) img.setAttribute('alt', alt.slice(0, 200));
+        // Breite in Pixeln (Höhe ergibt sich immer aus dem Seitenverhältnis).
+        const w = parseInt(el.getAttribute('width') ?? el.style.width ?? '', 10);
+        if (w >= 24 && w <= 4000) img.setAttribute('width', String(w));
         out.appendChild(img);
       }
       return;
@@ -50,6 +59,11 @@ function clean(node: Node, out: Node, doc: Document) {
     if (['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea', 'svg', 'math', 'template', 'head', 'meta', 'link', 'title'].includes(tag)) return;
     const mapped = BLOCK[tag] ?? INLINE[tag];
     const target = mapped ? doc.createElement(mapped) : doc.createDocumentFragment();
+    // Ausrichtung (zentriert/rechts) bei Absätzen, Überschriften und Listenpunkten behalten.
+    if (target instanceof HTMLElement && ALIGNABLE.has(mapped)) {
+      const a = alignOf(el);
+      if (a) target.setAttribute('style', `text-align: ${a}`);
+    }
     clean(el, target, doc);
     out.appendChild(target);
   });

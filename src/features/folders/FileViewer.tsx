@@ -15,7 +15,7 @@ const MAX_TEXT = 2 * 1024 * 1024;
 
 /** Vollbild-Ansicht einer Datei mit Vorschau und Aktionen. */
 export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose: () => void }) {
-  const { files, folders, canModify, me, userName } = useLibrary();
+  const { files, folders, me, userName } = useLibrary();
   // Immer die aktuelle Version (nach Umbenennen/Verschieben).
   const file = files.find((f) => f.id === initial.id);
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -143,11 +143,9 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
         <button className="icon-btn" aria-label="Herunterladen" title="Herunterladen" onClick={() => blob && downloadBlob(blob, name)} disabled={!blob}>
           <Icon name="download" />
         </button>
-        {canModify(file) && (
-          <button className="icon-btn" aria-label="Bearbeiten" title="Bearbeiten" onClick={() => setEditing(true)}>
-            <Icon name="edit" />
-          </button>
-        )}
+        <button className="icon-btn" aria-label="Details" title="Details" onClick={() => setEditing(true)}>
+          <Icon name="info" />
+        </button>
       </header>
       <div className="viewer-body">
         {(file.description || where) && (

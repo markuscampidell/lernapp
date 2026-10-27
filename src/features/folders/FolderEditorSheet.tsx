@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated, onDeleted }: Props) {
-  const { folders, files, createFolder, updateFolder, deleteFolder, deleteProblem, moveProblem, isRoot, isOwner, canModify, setAccess } = useLibrary();
+  const { folders, files, createFolder, updateFolder, deleteFolder, deleteProblem, moveProblem, isRoot, isOwner, canModify, setAccess, canEditFolder, canSetAccess, online } = useLibrary();
   const [access, setAccessValue] = useState<Access | null>(folder?.access ?? null);
   const [name, setName] = useState(folder?.name ?? '');
   const [description, setDescription] = useState(folder?.description ?? '');
@@ -50,6 +50,9 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
     target === SHARED_ROOT ? 'Geteilte Ordner' : pathOf(folders, target).map((p) => p.name).join(' / ') || (scopeOf(folders, target) === 'mine' ? 'Meine Ordner' : 'Oberste Ebene');
   // Löschen/Verschieben nur, wenn erlaubt (geteilte Ordner: Besitzer oder eigene Einträge).
   const canDelete = !!folder && !deleteProblem([folder.id], []);
+  // Details nur ansehen, wenn man den Ordner nicht ändern darf (bzw. offline in geteilten Ordnern).
+  const editable = !folder || (canEditFolder(folder) && (!folder.shareId || online));
+  const showSave = editable || (!!folder && canSetAccess(folder) && online);
   const canMove = !!folder && (isRoot(folder) ? isOwner(folder.shareId) : canModify(folder));
 
   const save = async () => {
@@ -58,7 +61,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
     try {
       if (folder) {
         if (folder.shareId && access !== (folder.access ?? null)) await setAccess(folder, access);
-        await updateFolder(folder, { name, description, image, parentId: target });
+        if (editable) await updateFolder(folder, { name, description, image, parentId: target });
         onClose();
       } else {
         const f = await createFolder(parentId, { name, description, image });
@@ -95,7 +98,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
   return (
     <>
       <Sheet
-        title={folder ? `${noun} bearbeiten` : `Neuer ${noun}`}
+        title={folder ? 'Details' : `Neuer ${noun}`}
         onClose={onClose}
         footer={
           <>
@@ -104,9 +107,15 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
                 Löschen
               </button>
             )}
-            <button className="btn primary grow" disabled={!name.trim() || busy} onClick={save}>
-              {folder ? 'Speichern' : 'Erstellen'}
-            </button>
+            {showSave ? (
+              <button className="btn primary grow" disabled={!name.trim() || busy} onClick={save}>
+                {folder ? 'Speichern' : 'Erstellen'}
+              </button>
+            ) : (
+              <button className="btn ghost grow" onClick={onClose}>
+                Schließen
+              </button>
+            )}
           </>
         }
       >
@@ -119,9 +128,10 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
             value={name}
             onChange={setName}
             enterKeyHint="done"
-            onEnter={() => name.trim() && save()}
+            onEnter={() => name.trim() && editable && save()}
             placeholder={isSub ? 'z. B. Kapitel 3' : 'z. B. Analysis 1'}
             maxLength={120}
+            disabled={!editable}
           />
         </div>
         <div className="field">
@@ -129,9 +139,13 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
             <span>Beschreibung</span>
             <span className="muted small">optional</span>
           </div>
-          <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={1000} />
+          {editable ? (
+            <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={1000} />
+          ) : (
+            <p className="pre-wrap">{description || <span className="muted">Keine Beschreibung</span>}</p>
+          )}
         </div>
-        <div className="field">
+        <div className="field" hidden={!editable}>
           <div className="field-label">
             <span>Bild</span>
             <span className="muted small">optional</span>
