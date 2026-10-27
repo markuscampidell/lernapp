@@ -4,7 +4,6 @@ import { InstallBanner } from './components/InstallBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FoldersView } from './features/folders/FoldersView';
 import { UploadView } from './features/upload/UploadView';
-import { AiView } from './features/ai/AiView';
 import { SettingsView } from './features/settings/SettingsView';
 import { navigate, useRoute, type Tab } from './lib/router';
 import { useLibrary } from './state/Library';
@@ -12,7 +11,6 @@ import { useLibrary } from './state/Library';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'ordner', label: 'Ordner', icon: 'folder' },
   { id: 'hochladen', label: 'Hochladen', icon: 'upload' },
-  { id: 'ki', label: 'KI', icon: 'ai' },
   { id: 'einstellungen', label: 'Einstellungen', icon: 'settings' },
 ];
 
@@ -80,7 +78,6 @@ export function App() {
           <ErrorBoundary>
             {tab === 'ordner' && <FoldersView folderId={route.folderId} />}
             {tab === 'hochladen' && <UploadView />}
-            {tab === 'ki' && <AiView initialFolderId={route.folderId} />}
             {tab === 'einstellungen' && <SettingsView />}
           </ErrorBoundary>
         )}

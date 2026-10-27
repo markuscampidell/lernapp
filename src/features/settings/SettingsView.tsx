@@ -5,7 +5,6 @@ import { exportBackup, importBackup } from '../../storage/backup';
 import { downloadBlob, formatSize } from '../../lib/files';
 import { Icon } from '../../components/Icon';
 import { Sheet } from '../../components/Sheet';
-import { AiSettings } from './AiSettings';
 
 export function SettingsView() {
   const { folders, files, reload } = useLibrary();
@@ -114,9 +113,6 @@ export function SettingsView() {
         )}
         {persisted && <p className="muted small">✓ Daten sind als dauerhaft markiert.</p>}
       </div>
-
-      <h3 className="section-title">KI</h3>
-      <AiSettings />
 
       <h3 className="section-title">Backup</h3>
       <div className="card stack">

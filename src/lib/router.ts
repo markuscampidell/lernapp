@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Hash-Routen: #ordner, #ordner/<id>, #hochladen, #ki, #einstellungen
-export type Tab = 'ordner' | 'hochladen' | 'ki' | 'einstellungen';
+// Hash-Routen: #ordner, #ordner/<id>, #hochladen, #einstellungen
+export type Tab = 'ordner' | 'hochladen' | 'einstellungen';
 export interface Route {
   tab: Tab;
   folderId: string | null;
 }
 
-const TABS: Tab[] = ['ordner', 'hochladen', 'ki', 'einstellungen'];
+const TABS: Tab[] = ['ordner', 'hochladen', 'einstellungen'];
 
 export function parseHash(hash = window.location.hash): Route {
   const [tab, id] = hash.replace(/^#/, '').split('/');
   if (!TABS.includes(tab as Tab)) return { tab: 'ordner', folderId: null };
-  // #ordner/<id> = geöffneter Ordner, #ki/<id> = Ordner, der der KI als Quelle vorgeschlagen wird
-  return { tab: tab as Tab, folderId: (tab === 'ordner' || tab === 'ki') && id ? decodeURIComponent(id) : null };
+  // #ordner/<id> = geöffneter Ordner
+  return { tab: tab as Tab, folderId: tab === 'ordner' && id ? decodeURIComponent(id) : null };
 }
 
 export const folderHash = (id: string | null) => (id ? `#ordner/${encodeURIComponent(id)}` : '#ordner');

@@ -18,8 +18,6 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
   Notizen direkt schreiben; Dateien/Ordner umbenennen, verschieben, löschen.
 - **Hochladen**: Dateien oder Fotos auswählen, benennen/beschreiben, Zielordner wählen.
   Auf Android erscheint die installierte App im **Teilen**-Menü anderer Apps.
-- **KI** (Google Gemini): Fragen zu gewählten Ordnern/Dateien mit Quellenangaben, Quiz aus mehreren Dateien.
-  Der Text der gewählten Unterlagen wird dafür an Google gesendet; alles andere bleibt auf dem Gerät.
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
 ## Entwickeln
@@ -37,8 +35,3 @@ npm run build    # Ergebnis in dist/
 3. Bei jedem Push baut `.github/workflows/deploy.yml` die App und veröffentlicht sie.
 
 Nach einem Deploy mit Änderungen am Service Worker `VERSION` in `public/sw.js` erhöhen.
-
-## KI-Server (Gemini-Schlüssel)
-
-Der Gemini-Schlüssel liegt **nicht** im Code, sondern geheim in einem kostenlosen Cloudflare Worker (`worker/`).
-Die App ruft nur diesen Worker auf. Einrichtung: siehe `worker/README.md`, danach die Worker-Adresse in `src/ai/config.ts` eintragen.
