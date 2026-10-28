@@ -1468,10 +1468,9 @@ button.person {
 }
 .pager-dots {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  overflow-x: auto;
   padding-bottom: 2px;
-  scrollbar-width: none;
 }
 .pager-dot {
   flex: none;

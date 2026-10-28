@@ -1,24 +1,27 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '../../components/Icon';
 import { StudyScreen } from './StudyScreen';
 import { shuffled, type Card } from './format';
 
 interface Round {
-  /** Noch offene Karten; die erste ist die aktuelle. */
+  /** Noch nicht gezeigte Karten; die erste ist die aktuelle. Jede Karte kommt pro Runde genau einmal dran. */
   queue: string[];
   known: number;
-  /** Wie oft eine Karte mit "Nochmal" zurückkam. */
-  again: Record<string, number>;
+  /** Karten, bei denen "Nochmal" gewählt wurde – sie kommen erst in der nächsten Runde wieder. */
+  missed: string[];
 }
 
-/** Lernmodus: Karte ansehen, umdrehen, "Gewusst" oder "Nochmal" (kommt ein paar Karten später wieder). */
+/** Lernmodus: jede Karte einmal ansehen, umdrehen, "Gewusst" oder "Nochmal" (für die nächste Runde merken). */
 export function CardsStudy({ title, cards, onClose }: { title: string; cards: Card[]; onClose: () => void }) {
   const [mix, setMix] = useState(true);
   const [reverse, setReverse] = useState(false);
   const [only, setOnly] = useState<string[] | null>(null);
+  // Nur neu beginnen, wenn sich wirklich andere Karten ergeben (nicht bei jedem Neuladen der Datei).
+  const idsKey = cards.map((c) => c.id).join('|');
+  const allIds = useMemo(() => (idsKey ? idsKey.split('|') : []), [idsKey]);
   const makeRound = useCallback(
-    (ids: string[] = cards.map((c) => c.id)): Round => ({ queue: mix ? shuffled(ids) : ids, known: 0, again: {} }),
-    [cards, mix],
+    (ids: string[] = allIds): Round => ({ queue: mix ? shuffled(ids) : [...ids], known: 0, missed: [] }),
+    [allIds, mix],
   );
   const [round, setRound] = useState<Round>(() => makeRound());
   const [flipped, setFlipped] = useState(false);
@@ -29,7 +32,8 @@ export function CardsStudy({ title, cards, onClose }: { title: string; cards: Ca
     setFlipped(false);
   }, [makeRound, only]);
 
-  const total = round.known + round.queue.length;
+  const total = round.known + round.missed.length + round.queue.length;
+  const shown = total - round.queue.length;
   const card = cards.find((c) => c.id === round.queue[0]);
   const done = !card;
 
@@ -38,10 +42,7 @@ export function CardsStudy({ title, cards, onClose }: { title: string; cards: Ca
       setRound((r) => {
         const [id, ...rest] = r.queue;
         if (!id) return r;
-        if (knew) return { ...r, queue: rest, known: r.known + 1 };
-        const next = [...rest];
-        next.splice(Math.min(3, next.length), 0, id);
-        return { ...r, queue: next, again: { ...r.again, [id]: (r.again[id] ?? 0) + 1 } };
+        return knew ? { ...r, queue: rest, known: r.known + 1 } : { ...r, queue: rest, missed: [...r.missed, id] };
       });
       setFlipped(false);
     },
@@ -61,13 +62,13 @@ export function CardsStudy({ title, cards, onClose }: { title: string; cards: Ca
     return () => window.removeEventListener('keydown', onKey);
   }, [done, flipped, answer]);
 
-  const hard = Object.keys(round.again);
+  const hard = round.missed;
   const [a, b] = card ? (reverse ? [card.back, card.front] : [card.front, card.back]) : ['', ''];
 
   return (
     <StudyScreen
       title={title}
-      subtitle={done ? 'Fertig' : `${round.known} von ${total} gewusst`}
+      subtitle={done ? 'Fertig' : `Karte ${shown + 1} von ${total} · ${round.known} gewusst`}
       onClose={onClose}
       actions={
         <>
@@ -82,7 +83,7 @@ export function CardsStudy({ title, cards, onClose }: { title: string; cards: Ca
     >
       <div className="study-play">
         <div className="meter wide">
-          <div className="meter-fill" style={{ width: `${total ? (round.known / total) * 100 : 0}%` }} />
+          <div className="meter-fill" style={{ width: `${total ? (shown / total) * 100 : 0}%` }} />
         </div>
 
         {done ? (
@@ -91,7 +92,7 @@ export function CardsStudy({ title, cards, onClose }: { title: string; cards: Ca
             <h2>Geschafft!</h2>
             <p className="muted">
               {total} {total === 1 ? 'Karte' : 'Karten'} gelernt
-              {hard.length > 0 ? ` – ${hard.length} davon brauchten eine Wiederholung.` : ' – alle auf Anhieb gewusst.'}
+              {hard.length > 0 ? ` – ${round.known} gewusst, ${hard.length} zum Wiederholen.` : ' – alle gewusst.'}
             </p>
             <div className="input-row wrap center">
               {hard.length > 0 && (
@@ -135,7 +136,7 @@ export function CardsStudy({ title, cards, onClose }: { title: string; cards: Ca
                 Umdrehen
               </button>
             )}
-            <p className="muted small center-text">Tippe auf die Karte zum Umdrehen. „Nochmal“ bringt sie ein paar Karten später zurück.</p>
+            <p className="muted small center-text">Tippe auf die Karte zum Umdrehen. Jede Karte kommt einmal dran – „Nochmal“-Karten kannst du am Ende wiederholen.</p>
           </>
         )}
       </div>
