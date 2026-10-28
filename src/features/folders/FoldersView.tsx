@@ -593,11 +593,11 @@ function SharedRootIntro() {
 
 /** Info-Zeile bei geteilten Ordnern. */
 function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void }) {
-  const { isRoot, shareOf, members, userName, me, folders, online } = useLibrary();
+  const { isRoot, shareOf, peopleOf, userName, me, folders, online } = useLibrary();
   if (!folder.shareId) return null;
   const share = shareOf(folder);
   if (!share) return null;
-  const count = members.filter((m) => m.shareId === share.id).length + 1;
+  const count = peopleOf(share.id).length;
   const owner = share.ownerId === me?.id ? 'dir' : userName(share.ownerId);
   const root = folders.find((f) => f.id === share.rootId);
   return (

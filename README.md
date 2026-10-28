@@ -47,7 +47,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
 1. Neues Projekt anlegen (Region z. B. Frankfurt).
 2. *Authentication → Sign In / Providers → Email*: **„Confirm email“ ausschalten** (Anmeldung nur mit Benutzername).
 3. *SQL Editor*: Inhalt von `supabase/schema.sql` einfügen und ausführen (Tabellen, Rechte, Dateispeicher),
-   danach genauso `supabase/002_rechte.sql` (Rechte pro Datei/Ordner).
+   danach genauso `supabase/002_rechte.sql` (Rechte pro Datei/Ordner)
+   und `supabase/003_verschachtelt.sql` (geteilte Ordner in geteilten Ordnern).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

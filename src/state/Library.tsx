@@ -47,6 +47,10 @@ interface LibraryValue {
   shareOf: (item: Item | undefined) => Share | undefined;
   isRoot: (folder: Folder | undefined) => boolean;
   isOwner: (shareId: string | undefined) => boolean;
+  /** Geteilter Ordner, in dem dieser geteilte Ordner liegt (dessen Personen sehen ihn mit). */
+  parentShareOf: (shareId: string | undefined) => Share | undefined;
+  /** Alle, die einen geteilten Ordner sehen: Besitzer, Mitglieder und die Personen der Ordner, in denen er liegt. */
+  peopleOf: (shareId: string | undefined) => string[];
   /** Platzhalter eines geteilten Ordners, der hier gerade nicht verfügbar ist (abgemeldet, gelöscht …). */
   isOrphan: (folderId: string) => boolean;
   /** Darf ich den Eintrag ändern (umbenennen, Inhalt bearbeiten, verschieben)? */
@@ -109,6 +113,11 @@ function merge(localData: local.LocalData, snap: Snapshot | null, me: string | u
       continue;
     }
     const share = roots.get(f.id);
+    // Liegt in einem anderen geteilten Ordner, den ich sehe -> dort anzeigen.
+    if (share?.inside && remoteIds.has(share.inside)) {
+      folders.push({ ...f, parentId: share.inside });
+      continue;
+    }
     const ph = placeholders.get(f.id);
     // Eigene geteilte Ordner bleiben dort unter "Meine Ordner", wo sie auf diesem Gerät liegen.
     const mounted = ph && share?.ownerId === me && (ph.parentId === null || (localIds.has(ph.parentId) && !placeholders.has(ph.parentId)));
@@ -284,6 +293,51 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [folders, byId, isRoot],
   );
 
+  /** Geteilte Ordner, die (auf beliebiger Ebene) in diesem Ordner liegen. */
+  const sharedRootsIn = useCallback(
+    (folderId: string) => [...subtreeIds(folders, folderId)].filter((id) => id !== folderId && isRoot(byId.get(id))).map((id) => byId.get(id)!),
+    [folders, byId, isRoot],
+  );
+  /** Nur die äußersten davon (die direkt zu diesem Ordner gehören, nicht zu einem anderen darin). */
+  const outerRootsIn = useCallback(
+    (folderId: string) => {
+      const out: Folder[] = [];
+      let level = [folderId];
+      while (level.length) {
+        const next: string[] = [];
+        for (const f of folders) {
+          if (!f.parentId || !level.includes(f.parentId)) continue;
+          if (isRoot(f)) out.push(f);
+          else next.push(f.id);
+        }
+        level = next;
+      }
+      return out;
+    },
+    [folders, isRoot],
+  );
+  const parentShareOf = useCallback(
+    (shareId: string | undefined) => {
+      const inside = shareId ? shareMap.get(shareId)?.inside : undefined;
+      const sid = inside ? byId.get(inside)?.shareId : undefined;
+      return sid ? shareMap.get(sid) : undefined;
+    },
+    [shareMap, byId],
+  );
+  const peopleOf = useCallback(
+    (shareId: string | undefined) => {
+      const out = new Set<string>();
+      let s = shareId ? shareMap.get(shareId) : undefined;
+      for (let i = 0; s && i < 16; i++) {
+        out.add(s.ownerId);
+        snap?.members.forEach((m) => m.shareId === s!.id && out.add(m.userId));
+        s = parentShareOf(s.id);
+      }
+      return [...out];
+    },
+    [shareMap, snap, parentShareOf],
+  );
+
   /** Darf ich diesen geteilten Ordner samt Inhalt entfernen (Besitzer, oder alles darin darf ich löschen)? */
   const canRemoveRemoteFolder = useCallback(
     (f: Folder) => {
@@ -306,6 +360,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           continue;
         }
         remoteInvolved = true;
+        const foreign = sharedRootsIn(id).find((r) => !isOwner(r.shareId));
+        if (foreign) return `„${f.name}“ enthält den geteilten Ordner „${foreign.name}“ – nur ${userName(shareOf(foreign)?.ownerId)} (Besitzer) kann ihn löschen.`;
         if (isRoot(f)) {
           if (!isOwner(f.shareId)) return `Nur ${userName(shareOf(f)?.ownerId)} (Besitzer) kann „${f.name}“ löschen. Du kannst den Ordner stattdessen verlassen.`;
         } else if (!canRemoveRemoteFolder(f)) {
@@ -323,7 +379,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (remoteInvolved && !online) return offlineError().message;
       return null;
     },
-    [byId, files, containsSharedRoot, isRoot, isOwner, userName, shareOf, canRemoveRemoteFolder, canDeleteItem, online],
+    [byId, files, containsSharedRoot, sharedRootsIn, isRoot, isOwner, userName, shareOf, canRemoveRemoteFolder, canDeleteItem, online],
   );
 
   const moveProblem = useCallback(
@@ -338,7 +394,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         if (!canMoveFolder(folders, id, targetId)) return 'Ein Ordner kann dorthin nicht verschoben werden (zu tief verschachtelt oder in sich selbst).';
         if (isRoot(f)) {
           if (!isOwner(f.shareId)) return `„${f.name}“ ist ein geteilter Ordner – nur der Besitzer kann ihn verschieben.`;
-          if (target !== 'local') return 'Ein geteilter Ordner kann nicht in einen anderen geteilten Ordner verschoben werden.';
+          if (target !== 'local' && !isOwner(target)) return 'Ein geteilter Ordner kann nur in eigene geteilte Ordner verschoben werden.';
+          if (target !== 'local' || shareMap.get(f.shareId!)?.inside) remoteInvolved = true;
           continue;
         }
         const src = f.shareId ?? 'local';
@@ -347,6 +404,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           continue;
         }
         remoteInvolved = true;
+        if (src !== target && containsSharedRoot(id)) return `„${f.name}“ enthält einen geteilten Ordner und kann daher nur innerhalb dieses geteilten Ordners verschoben werden.`;
         if (src === target ? !canModify(f) : !canRemoveRemoteFolder(f)) {
           return src === target
             ? `„${f.name}“ wurde von ${userName(f.createdBy)} erstellt – du darfst ihn nicht verschieben.`
@@ -364,7 +422,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (remoteInvolved && !online) return offlineError().message;
       return null;
     },
-    [byId, files, folders, storeOf, isRoot, isOwner, containsSharedRoot, canModify, canDeleteItem, canRemoveRemoteFolder, userName, online],
+    [byId, files, folders, storeOf, isRoot, isOwner, shareMap, containsSharedRoot, canModify, canDeleteItem, canRemoveRemoteFolder, userName, online],
   );
 
   const shareProblem = useCallback(
@@ -374,11 +432,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (!me) return 'Melde dich an, um Ordner zu teilen.';
       if (f.shareId) return null; // schon geteilt -> Mitglieder verwalten
       if (orphans.has(folderId)) return 'Dieser geteilte Ordner ist gerade nicht verfügbar.';
-      if (containsSharedRoot(folderId)) return `„${f.name}“ enthält bereits einen geteilten Ordner – teile stattdessen die einzelnen Ordner.`;
+      const foreign = sharedRootsIn(folderId).find((r) => !isOwner(r.shareId));
+      if (foreign) return `„${f.name}“ enthält „${foreign.name}“, der dir nicht gehört.`;
       if (!online) return offlineError().message;
       return null;
     },
-    [byId, me, orphans, containsSharedRoot, online],
+    [byId, me, orphans, sharedRootsIn, isOwner, online],
   );
 
   // ---------- "!" – Neues von anderen ----------
@@ -417,7 +476,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     snap.folders.forEach((f) => f.parentId && check(f, f.parentId));
     snap.files.forEach((f) => check(f, f.folderId));
     // Neu mit mir geteilt und noch nie geöffnet.
-    snap.shares.forEach((s) => s.ownerId !== me && !snap.seen[s.rootId] && direct.add(s.rootId));
+    // (Nicht für geteilte Ordner, die nur mitkommen, weil sie in einem anderen geteilten Ordner liegen.)
+    const remoteIds = new Set(snap.folders.map((f) => f.id));
+    snap.shares.forEach((s) => s.ownerId !== me && !snap.seen[s.rootId] && !(s.inside && remoteIds.has(s.inside)) && direct.add(s.rootId));
     for (const id of direct) {
       let cur: string | null | undefined = id;
       for (let i = 0; cur && cur !== SHARED_ROOT && !out.has(cur) && i < 64; i++) {
@@ -479,6 +540,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const localFiles = loose.filter((id) => !files.find((f) => f.id === id)?.shareId);
       const remoteFiles = loose.filter((id) => files.find((f) => f.id === id)?.shareId);
 
+      // Darin liegende geteilte Ordner werden mitgelöscht.
+      const nested = [...rootFolders, ...remoteFolders].flatMap((id) => sharedRootsIn(id).map((f) => f.id));
+      for (const id of nested) {
+        await remote.deleteShare(byId.get(id)!.shareId!, folders, files);
+        await local.deletePlaceholder(id).catch(() => {});
+      }
       if (localFolders.length || localFiles.length) await local.deleteMany(localData, localFolders, localFiles);
       if (remoteFolders.length || remoteFiles.length) await remote.deleteMany(folders, files, remoteFolders, remoteFiles);
       for (const id of rootFolders) {
@@ -487,7 +554,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       }
       await reload();
     },
-    [deleteProblem, folders, files, byId, isRoot, localData, reload],
+    [deleteProblem, folders, files, byId, isRoot, sharedRootsIn, localData, reload],
   );
 
   const deleteFolder = useCallback<LibraryValue['deleteFolder']>((id) => deleteMany([id], []), [deleteMany]);
@@ -502,9 +569,16 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const target = storeOf(targetId);
 
       // Eigene geteilte Ordner: nur der Platzhalter unter "Meine Ordner" wandert.
+      // In einen eigenen geteilten Ordner: dort auf dem Server einhängen (dann sehen ihn auch dessen Personen).
       for (const id of tops.filter((x) => isRoot(byId.get(x)))) {
         const f = byId.get(id)!;
-        await local.putPlaceholder({ id, parentId: targetId, name: f.name, shareId: f.shareId!, createdAt: f.createdAt });
+        if (target === 'local') {
+          if (shareMap.get(f.shareId!)?.inside) await remote.setInside(f.shareId!, null);
+          await local.putPlaceholder({ id, parentId: targetId, name: f.name, shareId: f.shareId!, createdAt: f.createdAt });
+        } else {
+          await remote.setInside(f.shareId!, targetId);
+          await local.deletePlaceholder(id).catch(() => {});
+        }
       }
 
       // Nach Speicherort gruppieren.
@@ -531,7 +605,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       }
       await reload();
     },
-    [moveProblem, folders, files, storeOf, isRoot, byId, localData, reload],
+    [moveProblem, folders, files, storeOf, isRoot, byId, shareMap, localData, reload],
   );
 
   const updateFolder = useCallback<LibraryValue['updateFolder']>(
@@ -617,21 +691,25 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const problem = shareProblem(folderId);
       if (problem) throw new Error(problem);
       onProgress?.('Dateien werden vorbereitet …');
-      const bundle = await makeBundle(folders, files, [folderId], [], loadBlob);
+      // Bereits geteilte Ordner darin bleiben eigene geteilte Ordner und werden nur eingehängt.
+      const nested = outerRootsIn(folderId);
+      const bundle = await makeBundle(folders, files, [folderId], [], loadBlob, nested.map((f) => f.id));
       const shareId = await remote.createShare(folderId);
       try {
         const total = bundle.files.length;
         onProgress?.(total ? `Hochladen … 0/${total}` : 'Hochladen …');
         await remote.importBundle(shareId, null, bundle, (n) => onProgress?.(`Hochladen … ${n}/${total}`));
+        for (const f of nested) await remote.setInside(f.shareId!, f.parentId);
         await remote.addMembers(shareId, userIds);
       } catch (e) {
+        for (const f of nested) await remote.setInside(f.shareId!, null).catch(() => {});
         await remote.deleteShare(shareId, [], []).catch(() => {});
         throw e;
       }
       await local.convertToPlaceholder(localData, folderId, shareId);
       await reload();
     },
-    [shareProblem, folders, files, localData, reload],
+    [shareProblem, outerRootsIn, folders, files, localData, reload],
   );
 
   const stopSharing = useCallback<LibraryValue['stopSharing']>(
@@ -641,16 +719,26 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       requireOnline();
       const root = byId.get(share.rootId);
       if (!root) throw new Error('Ordner nicht gefunden.');
+      // Liegt in einem anderen geteilten Ordner: nur die eigenen Personen entfernen – er bleibt dort für dessen Personen.
+      if (parentShareOf(shareId)) {
+        onProgress?.('Personen werden entfernt …');
+        for (const m of snap?.members.filter((x) => x.shareId === shareId) ?? []) await remote.removeMember(shareId, m.userId);
+        await refreshRemote();
+        return;
+      }
       onProgress?.('Dateien werden heruntergeladen …');
-      const bundle = await makeBundle(folders, files, [root.id], [], loadBlob);
+      const nested = outerRootsIn(root.id);
+      const bundle = await makeBundle(folders, files, [root.id], [], loadBlob, nested.map((f) => f.id));
       const target = root.parentId === SHARED_ROOT ? null : root.parentId;
       onProgress?.('Wird auf diesem Gerät gespeichert …');
       await local.importBundle(target, bundle);
+      // Darin liegende geteilte Ordner bleiben geteilt und an ihrer Stelle.
+      for (const f of nested) await local.putPlaceholder({ id: f.id, parentId: f.parentId, name: f.name, shareId: f.shareId!, createdAt: f.createdAt });
       onProgress?.('Wird vom Server entfernt …');
       await remote.deleteShare(shareId, folders, files);
       await reload();
     },
-    [shareMap, me, byId, folders, files, reload, requireOnline],
+    [shareMap, me, byId, folders, files, snap, parentShareOf, outerRootsIn, refreshRemote, reload, requireOnline],
   );
 
   const addMembers = useCallback<LibraryValue['addMembers']>(
@@ -740,11 +828,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       removeMember,
       leaveShare,
       refreshRemote,
+      parentShareOf,
+      peopleOf,
     }),
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
       user, online, snap, userName, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
-      shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, stopSharing, addMembers, removeMember, leaveShare, refreshRemote,
+      shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
     ],
   );
 

@@ -19,6 +19,8 @@ export interface Share {
   ownerId: string;
   rootId: string;
   createdAt: string;
+  /** Ordner eines anderen (eigenen) geteilten Ordners, in dem dieser liegt – dann sehen ihn auch dessen Personen. */
+  inside?: string | null;
 }
 export interface Member {
   shareId: string;
@@ -102,7 +104,7 @@ export async function fetchSnapshot(userId: string): Promise<Snapshot> {
   return {
     userId,
     profiles: profiles.map((r) => ({ id: String(r.id), username: String(r.username) })),
-    shares: shares.map((r) => ({ id: String(r.id), ownerId: String(r.owner_id), rootId: String(r.root_id), createdAt: String(r.created_at) })),
+    shares: shares.map((r) => ({ id: String(r.id), ownerId: String(r.owner_id), rootId: String(r.root_id), createdAt: String(r.created_at), inside: (r.inside as string | null) ?? null })),
     members: members.map((r) => ({ shareId: String(r.share_id), userId: String(r.user_id), addedAt: String(r.added_at) })),
     folders: folders.map(toFolder),
     files: files.map(toFile),
@@ -151,6 +153,17 @@ export async function deleteShare(shareId: string, folders: Folder[], files: Fil
   );
   await removePaths(paths);
   check(await sb().from('shares').delete().eq('id', shareId));
+}
+
+/** Legt einen geteilten Ordner in einen Ordner eines anderen eigenen geteilten Ordners (null = nirgends). */
+export async function setInside(shareId: string, folderId: string | null): Promise<void> {
+  const res = await sb().from('shares').update({ inside: folderId }).eq('id', shareId).select('id');
+  if (res.error) {
+    if (/inside/.test(res.error.message) && /column|schema/i.test(res.error.message))
+      throw new Error('Der Server ist noch nicht bereit: Bitte supabase/003_verschachtelt.sql im Supabase „SQL Editor“ ausführen.');
+    throw new Error(friendly(res.error.message));
+  }
+  expectAll(res.data, 1);
 }
 
 export async function addMembers(shareId: string, userIds: string[]): Promise<void> {

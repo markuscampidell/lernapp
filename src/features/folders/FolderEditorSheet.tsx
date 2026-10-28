@@ -82,7 +82,12 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
     const extra = [subCount > 0 && `${subCount} Unterordner`, fileCount > 0 && `${fileCount} Datei${fileCount === 1 ? '' : 'en'}`]
       .filter(Boolean)
       .join(' und ');
-    const forAll = isRoot(folder) ? '\n\nDer Ordner ist geteilt und wird für alle Mitglieder gelöscht.' : '';
+    const nestedShared = folder.shareId && [...ids].some((id) => id !== folder.id && isRoot(folders.find((f) => f.id === id)));
+    const forAll = isRoot(folder)
+      ? '\n\nDer Ordner ist geteilt und wird für alle Mitglieder gelöscht.'
+      : nestedShared
+        ? '\n\nDarin liegende geteilte Ordner werden für alle Mitglieder gelöscht.'
+        : '';
     if (!confirm(`„${folder.name}“ löschen?${extra ? ` Dabei werden auch ${extra} gelöscht.` : ''}${forAll}`)) return;
     setBusy(true);
     try {

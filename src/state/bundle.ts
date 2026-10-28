@@ -93,10 +93,13 @@ export async function makeBundle(
   folderIds: string[],
   fileIds: string[],
   load: (id: string) => Promise<Blob | undefined>,
+  /** Ordner, die samt Inhalt ausgelassen werden (z. B. darin liegende geteilte Ordner). */
+  skip: string[] = [],
 ): Promise<Bundle> {
   const tops = topLevel(folders, folderIds);
   const all = new Set<string>();
   tops.forEach((id) => subtreeIds(folders, id).forEach((x) => all.add(x)));
+  skip.forEach((id) => subtreeIds(folders, id).forEach((x) => all.delete(x)));
   const topSet = new Set(tops);
   const fileSet = new Set(fileIds);
 
