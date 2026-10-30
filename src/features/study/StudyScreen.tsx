@@ -1,6 +1,8 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import type { FileItem } from '../../domain/types';
 import { useBackToClose } from '../../lib/router';
 import { Icon } from '../../components/Icon';
+import { EditingLock, EditingNotice, useEditors } from '../../cloud/editing';
 
 /** Vollbild-Ansicht für Editoren und Lernmodi (Zurück-Taste schließt). */
 export function StudyScreen({
@@ -10,7 +12,10 @@ export function StudyScreen({
   actions,
   children,
   footer,
+  editing,
 }: {
+  /** Diese geteilte Datei wird hier bearbeitet: anzeigen, wenn jemand anderes sie gerade auch bearbeitet. */
+  editing?: FileItem;
   title: string;
   subtitle?: string;
   onClose: () => void;
@@ -19,6 +24,14 @@ export function StudyScreen({
   footer?: ReactNode;
 }) {
   useBackToClose(onClose);
+  const { others, mine } = useEditors(editing);
+  // Wer zuerst da war, wird nicht blockiert – nur wer später dazukommt.
+  const earlier = others.filter((o) => o.since <= mine);
+  // Einmal gesperrt, bleibt gesperrt: der geladene Inhalt ist evtl. veraltet, also neu öffnen.
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    if (earlier.length > 0) setLocked(true);
+  }, [earlier.length]);
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -38,8 +51,12 @@ export function StudyScreen({
         </div>
         {actions}
       </header>
-      <div className="viewer-body study-body">{children}</div>
+      <div className="viewer-body study-body">
+        <EditingNotice others={others} />
+        {children}
+      </div>
       {footer && <footer className="study-footer">{footer}</footer>}
+      {locked && <EditingLock others={earlier} onClose={onClose} />}
     </div>
   );
 }

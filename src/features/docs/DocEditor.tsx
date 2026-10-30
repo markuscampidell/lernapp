@@ -227,6 +227,7 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
 
   return (
     <StudyScreen
+      editing={file}
       title={file ? 'Dokument bearbeiten' : 'Neues Text-Dokument'}
       onClose={close}
       actions={

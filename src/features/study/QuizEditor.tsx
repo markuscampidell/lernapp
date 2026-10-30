@@ -60,6 +60,7 @@ export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileIt
 
   return (
     <StudyScreen
+      editing={file}
       title={file ? 'Quiz bearbeiten' : 'Neues Quiz'}
       subtitle={`${filled} ${filled === 1 ? 'Frage' : 'Fragen'}`}
       onClose={close}

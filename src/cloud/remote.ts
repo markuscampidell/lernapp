@@ -247,6 +247,13 @@ export async function updateFile(file: FileItem, patch: { name?: string; descrip
   expectAll(check(await sb().from('files').update(row).eq('id', file.id).select('id')), 1);
 }
 
+/** Aktueller Stand des Inhalts einer geteilten Datei (zum Erkennen, ob jemand anderes inzwischen gespeichert hat). */
+export async function contentInfo(fileId: string): Promise<{ blobPath: string; updatedBy: string | null } | null> {
+  const rows = check(await sb().from('files').select('blob_path, updated_by').eq('id', fileId).limit(1)) as Row[] | null;
+  const r = rows?.[0];
+  return r ? { blobPath: String(r.blob_path), updatedBy: (r.updated_by as string | null) ?? null } : null;
+}
+
 /** Inhalt einer geteilten Datei ersetzen: neue Datei hochladen, Eintrag umstellen, alte Datei entfernen. */
 export async function replaceContent(file: FileItem, blob: Blob, name?: string): Promise<void> {
   const blob_path = await upload(file.shareId!, blob, file.mime);

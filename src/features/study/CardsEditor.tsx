@@ -49,6 +49,7 @@ export function CardsEditor({ file, folderId, initial, onClose }: { file?: FileI
 
   return (
     <StudyScreen
+      editing={file}
       title={file ? 'Karteikarten bearbeiten' : 'Neue Karteikarten'}
       subtitle={`${filled} ${filled === 1 ? 'Karte' : 'Karten'}`}
       onClose={close}
