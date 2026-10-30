@@ -6,6 +6,7 @@ import { Pager, StudyScreen } from './StudyScreen';
 import { CARDS_EXT, CARDS_MIME, cardsBlob, newCard, type Card } from './format';
 import { useStudySave } from './useStudySave';
 import { DetailsButton } from './DetailsButton';
+import { MathPreview } from '../../components/MathText';
 
 /** Karteikarten anlegen/bearbeiten: eine Karte pro Seite (Vorder- und Rückseite). */
 export function CardsEditor({ file, folderId, initial, onClose }: { file?: FileItem; folderId?: string; initial?: Card[]; onClose: () => void }) {
@@ -76,11 +77,14 @@ export function CardsEditor({ file, folderId, initial, onClose }: { file?: FileI
           <label className="field">
             <span className="field-label">Vorderseite</span>
             <textarea ref={frontRef} rows={4} value={card.front} onChange={(e) => update({ front: e.target.value })} placeholder="Begriff oder Frage" />
+            <MathPreview text={card.front} />
           </label>
           <label className="field">
             <span className="field-label">Rückseite</span>
             <textarea rows={4} value={card.back} onChange={(e) => update({ back: e.target.value })} placeholder="Erklärung oder Antwort" />
+            <MathPreview text={card.back} />
           </label>
+        <p className="muted small math-hint">Formeln: <code>$x^2$</code> im Text, <code>$$\int_0^1 x\,dx$$</code> in eigener Zeile.</p>
         </div>
 
         <div className="input-row">

@@ -19,7 +19,8 @@ const safeLink = (href: string) => /^(https?:|mailto:)/i.test(href.trim());
 function clean(node: Node, out: Node, doc: Document) {
   node.childNodes.forEach((child) => {
     if (child.nodeType === Node.TEXT_NODE) {
-      out.appendChild(doc.createTextNode(child.textContent ?? ''));
+      // Unsichtbare Hilfszeichen hinter Formeln nicht mitspeichern.
+      out.appendChild(doc.createTextNode((child.textContent ?? '').replace(/\u200b/g, '')));
       return;
     }
     if (child.nodeType !== Node.ELEMENT_NODE) return;
@@ -40,6 +41,18 @@ function clean(node: Node, out: Node, doc: Document) {
         const w = parseInt(el.getAttribute('width') ?? el.style.width ?? '', 10);
         if (w >= 24 && w <= 4000) img.setAttribute('width', String(w));
         out.appendChild(img);
+      }
+      return;
+    }
+    // Formel: nur der LaTeX-Quelltext wird gespeichert, die Darstellung erzeugt KaTeX beim Anzeigen.
+    if (tag === 'span' && el.classList.contains('math')) {
+      const tex = (el.getAttribute('data-tex') ?? '').slice(0, 4000);
+      if (tex.trim()) {
+        const span = doc.createElement('span');
+        span.className = 'math';
+        span.setAttribute('data-tex', tex);
+        if (el.getAttribute('data-display') === '1') span.setAttribute('data-display', '1');
+        out.appendChild(span);
       }
       return;
     }

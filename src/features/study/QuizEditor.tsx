@@ -6,6 +6,7 @@ import { Pager, StudyScreen } from './StudyScreen';
 import { newAnswer, newQuestion, questionProblem, QUIZ_EXT, QUIZ_MIME, quizBlob, type Answer, type Question } from './format';
 import { useStudySave } from './useStudySave';
 import { DetailsButton } from './DetailsButton';
+import { MathPreview } from '../../components/MathText';
 
 const MAX_ANSWERS = 6;
 const LETTERS = 'ABCDEF';
@@ -86,7 +87,8 @@ export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileIt
         <div className="card edit-card">
           <label className="field">
             <span className="field-label">Frage</span>
-            <textarea ref={questionRef} rows={3} value={q.text} onChange={(e) => update({ text: e.target.value })} placeholder="z. B. Was ist die Ableitung von sin x?" />
+            <textarea ref={questionRef} rows={3} value={q.text} onChange={(e) => update({ text: e.target.value })} placeholder="z. B. Was ist die Ableitung von $\sin x$?" />
+            <MathPreview text={q.text} />
           </label>
 
           <div className="field">
@@ -115,6 +117,7 @@ export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileIt
                 </div>
               ))}
             </div>
+            <MathPreview text={q.answers.map((a, i) => (a.text.trim() ? `${LETTERS[i]}) ${a.text}` : '')).filter(Boolean).join('\n')} />
             {q.answers.length < MAX_ANSWERS && (
               <button type="button" className="btn ghost small" onClick={() => update({ answers: [...q.answers, newAnswer()] })}>
                 <Icon name="plus" size={16} /> Antwort
@@ -128,8 +131,10 @@ export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileIt
               <span className="muted small">optional, wird nach dem Antworten gezeigt</span>
             </span>
             <textarea rows={2} value={q.explanation ?? ''} onChange={(e) => update({ explanation: e.target.value })} />
+            <MathPreview text={q.explanation ?? ''} />
           </label>
           {problem && q.text.trim() && <p className="notice warning">{problem}</p>}
+          <p className="muted small math-hint">Formeln: <code>$x^2$</code> im Text, <code>$$\int_0^1 x\,dx$$</code> in eigener Zeile.</p>
         </div>
 
         <div className="input-row">

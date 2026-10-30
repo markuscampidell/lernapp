@@ -7,6 +7,7 @@ import { CardsEditor } from './CardsEditor';
 import { CardsStudy } from './CardsStudy';
 import { QuizEditor } from './QuizEditor';
 import { QuizPlay } from './QuizPlay';
+import { MathText } from '../../components/MathText';
 
 const LETTERS = 'ABCDEF';
 
@@ -44,8 +45,8 @@ export function CardsPanel({ file, text }: { file: FileItem; text: string }) {
         <ol className="study-list">
           {doc.cards.map((c) => (
             <li key={c.id} className="card study-item">
-              <span className="pre-wrap">{c.front}</span>
-              <span className="muted pre-wrap">{c.back}</span>
+              <span className="pre-wrap"><MathText text={c.front} /></span>
+              <span className="muted pre-wrap"><MathText text={c.back} /></span>
             </li>
           ))}
         </ol>
@@ -97,16 +98,16 @@ export function QuizPanel({ file, text }: { file: FileItem; text: string }) {
         <ol className="study-list">
           {doc.questions.map((q) => (
             <li key={q.id} className="card study-item">
-              <strong className="pre-wrap">{q.text}</strong>
+              <strong className="pre-wrap"><MathText text={q.text} /></strong>
               <ul className="study-answers">
                 {q.answers.map((a, i) => (
                   <li key={a.id} className={showAnswers && a.correct ? 'right' : ''}>
                     <span className="quiz-letter small">{showAnswers && a.correct ? <Icon name="check" size={13} /> : LETTERS[i]}</span>
-                    <span className="pre-wrap">{a.text}</span>
+                    <span className="pre-wrap"><MathText text={a.text} /></span>
                   </li>
                 ))}
               </ul>
-              {showAnswers && q.explanation && <span className="muted small pre-wrap">{q.explanation}</span>}
+              {showAnswers && q.explanation && <span className="muted small pre-wrap"><MathText text={q.explanation} /></span>}
             </li>
           ))}
         </ol>

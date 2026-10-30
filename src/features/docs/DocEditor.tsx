@@ -6,6 +6,11 @@ import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
 import { DOC_EXT, DOC_MIME, imageToDataUrl, sanitizeHtml } from './sanitize';
+import { loadKatex, renderMathIn, renderMathSpan } from '../../lib/math';
+import { useKatex } from '../../components/MathText';
+
+const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const blank = (c: string | undefined) => c === undefined || /\s/.test(c);
 
 type Align = 'left' | 'center' | 'right';
 type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
@@ -24,11 +29,20 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
   const wrap = useRef<HTMLDivElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: DOC_EXT, mime: DOC_MIME });
+  // Angeklickte Formel (wird in der Formel-Leiste bearbeitet).
+  const [formula, setFormula] = useState<HTMLElement | null>(null);
+  const [tex, setTex] = useState('');
+  const [display, setDisplay] = useState(false);
+  const katexOk = useKatex(!!formula);
+  useEffect(() => {
+    if (katexOk && formula) renderMathSpan(formula, true);
+  }, [katexOk, formula]);
 
   useEffect(() => {
     const el = editor.current;
     if (!el) return;
     el.innerHTML = sanitizeHtml(initial) || '<p><br></p>';
+    renderMathIn(el, true);
     document.execCommand('defaultParagraphSeparator', false, 'p');
     if (file) el.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,8 +191,89 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     }
   };
 
+  // ---------- Formeln ----------
+  const selectFormula = (el: HTMLElement | null) => {
+    editor.current?.querySelectorAll('span.math.selected').forEach((x) => x !== el && x.classList.remove('selected'));
+    if (formula && formula !== el && !(formula.dataset.tex ?? '').trim()) formula.remove();
+    setFormula(el);
+    if (!el) return;
+    el.classList.add('selected');
+    setTex(el.dataset.tex ?? '');
+    setDisplay(el.dataset.display === '1');
+    setImage(null);
+  };
+  /** Formel an der Cursor-Position (bzw. statt der Auswahl) einfügen. */
+  const insertFormula = (source = '', select = true) => {
+    loadKatex().catch(() => {});
+    cmd('insertHTML', `<span class="math" data-tex="${attr(source)}" data-new="1"></span>\u200b`);
+    const el = editor.current?.querySelector<HTMLElement>('span.math[data-new]');
+    if (!el) return;
+    delete el.dataset.new;
+    renderMathSpan(el, true);
+    if (select) selectFormula(el);
+  };
+  const updateFormula = (patch: { tex?: string; display?: boolean }) => {
+    if (!formula) return;
+    if (patch.tex !== undefined) {
+      setTex(patch.tex);
+      formula.dataset.tex = patch.tex;
+    }
+    if (patch.display !== undefined) {
+      setDisplay(patch.display);
+      if (patch.display) formula.dataset.display = '1';
+      else delete formula.dataset.display;
+    }
+    renderMathSpan(formula, true);
+    setDirty(true);
+  };
+  const finishFormula = () => {
+    const el = formula;
+    selectFormula(null);
+    if (!el || !el.isConnected) return;
+    el.classList.remove('selected');
+    if (!(el.dataset.tex ?? '').trim()) return el.remove();
+    // Cursor hinter die Formel setzen.
+    editor.current?.focus();
+    const r = document.createRange();
+    r.setStartAfter(el);
+    r.collapse(true);
+    const sel = document.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+  };
+  const deleteFormula = () => {
+    formula?.remove();
+    setFormula(null);
+    setDirty(true);
+  };
+  /** Gerade "$…$" getippt? Dann in eine Formel umwandeln (gleiche Regeln wie bei Karteikarten). */
+  const autoFormula = () => {
+    const sel = document.getSelection();
+    const node = sel?.anchorNode;
+    if (!sel || !node || node.nodeType !== Node.TEXT_NODE) return;
+    const off = sel.anchorOffset;
+    const before = (node.textContent ?? '').slice(0, off);
+    if (!before.endsWith('$') || before.endsWith('\\$')) return;
+    const open = before.lastIndexOf('$', off - 2);
+    if (open < 0 || before[open - 1] === '$' || before[open - 1] === '\\') return;
+    const source = before.slice(open + 1, off - 1);
+    if (!source || blank(source[0]) || blank(source[source.length - 1]) || source.endsWith('\\')) return;
+    const r = document.createRange();
+    r.setStart(node, open);
+    r.setEnd(node, off);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    insertFormula(source, false);
+  };
+
   const onEditorClick = (e: React.MouseEvent) => {
     const t = e.target as HTMLElement;
+    const math = t.closest?.('span.math') as HTMLElement | null;
+    if (math && editor.current?.contains(math)) {
+      selectFormula(math);
+      return;
+    }
+    if (formula) finishFormula();
     if (t instanceof HTMLImageElement) {
       setImage(t);
       const block = t.closest('p, h2, h3, li, blockquote') as HTMLElement | null;
@@ -223,6 +318,7 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     { icon: 'listBullet', label: 'Aufzählung', on: state.ul, run: () => cmd('insertUnorderedList') },
     { icon: 'listNumber', label: 'Nummerierung', on: state.ol, run: () => cmd('insertOrderedList') },
     { icon: 'image', label: 'Bild einfügen', run: () => imageInput.current?.click() },
+    { icon: 'sigma', label: 'Formel einfügen', on: !!formula, run: () => (formula ? finishFormula() : insertFormula()) },
   ];
 
   return (
@@ -262,6 +358,42 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
             ),
           )}
         </div>
+        {formula && (
+          <div className="card formula-bar" data-no-swipe>
+            <div className="field-label">
+              <span>Formel (LaTeX)</span>
+              <span className="muted small">{String.raw`z. B. \frac{a}{b}, x^2, \sqrt{x}, \int_0^1`}</span>
+            </div>
+            <textarea
+              autoFocus
+              rows={2}
+              value={tex}
+              placeholder="\int_0^1 x^2\,dx = \frac{1}{3}"
+              onChange={(e) => updateFormula({ tex: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  finishFormula();
+                } else if (e.key === 'Escape') finishFormula();
+              }}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+            />
+            <label className="toggle-row small-toggle">
+              <span>In eigener Zeile (zentriert)</span>
+              <input type="checkbox" className="switch" checked={display} onChange={(e) => updateFormula({ display: e.target.checked })} />
+            </label>
+            <div className="input-row">
+              <button className="btn ghost danger" onClick={deleteFormula}>
+                <Icon name="trash" size={18} /> Löschen
+              </button>
+              <button className="btn primary grow" onClick={finishFormula}>
+                Fertig
+              </button>
+            </div>
+          </div>
+        )}
         <div className="doc-edit-wrap" ref={wrap}>
           <div
             ref={editor}
@@ -272,9 +404,11 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
             aria-multiline="true"
             aria-label="Inhalt"
             data-no-swipe
-            onInput={() => {
+            onInput={(e) => {
               setDirty(true);
               measure();
+              const ev = e.nativeEvent as InputEvent;
+              if (ev.inputType === 'insertText' && ev.data?.endsWith('$')) autoFormula();
             }}
             onClick={onEditorClick}
             onKeyDown={onKeyDown}

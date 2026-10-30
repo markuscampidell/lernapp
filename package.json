@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
     "fflate": "^0.8.2",
+    "katex": "^0.16.47",
     "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

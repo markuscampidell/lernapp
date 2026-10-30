@@ -1973,3 +1973,81 @@ textarea.text-line.doc-title {
 .study-body > .notice.warning:first-child {
   margin-bottom: 12px;
 }
+
+/* Formeln (KaTeX) */
+.math-display {
+  display: block;
+  margin: 6px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.math-display .katex-display {
+  margin: 0;
+}
+.math-inline .katex,
+.math .katex {
+  font-size: 1.08em;
+}
+.math-preview {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 0.95rem;
+  overflow-x: auto;
+}
+.math-preview-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+.math-hint {
+  margin: 0;
+}
+/* Formeln in Text-Dokumenten */
+.doc-content span.math {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+}
+.doc-content span.math[data-display='1'] {
+  display: block;
+  text-align: center;
+  margin: 8px 0;
+}
+.doc-editable span.math {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+.doc-editable span.math:hover {
+  background: var(--surface-2);
+}
+.doc-editable span.math.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.doc-editable span.math:empty::before {
+  content: 'Σ Formel';
+  opacity: 0.6;
+  font-style: italic;
+}
+.formula-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.formula-bar textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.math-inline,
+.math-display,
+.doc-content span.math {
+  white-space: normal;
+  overflow-wrap: normal;
+}

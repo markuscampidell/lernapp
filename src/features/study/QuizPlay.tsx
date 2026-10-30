@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Icon } from '../../components/Icon';
 import { StudyScreen } from './StudyScreen';
 import { shuffled, type Question } from './format';
+import { MathText } from '../../components/MathText';
 
 const LETTERS = 'ABCDEF';
 
@@ -97,9 +98,17 @@ export function QuizPlay({ title, questions, onClose }: { title: string; questio
                 <h3 className="section-title">Falsch beantwortet</h3>
                 {wrong.map((w) => (
                   <div key={w.id} className="quiz-review-item">
-                    <strong className="pre-wrap">{w.text}</strong>
+                    <strong className="pre-wrap"><MathText text={w.text} /></strong>
                     <span className="muted small">
-                      Richtig: {w.answers.filter((a) => a.correct).map((a) => a.text).join(' · ')}
+                      Richtig:{' '}
+                      {w.answers
+                        .filter((a) => a.correct)
+                        .map((a, i) => (
+                          <span key={a.id}>
+                            {i > 0 && ' · '}
+                            <MathText text={a.text} />
+                          </span>
+                        ))}
                     </span>
                   </div>
                 ))}
@@ -122,7 +131,7 @@ export function QuizPlay({ title, questions, onClose }: { title: string; questio
         ) : (
           <>
             <div className="card quiz-question">
-              <p className="quiz-text pre-wrap">{q.text}</p>
+              <p className="quiz-text pre-wrap"><MathText text={q.text} /></p>
               {multi && <span className="muted small">Mehrere Antworten sind richtig.</span>}
             </div>
             <div className="quiz-options">
@@ -131,7 +140,7 @@ export function QuizPlay({ title, questions, onClose }: { title: string; questio
                 return (
                   <button key={a.id} className={`quiz-option ${state}`} onClick={() => pick(a.id)} disabled={checked}>
                     <span className="quiz-letter">{checked && a.correct ? <Icon name="check" size={16} /> : checked && picked.has(a.id) ? <Icon name="close" size={16} /> : LETTERS[i]}</span>
-                    <span className="grow pre-wrap">{a.text}</span>
+                    <span className="grow pre-wrap"><MathText text={a.text} /></span>
                   </button>
                 );
               })}
@@ -140,7 +149,7 @@ export function QuizPlay({ title, questions, onClose }: { title: string; questio
               <>
                 <p className={`notice ${lastOk ? 'good' : 'critical'}`}>
                   <strong>{lastOk ? 'Richtig!' : 'Leider falsch.'}</strong>
-                  {q.explanation && <span className="pre-wrap"> {q.explanation}</span>}
+                  {q.explanation && <span className="pre-wrap"> <MathText text={q.explanation} /></span>}
                 </p>
                 <button className="btn primary block" onClick={next}>
                   {pos + 1 < order.length ? 'Weiter' : 'Auswertung'}

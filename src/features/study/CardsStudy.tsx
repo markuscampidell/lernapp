@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '../../components/Icon';
 import { StudyScreen } from './StudyScreen';
 import { shuffled, type Card } from './format';
+import { MathText } from '../../components/MathText';
 
 interface Round {
   /** Noch nicht gezeigte Karten; die erste ist die aktuelle. Jede Karte kommt pro Runde genau einmal dran. */
@@ -114,11 +115,11 @@ export function CardsStudy({ title, cards, onClose }: { title: string; cards: Ca
               <span className="flashcard-inner">
                 <span className="flashcard-face front">
                   <span className="flashcard-label">{reverse ? 'Rückseite' : 'Vorderseite'}</span>
-                  <span className="flashcard-text">{a || <span className="muted">(leer)</span>}</span>
+                  <span className="flashcard-text">{a ? <MathText text={a} /> : <span className="muted">(leer)</span>}</span>
                 </span>
                 <span className="flashcard-face back">
                   <span className="flashcard-label">{reverse ? 'Vorderseite' : 'Rückseite'}</span>
-                  <span className="flashcard-text">{b || <span className="muted">(leer)</span>}</span>
+                  <span className="flashcard-text">{b ? <MathText text={b} /> : <span className="muted">(leer)</span>}</span>
                 </span>
               </span>
             </button>
