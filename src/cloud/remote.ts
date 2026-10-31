@@ -27,6 +27,14 @@ export interface Member {
   userId: string;
   addedAt: string;
 }
+/** Geteilte Ordner, die mir jemand beim Löschen seines Kontos übergeben hat (noch nicht entschieden). */
+export interface Handover {
+  id: string;
+  fromName: string;
+  createdAt: string;
+  expiresAt: string;
+  shareIds: string[];
+}
 export interface Snapshot {
   userId: string;
   profiles: Profile[];
@@ -37,6 +45,10 @@ export interface Snapshot {
   files: FileItem[];
   /** folderId -> Zeitpunkt, an dem ich den Ordner zuletzt geöffnet habe. */
   seen: Record<string, string>;
+  /** An mich übergebene geteilte Ordner (fehlt in älteren zwischengespeicherten Ständen). */
+  handovers?: Handover[];
+  /** false = supabase/004_konto_loeschen.sql wurde noch nicht ausgeführt. */
+  handoversReady?: boolean;
 }
 
 function sb(): SupabaseClient {
@@ -92,16 +104,40 @@ async function selectAll(table: string, order: string[]): Promise<Row[]> {
   }
 }
 
+/** Übergaben an mich – null, wenn der Server sie noch nicht kennt (004 nicht ausgeführt). */
+async function fetchHandovers(): Promise<Handover[] | null> {
+  const [h, hs] = await Promise.all([
+    sb().from('handovers').select('id, from_name, created_at, expires_at').order('created_at'),
+    sb().from('handover_shares').select('handover_id, share_id'),
+  ]);
+  if (h.error || hs.error) {
+    const msg = (h.error ?? hs.error)!.message;
+    if (/handover|relation|schema cache|does not exist/i.test(msg)) return null;
+    throw new Error(friendly(msg));
+  }
+  const links = (hs.data ?? []) as Row[];
+  return ((h.data ?? []) as Row[]).map((r) => ({
+    id: String(r.id),
+    fromName: String(r.from_name),
+    createdAt: String(r.created_at),
+    expiresAt: String(r.expires_at),
+    shareIds: links.filter((l) => String(l.handover_id) === String(r.id)).map((l) => String(l.share_id)),
+  }));
+}
+
 export async function fetchSnapshot(userId: string): Promise<Snapshot> {
-  const [profiles, shares, members, folders, files, seen] = await Promise.all([
+  const [profiles, shares, members, folders, files, seen, handovers] = await Promise.all([
     selectAll('profiles', ['id']),
     selectAll('shares', ['id']),
     selectAll('share_members', ['share_id', 'user_id']),
     selectAll('folders', ['id']),
     selectAll('files', ['id']),
     selectAll('seen', ['folder_id']),
+    fetchHandovers(),
   ]);
   return {
+    handovers: handovers ?? [],
+    handoversReady: handovers !== null,
     userId,
     profiles: profiles.map((r) => ({ id: String(r.id), username: String(r.username) })),
     shares: shares.map((r) => ({ id: String(r.id), ownerId: String(r.owner_id), rootId: String(r.root_id), createdAt: String(r.created_at), inside: (r.inside as string | null) ?? null })),
@@ -340,4 +376,28 @@ export async function importBundle(shareId: string, targetId: string | null, bun
     await removePaths(uploaded);
     throw e;
   }
+}
+
+// ---------- Konto löschen & Übergaben ----------
+
+export const NOT_READY = 'Der Server ist noch nicht bereit: Bitte supabase/004_konto_loeschen.sql im Supabase „SQL Editor“ ausführen.';
+
+/** Löscht das eigene Konto. recipient = Person, die die eigenen geteilten Ordner bekommt (null = niemand). */
+export async function deleteOwnAccount(recipient: string | null): Promise<void> {
+  const { error } = await sb().rpc('delete_own_account', { recipient });
+  if (error) throw new Error(/delete_own_account|schema cache|Could not find/i.test(error.message) ? NOT_READY : friendly(error.message));
+}
+
+/** Übergabe abschließen (übernommen oder abgelehnt): der Hinweis verschwindet. */
+export async function closeHandover(id: string): Promise<void> {
+  check(await sb().from('handovers').delete().eq('id', id));
+}
+
+/** Löscht abgelaufene Übergaben (nach 30 Tagen) samt ihren Dateien im Speicher. */
+export async function expireHandovers(): Promise<boolean> {
+  const { data, error } = await sb().rpc('expire_handovers');
+  if (error) return false;
+  const paths = ((data as string[] | null) ?? []).filter(Boolean);
+  if (paths.length) await removePaths(paths);
+  return paths.length > 0;
 }

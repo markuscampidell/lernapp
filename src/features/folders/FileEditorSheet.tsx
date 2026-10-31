@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Access, FileItem } from '../../domain/types';
 import { AccessPicker } from '../share/AccessPicker';
+import { DetailsLockNotice, useDetailsLock } from '../../cloud/editing';
 import { pathOf } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { Sheet } from '../../components/Sheet';
@@ -22,9 +23,11 @@ export function FileEditorSheet({ file, onClose, onDeleted }: { file: FileItem; 
   const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const editable = canModify(file) && (!file.shareId || online);
-  const canDelete = !deleteProblem([], [file.id]);
-  const showSave = editable || (canSetAccess(file) && online);
+  // Nur eine Person gleichzeitig bearbeitet die Details einer geteilten Datei.
+  const lock = useDetailsLock(file, (canModify(file) || canSetAccess(file)) && online);
+  const editable = canModify(file) && (!file.shareId || online) && !lock.locked;
+  const canDelete = !deleteProblem([], [file.id]) && !lock.locked;
+  const showSave = (editable || (canSetAccess(file) && online)) && !lock.locked;
   const kind = fileKind(file);
 
   const attempt = async (fn: () => Promise<void>, after?: () => void) => {
@@ -106,8 +109,9 @@ export function FileEditorSheet({ file, onClose, onDeleted }: { file: FileItem; 
             {editable && <span className="link">Verschieben</span>}
           </button>
         </div>
-        {file.shareId && <AccessPicker item={file} value={access} onChange={setAccessValue} />}
-        {!editable && file.shareId && (
+        {file.shareId && <AccessPicker item={file} value={access} onChange={setAccessValue} disabled={lock.locked} />}
+        <DetailsLockNotice {...lock} noun="dieser Datei" />
+        {!editable && file.shareId && !lock.locked && (
           <p className="muted small">{online ? 'Du darfst diese Datei nur ansehen.' : 'Offline – Änderungen sind gerade nicht möglich.'}</p>
         )}
         {err && <p className="notice critical">{err}</p>}

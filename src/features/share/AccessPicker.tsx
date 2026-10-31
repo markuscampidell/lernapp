@@ -11,7 +11,7 @@ export const ACCESS_LABEL: Record<Access, string> = {
  * Was andere Mitglieder mit einem geteilten Eintrag tun dürfen.
  * value null = wie der übergeordnete Ordner. Nur sichtbar für Ersteller und Besitzer.
  */
-export function AccessPicker({ item, value, onChange }: { item: Folder | FileItem; value: Access | null; onChange: (v: Access | null) => void }) {
+export function AccessPicker({ item, value, onChange, disabled = false }: { item: Folder | FileItem; value: Access | null; onChange: (v: Access | null) => void; disabled?: boolean }) {
   const { canSetAccess, inheritedAccessOf, isRoot, online } = useLibrary();
   if (!canSetAccess(item)) return null;
   const root = !('folderId' in item) && isRoot(item);
@@ -35,7 +35,7 @@ export function AccessPicker({ item, value, onChange }: { item: Folder | FileIte
             aria-checked={value === v}
             className={`access-option${value === v ? ' on' : ''}`}
             onClick={() => onChange(v)}
-            disabled={!online}
+            disabled={!online || disabled}
           >
             <span className="radio-dot" aria-hidden="true" />
             {label(v)}

@@ -8,7 +8,7 @@ import { fullName } from '../lib/files';
 import { useAuth, type User } from '../cloud/auth';
 import { supabase } from '../cloud/supabase';
 import * as remote from '../cloud/remote';
-import type { Member, Profile, Share, Snapshot } from '../cloud/remote';
+import type { Handover, Member, Profile, Share, Snapshot } from '../cloud/remote';
 import * as local from './local';
 import { looseFiles, makeBundle, topLevel, type FolderInput, type NewFileInput } from './bundle';
 
@@ -82,6 +82,31 @@ interface LibraryValue {
   removeMember: (shareId: string, userId: string) => Promise<void>;
   leaveShare: (shareId: string) => Promise<void>;
   refreshRemote: () => Promise<void>;
+
+  // ---------- Konto löschen & Übergaben ----------
+  /** An mich übergebene geteilte Ordner, über die ich noch entscheiden muss. */
+  handovers: Handover[];
+  /** Server kennt Konto-Löschen/Übergaben (supabase/004_konto_loeschen.sql ausgeführt). */
+  handoversReady: boolean;
+  handoverStats: (h: Handover) => HandoverStats;
+  /** Übernehmen: 'shared' = weiter geteilt, ich bin Besitzer; 'local' = in „Meine Ordner“ auf dieses Gerät. */
+  claimHandover: (id: string, mode: 'shared' | 'local', onProgress?: (msg: string) => void) => Promise<void>;
+  /** Ablehnen: alles wird endgültig gelöscht. */
+  declineHandover: (id: string) => Promise<void>;
+  /** Geteilte Ordner, die mir gehören (die oberste Ebene davon). */
+  ownedRoots: Folder[];
+  /** Eigenes Konto löschen; recipient bekommt die eigenen geteilten Ordner (null = alles löschen). */
+  deleteAccount: (recipient: string | null, onProgress?: (msg: string) => void) => Promise<void>;
+}
+
+export interface HandoverStats {
+  folders: number;
+  files: number;
+  bytes: number;
+  /** Namen der obersten Ordner. */
+  names: string[];
+  /** Personen, die die Ordner weiterhin sehen, wenn sie geteilt bleiben. */
+  people: string[];
 }
 
 const Ctx = createContext<LibraryValue | null>(null);
@@ -127,11 +152,23 @@ function merge(localData: local.LocalData, snap: Snapshot | null, me: string | u
 }
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
-  const { user, ready: authReady } = useAuth();
+  const { user, ready: authReady, signOut } = useAuth();
   const me = user?.id;
   const [localData, setLocalData] = useState<local.LocalData>({ folders: [], files: [] });
   const [localReady, setLocalReady] = useState(false);
-  const [snap, setSnap] = useState<Snapshot | null>(null);
+  // Vollständiger Stand vom Server; "snap" blendet Ordner aus, die mir übergeben wurden und noch auf eine Entscheidung warten.
+  const [rawSnap, setSnap] = useState<Snapshot | null>(null);
+  const pendingShares = useMemo(() => new Set((rawSnap?.handovers ?? []).flatMap((h) => h.shareIds)), [rawSnap]);
+  const snap = useMemo<Snapshot | null>(() => {
+    if (!rawSnap || !pendingShares.size) return rawSnap;
+    return {
+      ...rawSnap,
+      shares: rawSnap.shares.filter((s) => !pendingShares.has(s.id)),
+      members: rawSnap.members.filter((m) => !pendingShares.has(m.shareId)),
+      folders: rawSnap.folders.filter((f) => !pendingShares.has(f.shareId!)),
+      files: rawSnap.files.filter((f) => !pendingShares.has(f.shareId!)),
+    };
+  }, [rawSnap, pendingShares]);
   const [remoteReady, setRemoteReady] = useState(false);
   const [online, setOnline] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -233,6 +270,21 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     await Promise.all([reloadLocal(), refreshRemote()]);
   }, [reloadLocal, refreshRemote]);
+
+  // Abgelaufene Übergaben (30 Tage ohne Entscheidung) aufräumen – einmal pro Anmeldung.
+  useEffect(() => {
+    if (!me || !supabase) return;
+    let alive = true;
+    remote
+      .expireHandovers()
+      .then((changed) => {
+        if (alive && changed) refreshRemote();
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [me, refreshRemote]);
 
   // ---------- Zusammengeführte Sicht ----------
   const merged = useMemo(() => merge(localData, snap, me), [localData, snap, me]);
@@ -769,6 +821,121 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [me, refreshRemote, requireOnline],
   );
 
+  // ---------- Konto löschen & Übergaben ----------
+  const handovers = useMemo(() => rawSnap?.handovers ?? [], [rawSnap]);
+
+  /** Alles, was zu einer Übergabe gehört (aus dem vollständigen Stand, auch wenn es ausgeblendet ist). */
+  const handoverParts = useCallback(
+    (id: string) => {
+      const h = rawSnap?.handovers?.find((x) => x.id === id);
+      if (!h || !rawSnap) throw new Error('Diese Übergabe gibt es nicht mehr.');
+      const set = new Set(h.shareIds);
+      const hShares = rawSnap.shares.filter((s) => set.has(s.id));
+      const hFolders = rawSnap.folders.filter((f) => set.has(f.shareId!));
+      const hFiles = rawSnap.files.filter((f) => set.has(f.shareId!));
+      const folderIds = new Set(hFolders.map((f) => f.id));
+      // Oberste Ebene: geteilte Ordner, die nicht in einem anderen davon liegen.
+      const tops = hShares.filter((s) => !(s.inside && folderIds.has(s.inside)) && folderIds.has(s.rootId));
+      return { h, hShares, hFolders, hFiles, folderIds, tops };
+    },
+    [rawSnap],
+  );
+
+  const handoverStats = useCallback(
+    (h: Handover): HandoverStats => {
+      const { hShares, hFolders, hFiles, tops } = handoverParts(h.id);
+      const ids = new Set(hShares.map((s) => s.id));
+      const people = new Set<string>();
+      rawSnap?.members.forEach((m) => ids.has(m.shareId) && m.userId !== me && people.add(m.userId));
+      return {
+        folders: hFolders.length,
+        files: hFiles.length,
+        bytes: hFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+        names: tops.map((s) => hFolders.find((f) => f.id === s.rootId)?.name ?? '').filter(Boolean),
+        people: [...people].map((id) => profileMap.get(id) ?? 'Unbekannt').sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' })),
+      };
+    },
+    [handoverParts, rawSnap, me, profileMap],
+  );
+
+  const claimHandover = useCallback<LibraryValue['claimHandover']>(
+    async (id, mode, onProgress) => {
+      requireOnline();
+      const { hShares, hFolders, hFiles, folderIds, tops } = handoverParts(id);
+      if (mode === 'shared') {
+        await remote.closeHandover(id);
+        // Wie bei eigenen geteilten Ordnern: unter „Meine Ordner“ (auf diesem Gerät) anzeigen.
+        for (const s of tops) {
+          const root = hFolders.find((f) => f.id === s.rootId)!;
+          await local.putPlaceholder({ id: root.id, parentId: null, name: root.name, shareId: s.id, createdAt: root.createdAt });
+        }
+        await reload();
+        return;
+      }
+      onProgress?.('Dateien werden heruntergeladen …');
+      // Innere geteilte Ordner liegen danach als normale Unterordner dort, wo sie eingehängt waren.
+      const tree = hFolders.map((f) => {
+        if (f.parentId !== null) return f;
+        const s = hShares.find((x) => x.rootId === f.id);
+        return s?.inside && folderIds.has(s.inside) ? { ...f, parentId: s.inside } : f;
+      });
+      const bundle = await makeBundle(tree, hFiles, tops.map((s) => s.rootId), [], loadBlob);
+      const total = bundle.files.length;
+      onProgress?.('Wird auf diesem Gerät gespeichert …');
+      await local.importBundle(null, bundle, (n) => onProgress?.(`Wird auf diesem Gerät gespeichert … ${n}/${total}`));
+      onProgress?.('Wird vom Server entfernt …');
+      for (const s of hShares) await remote.deleteShare(s.id, hFolders, hFiles);
+      await remote.closeHandover(id);
+      await reload();
+    },
+    [requireOnline, handoverParts, reload],
+  );
+
+  const declineHandover = useCallback<LibraryValue['declineHandover']>(
+    async (id) => {
+      requireOnline();
+      const { hShares, hFolders, hFiles } = handoverParts(id);
+      for (const s of hShares) await remote.deleteShare(s.id, hFolders, hFiles);
+      await remote.closeHandover(id);
+      await refreshRemote();
+    },
+    [requireOnline, handoverParts, refreshRemote],
+  );
+
+  const ownedRoots = useMemo(
+    () => folders.filter((f) => isRoot(f) && isOwner(f.shareId) && !parentShareOf(f.shareId)),
+    [folders, isRoot, isOwner, parentShareOf],
+  );
+
+  const deleteAccount = useCallback<LibraryValue['deleteAccount']>(
+    async (recipient, onProgress) => {
+      if (!me || !supabase) throw new Error('Du bist nicht angemeldet.');
+      requireOnline();
+      onProgress?.('Wird vorbereitet …');
+      // Frischer Stand: auch Ordner, die mir übergeben wurden und noch warten, gehören dazu.
+      const fresh = await remote.fetchSnapshot(me);
+      if (!fresh.handoversReady) throw new Error(remote.NOT_READY);
+      const owned = fresh.shares.filter((s) => s.ownerId === me);
+      if (!recipient) {
+        for (let i = 0; i < owned.length; i++) {
+          onProgress?.(`Geteilte Ordner werden gelöscht … ${i + 1}/${owned.length}`);
+          await remote.deleteShare(owned[i].id, fresh.folders, fresh.files);
+        }
+      }
+      onProgress?.('Konto wird gelöscht …');
+      await remote.deleteOwnAccount(recipient);
+      // Platzhalter der eigenen geteilten Ordner auf diesem Gerät entfernen („Meine Ordner“ bleiben).
+      const ownedIds = new Set(owned.map((s) => s.id));
+      for (const f of localData.folders) {
+        if (f.shareId && ownedIds.has(f.shareId)) await local.deletePlaceholder(f.id).catch(() => {});
+      }
+      // Das Konto gibt es nicht mehr – nur noch auf dem Gerät abmelden.
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => signOut());
+      await reloadLocal();
+    },
+    [me, requireOnline, localData, signOut, reloadLocal],
+  );
+
   // Beim Abmelden zwischengespeicherte geteilte Daten vom Gerät entfernen.
   const prevUser = useRef(me);
   useEffect(() => {
@@ -830,11 +997,19 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       refreshRemote,
       parentShareOf,
       peopleOf,
+      handovers,
+      handoversReady: rawSnap?.handoversReady !== false,
+      handoverStats,
+      claimHandover,
+      declineHandover,
+      ownedRoots,
+      deleteAccount,
     }),
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
       user, online, snap, userName, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
       shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
+      handovers, rawSnap, handoverStats, claimHandover, declineHandover, ownedRoots, deleteAccount,
     ],
   );
 

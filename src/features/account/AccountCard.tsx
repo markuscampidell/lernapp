@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../cloud/auth';
 import { MIN_PASSWORD } from '../../cloud/supabase';
 import { Icon } from '../../components/Icon';
+import { DeleteAccountSheet } from './DeleteAccountSheet';
 
 /** Anmelden/Registrieren – oder, wenn angemeldet, Konto-Infos (Abmelden, Passwort ändern). */
 export function AccountCard({ showAccount = true }: { showAccount?: boolean }) {
@@ -100,6 +101,7 @@ function AccountInfo() {
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<{ kind: 'good' | 'critical'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,8 +154,12 @@ function AccountInfo() {
           >
             <Icon name="logout" size={18} /> Abmelden
           </button>
+          <button className="btn ghost danger" onClick={() => setDeleting(true)}>
+            <Icon name="trash" size={18} /> Konto löschen
+          </button>
         </div>
       )}
+      {deleting && <DeleteAccountSheet onClose={() => setDeleting(false)} />}
       {status && <p className={`notice ${status.kind}`}>{status.text}</p>}
     </div>
   );

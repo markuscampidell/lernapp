@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Icon, type IconName } from './components/Icon';
 import { InstallBanner } from './components/InstallBanner';
+import { HandoverBanner } from './features/account/HandoverBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FoldersView } from './features/folders/FoldersView';
 import { UploadView } from './features/upload/UploadView';
@@ -79,6 +80,7 @@ export function App() {
           <p className="muted">Lädt …</p>
         ) : (
           <ErrorBoundary>
+            <HandoverBanner />
             {tab === 'ordner' && <FoldersView folderId={route.folderId} />}
             {tab === 'hochladen' && <UploadView />}
             {tab === 'einstellungen' && <SettingsView />}

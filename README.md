@@ -22,6 +22,8 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
   „Geteilte Ordner“. Alle Mitglieder können hinzufügen; was andere mit einem Eintrag tun dürfen (nur lesen / bearbeiten / auch löschen),
   stellt die Person ein, die ihn erstellt hat (Ordner vererben es). Der Besitzer darf alles, fügt Personen
   hinzu, entfernt sie oder beendet das Teilen. „!“ markiert Neues von anderen. Geöffnete geteilte Dateien sind offline lesbar.
+- **Konto löschen**: Eigene geteilte Ordner gehen an eine gewählte Person (oder werden gelöscht). Sie sieht einen Hinweis und kann
+  übernehmen – weiter geteilt als Besitzer oder in „Meine Ordner“ auf ihr Gerät – oder ablehnen. Nach 30 Tagen ohne Entscheidung wird alles gelöscht.
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
 ## Entwickeln
@@ -48,7 +50,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
 2. *Authentication → Sign In / Providers → Email*: **„Confirm email“ ausschalten** (Anmeldung nur mit Benutzername).
 3. *SQL Editor*: Inhalt von `supabase/schema.sql` einfügen und ausführen (Tabellen, Rechte, Dateispeicher),
    danach genauso `supabase/002_rechte.sql` (Rechte pro Datei/Ordner)
-   und `supabase/003_verschachtelt.sql` (geteilte Ordner in geteilten Ordnern).
+   , `supabase/003_verschachtelt.sql` (geteilte Ordner in geteilten Ordnern)
+   und `supabase/004_konto_loeschen.sql` (Konto löschen & geteilte Ordner übergeben).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

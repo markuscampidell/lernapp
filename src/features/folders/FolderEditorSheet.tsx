@@ -3,6 +3,7 @@ import type { Folder } from '../../domain/types';
 import { pathOf, scopeOf, subtreeIds } from '../../domain/tree';
 import { SHARED_ROOT, type Access } from '../../domain/types';
 import { AccessPicker } from '../share/AccessPicker';
+import { DetailsLockNotice, useDetailsLock } from '../../cloud/editing';
 import { useLibrary } from '../../state/Library';
 import { useBlobUrl } from '../../hooks/useBlobUrl';
 import { Sheet } from '../../components/Sheet';
@@ -49,11 +50,13 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
   const targetPath =
     target === SHARED_ROOT ? 'Geteilte Ordner' : pathOf(folders, target).map((p) => p.name).join(' / ') || (scopeOf(folders, target) === 'mine' ? 'Meine Ordner' : 'Oberste Ebene');
   // Löschen/Verschieben nur, wenn erlaubt (geteilte Ordner: Besitzer oder eigene Einträge).
-  const canDelete = !!folder && !deleteProblem([folder.id], []);
+  // Nur eine Person gleichzeitig bearbeitet die Details eines geteilten Ordners.
+  const lock = useDetailsLock(folder, !!folder && (canEditFolder(folder) || canSetAccess(folder)) && online);
+  const canDelete = !!folder && !deleteProblem([folder.id], []) && !lock.locked;
   // Details nur ansehen, wenn man den Ordner nicht ändern darf (bzw. offline in geteilten Ordnern).
-  const editable = !folder || (canEditFolder(folder) && (!folder.shareId || online));
-  const showSave = editable || (!!folder && canSetAccess(folder) && online);
-  const canMove = !!folder && (isRoot(folder) ? isOwner(folder.shareId) : canModify(folder));
+  const editable = !folder || (canEditFolder(folder) && (!folder.shareId || online) && !lock.locked);
+  const showSave = (editable || (!!folder && canSetAccess(folder) && online)) && !lock.locked;
+  const canMove = !!folder && (isRoot(folder) ? isOwner(folder.shareId) : canModify(folder)) && !lock.locked;
 
   const save = async () => {
     setBusy(true);
@@ -196,7 +199,8 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
             </button>
           </div>
         )}
-        {folder?.shareId && <AccessPicker item={folder} value={access} onChange={setAccessValue} />}
+        {folder?.shareId && <AccessPicker item={folder} value={access} onChange={setAccessValue} disabled={lock.locked} />}
+        <DetailsLockNotice {...lock} noun="dieses Ordners" />
         {err && <p className="notice critical">{err}</p>}
       </Sheet>
       {picking && folder && (

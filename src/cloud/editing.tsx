@@ -1,6 +1,6 @@
 // Wer bearbeitet gerade eine geteilte Datei? Über Supabase Realtime "Presence" (nichts wird gespeichert).
 import { useEffect, useState } from 'react';
-import type { FileItem } from '../domain/types';
+
 import { newId } from '../lib/id';
 import { useAuth } from './auth';
 import { supabase } from './supabase';
@@ -18,20 +18,24 @@ export interface Editor {
 // Eine Kennung pro Fenster: so fällt auch dasselbe Konto in zwei Fenstern auf.
 const TAB = newId();
 
+/** Was gerade bearbeitet wird: der Inhalt einer Datei oder die Details (Name, Beschreibung, Ort, Rechte) einer Datei/eines Ordners. */
+export type EditScope = 'edit' | 'details';
+
 /**
- * Meldet, dass ich diese geteilte Datei gerade bearbeite, und liefert alle anderen, die sie auch bearbeiten.
- * `mine` = Zeitpunkt, seit dem ich sie offen habe (zum Vergleich, wer zuerst da war).
+ * Meldet, dass ich diesen geteilten Eintrag gerade bearbeite, und liefert alle anderen, die ihn auch bearbeiten.
+ * `mine` = Zeitpunkt, seit dem ich ihn offen habe (zum Vergleich, wer zuerst da war).
+ * active = false: nichts melden (z. B. wenn ich den Eintrag nur ansehen darf).
  */
-export function useEditors(file?: FileItem | null): { others: Editor[]; mine: number } {
+export function useEditors(item?: { id: string; shareId?: string } | null, scope: EditScope = 'edit', active = true): { others: Editor[]; mine: number } {
   const { user } = useAuth();
   const [others, setOthers] = useState<Editor[]>([]);
   const [mine] = useState(() => Date.now());
-  const fileId = file?.shareId ? file.id : null;
+  const itemId = item?.shareId && active ? item.id : null;
 
   useEffect(() => {
-    if (!fileId || !user || !supabase) return;
+    if (!itemId || !user || !supabase) return;
     const client = supabase;
-    const channel = client.channel(`edit-${fileId}`, { config: { presence: { key: TAB } } });
+    const channel = client.channel(`${scope}-${itemId}`, { config: { presence: { key: TAB } } });
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState<{ userId: string; username: string; since: number }>();
       const list: Editor[] = [];
@@ -52,7 +56,7 @@ export function useEditors(file?: FileItem | null): { others: Editor[]; mine: nu
       channel.untrack().catch(() => {});
       client.removeChannel(channel);
     };
-  }, [fileId, user, mine]);
+  }, [itemId, scope, user, mine]);
 
   return { others, mine };
 }
@@ -99,5 +103,42 @@ export function EditingLock({ others, onClose }: { others: Editor[]; onClose: ()
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Details (Name, Beschreibung, Ort, Rechte) eines geteilten Eintrags: Wer später dazukommt, kann sie nur ansehen.
+ * Einmal gesperrt, bleibt gesperrt – die angezeigten Werte sind evtl. veraltet, also neu öffnen.
+ */
+export function useDetailsLock(item: { id: string; shareId?: string } | null | undefined, canEdit: boolean) {
+  const { others, mine } = useEditors(item, 'details', canEdit);
+  const earlier = others.filter((o) => o.since <= mine);
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    if (earlier.length > 0) setLocked(true);
+  }, [earlier.length]);
+  return { locked, earlier, later: others.filter((o) => o.since > mine) };
+}
+
+/** Hinweis im Details-Blatt: gesperrt (jemand war zuerst da) oder jemand anderes hat sie gerade auch geöffnet. */
+export function DetailsLockNotice({ locked, earlier, later, noun }: { locked: boolean; earlier: Editor[]; later: Editor[]; noun: string }) {
+  if (locked) {
+    return earlier.length ? (
+      <p className="notice warning" role="status">
+        ⚠️ {namesOf(earlier)} {verb(earlier)} die Details {noun} gerade. Damit keine Änderungen verloren gehen, kann sie nur eine Person gleichzeitig
+        bearbeiten – du kannst sie im Moment nur ansehen.
+      </p>
+    ) : (
+      <p className="notice info" role="status">
+        ✅ Die andere Bearbeitung ist beendet. Schließe die Details und öffne sie neu, um die neueste Version zu bearbeiten.
+      </p>
+    );
+  }
+  if (!later.length) return null;
+  return (
+    <p className="notice info" role="status">
+      {namesOf(later)} {later.length === 1 && !later[0].self ? 'möchte' : later.length === 1 ? 'möchtest' : 'möchten'} die Details {noun} gerade auch
+      bearbeiten und {later.length === 1 && later[0].self ? 'wartest' : later.length === 1 ? 'wartet' : 'warten'}, bis du fertig bist.
+    </p>
   );
 }
