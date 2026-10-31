@@ -172,13 +172,14 @@ export async function importBundle(targetId: string | null, bundle: Bundle, onPr
 }
 
 /** Speichert/aktualisiert den lokalen Platzhalter eines geteilten Ordners (bestimmt, wo er unter „Meine Ordner“ liegt). */
-export async function putPlaceholder(p: { id: string; parentId: string | null; name: string; shareId: string; createdAt: string }): Promise<void> {
-  const folder: Folder = { id: p.id, parentId: p.parentId, name: p.name, shareId: p.shareId, createdAt: p.createdAt, updatedAt: now() };
+// createdBy = Konto, dem der geteilte Ordner gehört (zum Aufräumen, wenn er auf dem Server gelöscht wurde).
+export async function putPlaceholder(p: { id: string; parentId: string | null; name: string; shareId: string; createdAt: string; createdBy?: string | null }): Promise<void> {
+  const folder: Folder = { id: p.id, parentId: p.parentId, name: p.name, shareId: p.shareId, createdAt: p.createdAt, updatedAt: now(), createdBy: p.createdBy ?? null };
   await write(['folders'], (s) => s.folders.put(folder));
 }
 
 /** Nach dem Teilen: Inhalt vom Gerät entfernen, der Ordner selbst bleibt als Platzhalter an seiner Stelle. */
-export async function convertToPlaceholder(data: LocalData, folderId: string, shareId: string): Promise<void> {
+export async function convertToPlaceholder(data: LocalData, folderId: string, shareId: string, owner: string): Promise<void> {
   const folder = data.folders.find((f) => f.id === folderId);
   if (!folder) return;
   const kids = data.folders.filter((f) => f.parentId === folderId).map((f) => f.id);
@@ -186,7 +187,7 @@ export async function convertToPlaceholder(data: LocalData, folderId: string, sh
   await deleteMany(data, kids, ownFiles);
   await write(['folders', 'blobs'], (s) => {
     if (folder.imageId) s.blobs.delete(folder.imageId);
-    s.folders.put({ id: folder.id, parentId: folder.parentId, name: folder.name, shareId, createdAt: folder.createdAt, updatedAt: now() });
+    s.folders.put({ id: folder.id, parentId: folder.parentId, name: folder.name, shareId, createdAt: folder.createdAt, updatedAt: now(), createdBy: owner });
   });
 }
 

@@ -177,6 +177,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [localReady, setLocalReady] = useState(false);
   // Vollständiger Stand vom Server; "snap" blendet Ordner aus, die mir übergeben wurden und noch auf eine Entscheidung warten.
   const [rawSnap, setSnap] = useState<Snapshot | null>(null);
+  /** Wann (Gerätezeit) der zuletzt erfolgreich vom Server geladene Stand angefragt wurde – nicht der gespeicherte. */
+  const [freshAt, setFreshAt] = useState<{ uid: string; at: number } | null>(null);
   const pendingShares = useMemo(() => new Set((rawSnap?.handovers ?? []).flatMap((h) => h.shareIds)), [rawSnap]);
   const snap = useMemo<Snapshot | null>(() => {
     if (!rawSnap || !pendingShares.size) return rawSnap;
@@ -215,10 +217,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const refreshRemote = useCallback(async () => {
     const uid = userRef.current;
     if (!uid || !supabase) return;
+    const started = Date.now();
     try {
       const next = await remote.fetchSnapshot(uid);
       if (userRef.current !== uid) return;
       setSnap(next);
+      setFreshAt({ uid, at: started });
       setOnline(true);
       db.setMeta(SNAPSHOT_KEY, next).catch(() => {});
     } catch (e) {
@@ -231,6 +235,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!authReady) return;
+    setFreshAt(null);
     if (!me) {
       setSnap(null);
       setRemoteReady(true);
@@ -304,6 +309,22 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       alive = false;
     };
   }, [me, refreshRemote]);
+
+  // Eigene geteilte Ordner, die auf einem anderen Gerät gelöscht wurden: Platzhalter hier entfernen.
+  // Nur mit frischem Stand vom Server (nicht offline/zwischengespeichert), nur eigene, und nur Platzhalter,
+  // die schon vor dieser Abfrage existierten (sonst würde ein gerade eben geteilter Ordner verschwinden).
+  useEffect(() => {
+    if (!me || !online || !rawSnap || !freshAt || freshAt.uid !== me) return;
+    const shareIds = new Set(rawSnap.shares.map((s) => s.id));
+    const gone = localData.folders.filter(
+      (f) => f.shareId && !shareIds.has(f.shareId) && (!f.createdBy || f.createdBy === me) && Date.parse(f.updatedAt) < freshAt.at,
+    );
+    if (!gone.length) return;
+    (async () => {
+      for (const f of gone) await local.deletePlaceholder(f.id).catch(() => {});
+      await reloadLocal();
+    })();
+  }, [me, online, rawSnap, freshAt, localData, reloadLocal]);
 
   // ---------- Zusammengeführte Sicht ----------
   const merged = useMemo(() => merge(localData, snap, me), [localData, snap, me]);
@@ -645,7 +666,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         const f = byId.get(id)!;
         if (target === 'local') {
           if (shareMap.get(f.shareId!)?.inside) await remote.setInside(f.shareId!, null);
-          await local.putPlaceholder({ id, parentId: targetId, name: f.name, shareId: f.shareId!, createdAt: f.createdAt });
+          await local.putPlaceholder({ id, parentId: targetId, name: f.name, shareId: f.shareId!, createdAt: f.createdAt, createdBy: me });
         } else {
           await remote.setInside(f.shareId!, targetId);
           await local.deletePlaceholder(id).catch(() => {});
@@ -777,7 +798,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         await remote.deleteShare(shareId, [], []).catch(() => {});
         throw e;
       }
-      await local.convertToPlaceholder(localData, folderId, shareId);
+      await local.convertToPlaceholder(localData, folderId, shareId, me!);
       await reload();
     },
     [shareProblem, outerRootsIn, folders, files, localData, reload],
@@ -805,7 +826,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       onProgress?.('Wird auf diesem Gerät gespeichert …');
       await local.importBundle(target, bundle);
       // Darin liegende geteilte Ordner bleiben geteilt und an ihrer Stelle.
-      for (const f of nested) await local.putPlaceholder({ id: f.id, parentId: f.parentId, name: f.name, shareId: f.shareId!, createdAt: f.createdAt });
+      for (const f of nested) await local.putPlaceholder({ id: f.id, parentId: f.parentId, name: f.name, shareId: f.shareId!, createdAt: f.createdAt, createdBy: me });
       onProgress?.('Wird vom Server entfernt …');
       await remote.deleteShare(shareId, folders, files);
       await reload();
@@ -887,7 +908,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         // Wie bei eigenen geteilten Ordnern: unter „Meine Ordner“ (auf diesem Gerät) anzeigen.
         for (const s of tops) {
           const root = hFolders.find((f) => f.id === s.rootId)!;
-          await local.putPlaceholder({ id: root.id, parentId: null, name: root.name, shareId: s.id, createdAt: root.createdAt });
+          await local.putPlaceholder({ id: root.id, parentId: null, name: root.name, shareId: s.id, createdAt: root.createdAt, createdBy: me });
         }
         await reload();
         return;
