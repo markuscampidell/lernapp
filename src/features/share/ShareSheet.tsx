@@ -124,13 +124,15 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
               {busy ?? `${selected.size || ''} hinzufügen`.trim()}
             </button>
           </>
-        ) : owner && parent && memberIds.length === 0 ? undefined : owner ? (
+        ) : owner && (parent || lib.sync.on) && memberIds.length === 0 ? undefined : owner ? (
           <button
             className="btn ghost danger grow"
             disabled={!!busy || !lib.online}
             onClick={async () => {
               const text = parent
                 ? `Teilen von „${folder.name}“ beenden?\n\nDie hier hinzugefügten Personen sehen den Ordner dann nicht mehr. Er bleibt in „${parentName}“ für alle Personen von dort.`
+                : lib.sync.on
+                ? `Teilen von „${folder.name}“ beenden?\n\nDie anderen Personen sehen den Ordner dann nicht mehr. Für dich bleibt er auf allen deinen Geräten.`
                 : `Teilen von „${folder.name}“ beenden?\n\nAlle Inhalte (auch die der anderen) werden auf dieses Gerät heruntergeladen und für alle anderen entfernt.`;
               if (!confirm(text)) return;
               if (await run('Wird beendet …', () => lib.stopSharing(share.id, (msg) => setBusy(msg)))) onClose();

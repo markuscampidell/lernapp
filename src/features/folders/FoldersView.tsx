@@ -600,14 +600,16 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
   const count = peopleOf(share.id).length;
   const owner = share.ownerId === me?.id ? 'dir' : userName(share.ownerId);
   const root = folders.find((f) => f.id === share.rootId);
+  // Eigener Ordner, nur auf meinen Geräten: kein "geteilt"-Hinweis, nur die Möglichkeit, Personen hinzuzufügen.
+  const alone = share.ownerId === me?.id && count <= 1;
   return (
     <>
       <button className="share-info" onClick={onPeople}>
         <Icon name="users" size={18} />
         <span className="grow">
-          {isRoot(folder) ? `Geteilt von ${owner} · ${count} ${count === 1 ? 'Person' : 'Personen'}` : `In „${root?.name ?? '…'}“ (geteilt von ${owner}) · erstellt von ${folder.createdBy === me?.id ? 'dir' : userName(folder.createdBy)}`}
+          {alone ? (isRoot(folder) ? 'Auf allen deinen Geräten · mit niemandem geteilt' : `In „${root?.name ?? '…'}“ · auf allen deinen Geräten`) : isRoot(folder) ? `Geteilt von ${owner} · ${count} ${count === 1 ? 'Person' : 'Personen'}` : `In „${root?.name ?? '…'}“ (geteilt von ${owner}) · erstellt von ${folder.createdBy === me?.id ? 'dir' : userName(folder.createdBy)}`}
         </span>
-        <span className="link">Personen</span>
+        <span className="link">{alone ? 'Teilen' : 'Personen'}</span>
       </button>
       {!online && (
         <p className="notice warning">

@@ -4,6 +4,8 @@ import { cloudEnabled, friendly, MIN_PASSWORD, supabase, usernameToEmail, USERNA
 export interface User {
   id: string;
   username: string;
+  /** „Meine Ordner“ automatisch auf alle Geräte dieses Kontos bringen (gilt fürs ganze Konto). */
+  sync: boolean;
 }
 
 interface AuthValue {
@@ -15,13 +17,15 @@ interface AuthValue {
   signUp: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   changePassword: (password: string) => Promise<void>;
+  setSync: (on: boolean) => Promise<void>;
 }
 
 const Ctx = createContext<AuthValue | null>(null);
 
 type SessionUser = { id: string; user_metadata?: Record<string, unknown> } | null | undefined;
 const toUser = (u: SessionUser): User | null =>
-  u ? { id: u.id, username: String(u.user_metadata?.username ?? '') } : null;
+  u ? { id: u.id, username: String(u.user_metadata?.username ?? ''), sync: u.user_metadata?.sync === true } : null;
+const same = (a: User | null, b: User | null) => !!a && !!b && a.id === b.id && a.username === b.username && a.sync === b.sync;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -37,10 +41,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser((prev) => {
         const next = toUser(session?.user);
         // Gleiche Person -> altes Objekt behalten (verhindert unnötiges Neuladen bei Token-Erneuerung).
-        return prev && next && prev.id === next.id && prev.username === next.username ? prev : next;
+        return same(prev, next) ? prev : next;
       });
     });
-    return () => data.subscription.unsubscribe();
+    // Einstellungen des Kontos (z. B. "sync") können auf einem anderen Gerät geändert worden sein.
+    const client = supabase;
+    const fresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      client.auth.getUser().then(({ data: d }) => {
+        if (d.user) setUser((prev) => (prev && prev.id === d.user!.id && !same(prev, toUser(d.user)) ? toUser(d.user) : prev));
+      }, () => {});
+    };
+    document.addEventListener('visibilitychange', fresh);
+    const timer = setInterval(fresh, 5 * 60_000);
+    return () => {
+      data.subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', fresh);
+      clearInterval(timer);
+    };
   }, []);
 
   const signIn = useCallback(async (username: string, password: string) => {
@@ -87,9 +105,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(friendly(error.message));
   }, []);
 
+  const setSync = useCallback(
+    async (on: boolean) => {
+      if (!supabase || !user) return;
+      const { data, error } = await supabase.auth.updateUser({ data: { username: user.username, sync: on } });
+      if (error) throw new Error(friendly(error.message));
+      if (data.user) setUser(toUser(data.user));
+    },
+    [user],
+  );
+
   const value = useMemo<AuthValue>(
-    () => ({ enabled: cloudEnabled, ready, user, signIn, signUp, signOut, changePassword }),
-    [ready, user, signIn, signUp, signOut, changePassword],
+    () => ({ enabled: cloudEnabled, ready, user, signIn, signUp, signOut, changePassword, setSync }),
+    [ready, user, signIn, signUp, signOut, changePassword, setSync],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

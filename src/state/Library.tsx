@@ -95,11 +95,25 @@ interface LibraryValue {
   declineHandover: (id: string) => Promise<void>;
   /** Geteilte Ordner, die mir gehören (die oberste Ebene davon). */
   ownedRoots: Folder[];
+  /** Automatisches Hochladen von „Meine Ordner“ (Konto-Einstellung "Auf allen Geräten"). */
+  sync: SyncState;
+  /** Fehlgeschlagene Ordner erneut versuchen. */
+  retrySync: () => void;
   /**
    * Eigenes Konto löschen; recipient bekommt die eigenen geteilten Ordner (null = alles löschen).
    * wipeLocal: auch „Meine Ordner“ (und alles andere) auf diesem Gerät löschen.
    */
   deleteAccount: (recipient: string | null, wipeLocal: boolean, onProgress?: (msg: string) => void) => Promise<void>;
+}
+
+export interface SyncState {
+  on: boolean;
+  /** Was gerade hochgeladen wird (null = nichts). */
+  busy: string | null;
+  /** Ordner, die nicht hochgeladen werden konnten. */
+  errors: { id: string; name: string; message: string }[];
+  /** Ordner, die noch nur auf diesem Gerät liegen. */
+  pending: number;
 }
 
 export interface HandoverStats {
@@ -147,9 +161,11 @@ function merge(localData: local.LocalData, snap: Snapshot | null, me: string | u
       continue;
     }
     const ph = placeholders.get(f.id);
-    // Eigene geteilte Ordner bleiben dort unter "Meine Ordner", wo sie auf diesem Gerät liegen.
-    const mounted = ph && share?.ownerId === me && (ph.parentId === null || (localIds.has(ph.parentId) && !placeholders.has(ph.parentId)));
-    folders.push({ ...f, parentId: mounted ? ph.parentId : SHARED_ROOT });
+    // Eigene geteilte Ordner stehen immer unter "Meine Ordner": dort, wo sie auf diesem Gerät liegen, sonst ganz oben.
+    // Unter "Geteilte Ordner" stehen nur Ordner, die andere mit mir geteilt haben.
+    const mine = share?.ownerId === me;
+    const mounted = ph && mine && (ph.parentId === null || (localIds.has(ph.parentId) && !placeholders.has(ph.parentId)));
+    folders.push({ ...f, parentId: mounted ? ph.parentId : mine ? null : SHARED_ROOT });
   }
   return { folders, files: [...localData.files, ...(snap?.files ?? [])], orphans };
 }
@@ -775,7 +791,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const root = byId.get(share.rootId);
       if (!root) throw new Error('Ordner nicht gefunden.');
       // Liegt in einem anderen geteilten Ordner: nur die eigenen Personen entfernen – er bleibt dort für dessen Personen.
-      if (parentShareOf(shareId)) {
+      // Ebenso bei "Auf allen Geräten": der Ordner bleibt auf dem Server, nur die anderen Personen verlieren den Zugriff.
+      if (parentShareOf(shareId) || user?.sync) {
         onProgress?.('Personen werden entfernt …');
         for (const m of snap?.members.filter((x) => x.shareId === shareId) ?? []) await remote.removeMember(shareId, m.userId);
         await refreshRemote();
@@ -793,7 +810,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       await remote.deleteShare(shareId, folders, files);
       await reload();
     },
-    [shareMap, me, byId, folders, files, snap, parentShareOf, outerRootsIn, refreshRemote, reload, requireOnline],
+    [shareMap, me, user, byId, folders, files, snap, parentShareOf, outerRootsIn, refreshRemote, reload, requireOnline],
   );
 
   const addMembers = useCallback<LibraryValue['addMembers']>(
@@ -944,6 +961,40 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [me, requireOnline, localData, signOut, reloadLocal],
   );
 
+  // ---------- „Meine Ordner“ auf allen Geräten ----------
+  // Ist es eingeschaltet, wird jeder eigene Ordner der obersten Ebene, der nur auf diesem Gerät liegt,
+  // automatisch „mit niemandem geteilt“ – so erscheint er auf allen Geräten dieses Kontos.
+  // Immer nur ein Ordner auf einmal; danach lädt der Stand neu und der nächste ist dran.
+  const [syncBusy, setSyncBusy] = useState<string | null>(null);
+  const [syncErrors, setSyncErrors] = useState<SyncState['errors']>([]);
+  const syncRunning = useRef(false);
+  const syncOn = !!user?.sync && !!supabase;
+  const localTops = useMemo(() => localData.folders.filter((f) => f.parentId === null && !f.shareId), [localData]);
+  const nextToSync = useMemo(
+    () => (syncOn ? localTops.find((f) => !syncErrors.some((e) => e.id === f.id)) : undefined),
+    [syncOn, localTops, syncErrors],
+  );
+
+  useEffect(() => {
+    if (!nextToSync || !online || !localReady || !authReady || !remoteReady || syncRunning.current) return;
+    syncRunning.current = true;
+    const f = nextToSync;
+    setSyncBusy(`„${f.name}“ wird hochgeladen …`);
+    shareFolder(f.id, [], (msg) => setSyncBusy(`„${f.name}“: ${msg}`))
+      .catch((e) => setSyncErrors((list) => [...list, { id: f.id, name: f.name, message: e instanceof Error ? e.message : 'Das hat nicht geklappt.' }]))
+      .finally(() => {
+        syncRunning.current = false;
+        setSyncBusy(null);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextToSync, online, remoteReady]);
+
+  const retrySync = useCallback(() => setSyncErrors([]), []);
+  const sync = useMemo<SyncState>(
+    () => ({ on: syncOn, busy: syncBusy, errors: syncErrors.filter((e) => localTops.some((f) => f.id === e.id)), pending: syncOn ? localTops.length : 0 }),
+    [syncOn, syncBusy, syncErrors, localTops],
+  );
+
   // Beim Abmelden zwischengespeicherte geteilte Daten vom Gerät entfernen.
   const prevUser = useRef(me);
   useEffect(() => {
@@ -1012,12 +1063,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       declineHandover,
       ownedRoots,
       deleteAccount,
+      sync,
+      retrySync,
     }),
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
       user, online, snap, userName, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
       shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
-      handovers, rawSnap, handoverStats, claimHandover, declineHandover, ownedRoots, deleteAccount,
+      handovers, rawSnap, handoverStats, claimHandover, declineHandover, ownedRoots, deleteAccount, sync, retrySync,
     ],
   );
 

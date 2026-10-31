@@ -22,6 +22,9 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
   „Geteilte Ordner“. Alle Mitglieder können hinzufügen; was andere mit einem Eintrag tun dürfen (nur lesen / bearbeiten / auch löschen),
   stellt die Person ein, die ihn erstellt hat (Ordner vererben es). Der Besitzer darf alles, fügt Personen
   hinzu, entfernt sie oder beendet das Teilen. „!“ markiert Neues von anderen. Geöffnete geteilte Dateien sind offline lesbar.
+- **„Meine Ordner“ auf allen Geräten** (Schalter im Konto): eigene Ordner werden automatisch hochgeladen („mit niemandem geteilt“)
+  und erscheinen auf jedem Gerät, auf dem man angemeldet ist. Eigene Ordner stehen immer unter „Meine Ordner“,
+  unter „Geteilte Ordner“ nur, was andere mit einem teilen.
 - **Konto löschen**: Eigene geteilte Ordner gehen an eine gewählte Person (oder werden gelöscht). Sie sieht einen Hinweis und kann
   übernehmen – weiter geteilt als Besitzer oder in „Meine Ordner“ auf ihr Gerät – oder ablehnen. Nach 30 Tagen ohne Entscheidung wird alles gelöscht.
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.

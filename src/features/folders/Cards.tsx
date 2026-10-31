@@ -68,7 +68,7 @@ function AccessChip({ item }: { item: Folder | FileItem }) {
 }
 
 export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { folder: Folder }) {
-  const { folders, files, unread, isRoot, shareOf, me, userName, isOrphan } = useLibrary();
+  const { folders, files, unread, isRoot, shareOf, me, userName, isOrphan, peopleOf } = useLibrary();
   const c = counts(folders, files, folder.id);
   const parts = [c.folders > 0 && plural(c.folders, 'Unterordner', 'Unterordner'), c.files > 0 && plural(c.files, 'Datei', 'Dateien')].filter(Boolean);
   const root = isRoot(folder);
@@ -76,7 +76,8 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
   const thumb = (
     <span className="thumb-wrap">
       <FolderThumb folder={folder} />
-      {(root || isOrphan(folder.id)) && (
+      {/* Eigene Ordner, die nur auf meinen Geräten liegen (mit niemandem geteilt), bekommen kein Teilen-Zeichen. */}
+      {((root && (share?.ownerId !== me?.id || peopleOf(share?.id).length > 1)) || isOrphan(folder.id)) && (
         <span className="shared-mark" title="Geteilt">
           <Icon name="users" size={12} />
         </span>
