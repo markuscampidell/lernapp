@@ -79,6 +79,17 @@ export function SettingsView() {
         <h1>Einstellungen</h1>
       </header>
 
+      {cloudEnabled && (
+        <>
+          <h2 className="settings-group">Konto</h2>
+          <p className="muted small">Gilt auf allen Geräten, auf denen du angemeldet bist. Ein Konto brauchst du nur, um Ordner mit anderen zu teilen.</p>
+          <AccountCard />
+        </>
+      )}
+
+      <h2 className="settings-group">Auf diesem Gerät</h2>
+      <p className="muted small">Gilt nur für dieses Gerät – nicht für dein Konto.</p>
+
       <h3 className="section-title">Speicher</h3>
       <div className="card stack">
         <div className="tiles">
@@ -121,14 +132,6 @@ export function SettingsView() {
         {persisted && <p className="muted small">✓ Daten sind als dauerhaft markiert.</p>}
       </div>
 
-      {cloudEnabled && (
-        <>
-          <h3 className="section-title">Konto</h3>
-          <p className="muted small">Ein Konto brauchst du nur, um Ordner mit anderen zu teilen.</p>
-          <AccountCard />
-        </>
-      )}
-
       <h3 className="section-title">Backup</h3>
       <div className="card stack">
         <p className="muted small">
@@ -158,9 +161,10 @@ export function SettingsView() {
       </div>
 
       <h3 className="section-title">Gefahrenzone</h3>
-      <div className="card">
+      <div className="card stack">
+        <p className="muted small">Löscht „Meine Ordner“ und alles Zwischengespeicherte auf diesem Gerät. Dein Konto und geteilte Ordner bleiben bestehen.</p>
         <button className="btn ghost danger" onClick={wipe} disabled={busy}>
-          <Icon name="trash" size={18} /> Alle Daten löschen
+          <Icon name="trash" size={18} /> Alle Daten auf diesem Gerät löschen
         </button>
       </div>
 

@@ -2075,3 +2075,30 @@ textarea.text-line.doc-title {
   background: var(--info-bg);
   border-color: var(--info);
 }
+
+/* Einstellungen: Gruppen "Konto" / "Auf diesem Gerät" */
+.settings-group {
+  margin: 20px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 1.15rem;
+}
+.view-header + .settings-group {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: 0;
+}
+.delete-summary p,
+.delete-summary ul {
+  margin: 0;
+}
+.delete-summary ul {
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.toggle-row .block {
+  display: block;
+  font-weight: 400;
+}

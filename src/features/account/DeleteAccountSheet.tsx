@@ -12,6 +12,7 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
   const [choice, setChoice] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [confirmName, setConfirmName] = useState('');
+  const [wipeLocal, setWipeLocal] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -38,7 +39,7 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
     setErr(null);
     setBusy('Bitte warten …');
     try {
-      await deleteAccount(hasShares && choice !== NOBODY ? choice : null, setBusy);
+      await deleteAccount(hasShares && choice !== NOBODY ? choice : null, wipeLocal, setBusy);
       onClose();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Das hat nicht geklappt.');
@@ -67,10 +68,24 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
         )}
         {!online && <p className="notice warning">Keine Verbindung zum Server – das Konto kann nur online gelöscht werden.</p>}
 
-        <p className="muted small">
-          Dein Konto <strong>{me?.username}</strong> wird gelöscht und du wirst abgemeldet. „Meine Ordner“ auf diesem Gerät bleiben erhalten. Was du in
-          geteilten Ordnern anderer hinzugefügt hast, bleibt dort (ohne deinen Namen).
-        </p>
+        <div className="stack delete-summary">
+          <p>
+            Dein Konto <strong>{me?.username}</strong> (Benutzername und Passwort) wird gelöscht und du wirst abgemeldet. Der Name wird wieder frei.
+          </p>
+          <ul className="muted small">
+            <li>
+              <strong>Deine geteilten Ordner:</strong>{' '}
+              {hasShares ? 'gehen an die Person, die du unten wählst – oder werden gelöscht.' : 'du hast keine – hier gibt es nichts zu übergeben.'}
+            </li>
+            <li>
+              <strong>Was du in Ordnern anderer hinzugefügt hast,</strong> bleibt dort (als „Unbekannt“).
+            </li>
+            <li>
+              <strong>„Meine Ordner“</strong> liegen nur auf diesem Gerät und gehören nicht zum Konto. Sie bleiben – außer du wählst unten das Löschen. Andere
+              Geräte sind nicht betroffen.
+            </li>
+          </ul>
+        </div>
 
         {hasShares && (
           <>
@@ -122,6 +137,15 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
             )}
           </>
         )}
+
+        <label className="toggle-row">
+          <span>
+            Auch „Meine Ordner“ auf diesem Gerät löschen
+            <span className="muted small block">Alle eigenen Ordner und Dateien auf diesem Gerät – nicht rückgängig zu machen.</span>
+          </span>
+          <input type="checkbox" className="switch" checked={wipeLocal} onChange={(e) => setWipeLocal(e.target.checked)} />
+        </label>
+        {wipeLocal && <p className="notice critical">„Meine Ordner“ auf diesem Gerät werden endgültig gelöscht. Exportiere vorher ein Backup, wenn du sie behalten willst.</p>}
 
         <label className="field">
           <span className="field-label">Zum Bestätigen deinen Benutzernamen eingeben</span>

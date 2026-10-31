@@ -95,8 +95,11 @@ interface LibraryValue {
   declineHandover: (id: string) => Promise<void>;
   /** Geteilte Ordner, die mir gehören (die oberste Ebene davon). */
   ownedRoots: Folder[];
-  /** Eigenes Konto löschen; recipient bekommt die eigenen geteilten Ordner (null = alles löschen). */
-  deleteAccount: (recipient: string | null, onProgress?: (msg: string) => void) => Promise<void>;
+  /**
+   * Eigenes Konto löschen; recipient bekommt die eigenen geteilten Ordner (null = alles löschen).
+   * wipeLocal: auch „Meine Ordner“ (und alles andere) auf diesem Gerät löschen.
+   */
+  deleteAccount: (recipient: string | null, wipeLocal: boolean, onProgress?: (msg: string) => void) => Promise<void>;
 }
 
 export interface HandoverStats {
@@ -908,7 +911,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteAccount = useCallback<LibraryValue['deleteAccount']>(
-    async (recipient, onProgress) => {
+    async (recipient, wipeLocal, onProgress) => {
       if (!me || !supabase) throw new Error('Du bist nicht angemeldet.');
       requireOnline();
       onProgress?.('Wird vorbereitet …');
@@ -924,10 +927,15 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       }
       onProgress?.('Konto wird gelöscht …');
       await remote.deleteOwnAccount(recipient);
-      // Platzhalter der eigenen geteilten Ordner auf diesem Gerät entfernen („Meine Ordner“ bleiben).
-      const ownedIds = new Set(owned.map((s) => s.id));
-      for (const f of localData.folders) {
-        if (f.shareId && ownedIds.has(f.shareId)) await local.deletePlaceholder(f.id).catch(() => {});
+      if (wipeLocal) {
+        onProgress?.('Daten auf diesem Gerät werden gelöscht …');
+        await db.clearAll();
+      } else {
+        // Platzhalter der eigenen geteilten Ordner auf diesem Gerät entfernen („Meine Ordner“ bleiben).
+        const ownedIds = new Set(owned.map((s) => s.id));
+        for (const f of localData.folders) {
+          if (f.shareId && ownedIds.has(f.shareId)) await local.deletePlaceholder(f.id).catch(() => {});
+        }
       }
       // Das Konto gibt es nicht mehr – nur noch auf dem Gerät abmelden.
       await supabase.auth.signOut({ scope: 'local' }).catch(() => signOut());
