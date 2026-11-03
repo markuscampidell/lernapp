@@ -2568,3 +2568,148 @@ textarea.text-line.doc-desc {
   color: var(--text-2);
   font-size: 0.95rem;
 }
+
+/* ---------- Karteikarten: Wiederholen ---------- */
+.review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.review-card p {
+  margin: 0;
+}
+.review-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+.review-stats > div {
+  display: flex;
+  flex-direction: column;
+}
+.review-num {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.box-bar {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.box-seg { min-width: 4px; }
+.box-seg.new { background: var(--border); }
+.box-seg.b0 { background: var(--critical); }
+.box-seg.b1 { background: color-mix(in srgb, var(--critical) 50%, var(--warning)); }
+.box-seg.b2 { background: var(--warning); }
+.box-seg.b3 { background: color-mix(in srgb, var(--warning) 40%, var(--good)); }
+.box-seg.b4,
+.box-seg.b5,
+.box-seg.b6 { background: var(--good); }
+.grade-row .btn {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.hard-btn {
+  color: var(--warning);
+}
+.grade-row .again-btn {
+  color: var(--critical);
+}
+
+/* ---------- Kommentare ---------- */
+.comments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+.comments p {
+  margin: 0;
+}
+.comments-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+}
+.comment-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.comment {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.comment.reply {
+  margin-left: 44px;
+}
+.comment-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.comment-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.comment-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.comment-actions {
+  display: flex;
+  gap: 14px;
+  font-size: 0.85rem;
+}
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+.comment-form textarea {
+  width: 100%;
+}
+.comment-replying {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.badge-btn {
+  position: relative;
+}
+.count-badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+.count-badge.unread,
+.chip.comment-chip.unread {
+  background: var(--info);
+  color: #fff;
+}
+.chip.comment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

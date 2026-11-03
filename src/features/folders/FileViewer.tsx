@@ -11,6 +11,7 @@ import { FileEditorSheet } from './FileEditorSheet';
 import { CardsPanel, QuizPanel } from '../study/StudyPanels';
 import { DocPanel } from '../docs/DocPanel';
 import { ShareSheet } from '../share/ShareSheet';
+import { Comments } from '../comments/Comments';
 import { cloudEnabled } from '../../cloud/supabase';
 import { ChartPanel } from '../charts/ChartPanel';
 import { WheelPanel } from '../wheel/WheelPanel';
@@ -19,7 +20,7 @@ const MAX_TEXT = 2 * 1024 * 1024;
 
 /** Vollbild-Ansicht einer Datei mit Vorschau und Aktionen. */
 export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose: () => void }) {
-  const { files, folders, me, userName, isOrphan } = useLibrary();
+  const { files, folders, me, userName, isOrphan, commentInfo } = useLibrary();
   // Immer die aktuelle Version (nach Umbenennen/Verschieben).
   const file = files.find((f) => f.id === initial.id);
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -69,6 +70,9 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   if (!file) return null;
 
   const name = fullName(file);
+  // Kommentare gibt es für Dateien auf dem Server (geteilt oder „Auf allen Geräten“).
+  const canComment = cloudEnabled && !!file.shareId && !!me && !isOrphan(file.folderId);
+  const comments = commentInfo(file.id);
   // „Senden“ = an eine andere App übergeben (System-Teilen-Menü, z. B. WhatsApp, Mail). Nur auf Handys/Tablets –
   // am PC ist das Menü oft nicht vorhanden oder tut nichts. Mit Personen teilt man über den Ordner.
   const shareable = (() => {
@@ -147,6 +151,17 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
             <Icon name="open" />
           </button>
         )}
+        {canComment && (
+          <button
+            className="icon-btn badge-btn"
+            aria-label="Kommentare"
+            title="Kommentare"
+            onClick={() => document.getElementById('kommentare')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            <Icon name="comment" />
+            {comments.count > 0 && <span className={`count-badge${comments.unread ? ' unread' : ''}`}>{comments.count}</span>}
+          </button>
+        )}
         {cloudEnabled && !isOrphan(file.folderId) && (
           <button className="icon-btn" aria-label="Personen" title="Personen" onClick={() => setSharing(true)}>
             <Icon name="users" />
@@ -175,6 +190,11 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
           </div>
         )}
         {body}
+        {canComment && (
+          <div id="kommentare">
+            <Comments file={file} />
+          </div>
+        )}
       </div>
       {editing && <FileEditorSheet file={file} onClose={() => setEditing(false)} />}
       {sharing && <ShareSheet file={file} onClose={() => setSharing(false)} />}

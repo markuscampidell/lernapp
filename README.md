@@ -38,6 +38,9 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
   oder dort über das Diagramm-Symbol in der Leiste. Eingefügte Diagramme lassen sich im Dokument antippen und bearbeiten.
 - **Glücksrad**: Einträge als Liste oder Text („×2“ = doppelt so großes Feld), optional „Gezogene entfernen“. Kopieren und in
   Text-Dokumente einfügen wie Diagramme – dort ist es drehbar (jede Person dreht für sich).
+- **Karteikarten wiederholen**: „Wiederholen“ zeigt nur fällige Karten; Gewusst → immer längere Abstände (1, 3, 7, 14, 30, 60 Tage),
+  Unsicher → morgen, Nochmal → gleich wieder. Lernstand pro Person, auf dem Server auf allen eigenen Geräten gleich.
+- **Kommentare** an Dateien auf dem Server (geteilt / „Auf allen Geräten“): kommentieren, antworten, löschen; Anzahl und „neu“ in der Liste.
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
 ## Entwickeln
@@ -69,7 +72,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
    , `supabase/005_checklisten.sql` (Häkchen in Checklisten pro Konto bzw. gemeinsam)
    , `supabase/006_profilbilder.sql` (Profilbilder)
    , `supabase/007_rechte_vererben.sql` (Rechte einheitlich vererben, auch vom obersten Ordner)
-   und `supabase/008_oberster_ordner.sql` (obersten geteilten Ordner ändert nur der Besitzer).
+   , `supabase/008_oberster_ordner.sql` (obersten geteilten Ordner ändert nur der Besitzer)
+   und `supabase/009_lernstand_kommentare.sql` (Lernstand bei Karteikarten, Kommentare).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

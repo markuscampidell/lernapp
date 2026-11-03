@@ -116,6 +116,8 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
 
 export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file: FileItem }) {
   const kind = fileKind(file);
+  const { commentInfo } = useLibrary();
+  const comments = commentInfo(file.id);
   return (
     <ItemCard {...rest} thumb={<FileThumb file={file} />} label={fullName(file)}>
       <strong className="wrap-text">{fullName(file)}</strong>
@@ -127,6 +129,11 @@ export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file:
         <span className="chip">{formatSize(file.size)}</span>
         {file.shareId && <ByChip id={file.createdBy} />}
         {file.shareId && <AccessChip item={file} />}
+        {comments.count > 0 && (
+          <span className={`chip comment-chip${comments.unread ? ' unread' : ''}`} title={comments.unread ? 'Neue Kommentare' : 'Kommentare'}>
+            <Icon name="comment" size={12} /> {comments.count}
+          </span>
+        )}
       </span>
     </ItemCard>
   );

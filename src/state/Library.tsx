@@ -45,6 +45,10 @@ interface LibraryValue {
   members: Member[];
   profiles: Profile[];
   userName: (id: string | null | undefined) => string;
+  /** Kommentare an einer Datei: Anzahl und ob es neue von anderen gibt (seit ich sie zuletzt gelesen habe). */
+  commentInfo: (fileId: string) => { count: number; unread: boolean };
+  /** Kommentare dieser Datei als gelesen merken. */
+  markCommentsRead: (fileId: string) => void;
   /** Adresse des Profilbilds einer Person (undefined = keins). */
   avatarOf: (id: string | null | undefined) => string | undefined;
   shareOf: (item: Item | undefined) => Share | undefined;
@@ -276,7 +280,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       timer = setTimeout(refreshRemote, 400);
     };
     const channel = client.channel(`lernapp-${me}`);
-    for (const table of ['shares', 'share_members', 'folders', 'files', 'profiles']) {
+    for (const table of ['shares', 'share_members', 'folders', 'files', 'profiles', 'comments']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, soon);
     }
     channel.subscribe();
@@ -355,6 +359,43 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }
     return m;
   }, [snap]);
+  // Kommentare: Anzahl je Datei und „gelesen bis“ (nur auf diesem Gerät gemerkt).
+  const [commentsRead, setCommentsRead] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('lernapp-kommentare-gelesen') ?? '{}');
+    } catch {
+      return {};
+    }
+  });
+  const commentStats = useMemo(() => {
+    const m = new Map<string, { count: number; lastOther: string }>();
+    for (const c of snap?.comments ?? []) {
+      const e = m.get(c.fileId) ?? { count: 0, lastOther: '' };
+      e.count++;
+      if (c.userId !== user?.id && c.createdAt > e.lastOther) e.lastOther = c.createdAt;
+      m.set(c.fileId, e);
+    }
+    return m;
+  }, [snap, user?.id]);
+  const commentInfo = useCallback(
+    (fileId: string) => {
+      const e = commentStats.get(fileId);
+      if (!e) return { count: 0, unread: false };
+      return { count: e.count, unread: !!e.lastOther && e.lastOther > (commentsRead[fileId] ?? '') };
+    },
+    [commentStats, commentsRead],
+  );
+  const markCommentsRead = useCallback((fileId: string) => {
+    setCommentsRead((prev) => {
+      const next = { ...prev, [fileId]: new Date().toISOString() };
+      try {
+        localStorage.setItem('lernapp-kommentare-gelesen', JSON.stringify(next));
+      } catch {
+        /* privat/voll */
+      }
+      return next;
+    });
+  }, []);
   const avatarOf = useCallback((id: string | null | undefined) => (id ? avatarMap.get(id) : undefined), [avatarMap]);
   const shareOf = useCallback((item: Item | undefined) => (item?.shareId ? shareMap.get(item.shareId) : undefined), [shareMap]);
   const isOwner = useCallback((shareId: string | undefined) => !!shareId && !!me && shareMap.get(shareId)?.ownerId === me, [shareMap, me]);
@@ -1192,6 +1233,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       profiles: snap?.profiles ?? [],
       userName,
       avatarOf,
+      commentInfo,
+      markCommentsRead,
       shareOf,
       isRoot,
       isOwner,
@@ -1233,7 +1276,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
-      user, online, snap, userName, avatarOf, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
+      user, online, snap, userName, avatarOf, commentInfo, markCommentsRead, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
       shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, shareFileProblem, shareFile, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
       handovers, rawSnap, handoverStats, claimHandover, declineHandover, ownedRoots, deleteAccount, sync, retrySync,
     ],

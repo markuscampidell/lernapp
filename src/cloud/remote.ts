@@ -51,6 +51,18 @@ export interface Snapshot {
   handovers?: Handover[];
   /** false = supabase/004_konto_loeschen.sql wurde noch nicht ausgeführt. */
   handoversReady?: boolean;
+  /** Kommentare (nur wer/wann, für Anzahl und „neu“) – fehlt, solange 009 nicht ausgeführt ist. */
+  comments?: CommentMeta[];
+}
+export interface CommentMeta {
+  fileId: string;
+  userId: string | null;
+  createdAt: string;
+}
+export interface Comment extends CommentMeta {
+  id: string;
+  parentId: string | null;
+  body: string;
 }
 
 function sb(): SupabaseClient {
@@ -137,6 +149,7 @@ export async function fetchSnapshot(userId: string): Promise<Snapshot> {
     selectAll('seen', ['folder_id']),
     fetchHandovers(),
   ]);
+  const comments = await fetchCommentMeta();
   return {
     handovers: handovers ?? [],
     handoversReady: handovers !== null,
@@ -147,7 +160,46 @@ export async function fetchSnapshot(userId: string): Promise<Snapshot> {
     folders: folders.map(toFolder),
     files: files.map(toFile),
     seen: Object.fromEntries(seen.map((r) => [String(r.folder_id), String(r.seen_at)])),
+    comments,
   };
+}
+
+/** Wer wann wo kommentiert hat (ohne Text) – leer, wenn 009 noch nicht ausgeführt ist. */
+async function fetchCommentMeta(): Promise<CommentMeta[]> {
+  const out: CommentMeta[] = [];
+  for (let from = 0; ; from += 1000) {
+    const res = await sb().from('comments').select('file_id, user_id, created_at').order('created_at').range(from, from + 999);
+    if (res.error) return out;
+    const rows = (res.data ?? []) as Row[];
+    rows.forEach((r) => out.push({ fileId: String(r.file_id), userId: (r.user_id as string | null) ?? null, createdAt: String(r.created_at) }));
+    if (rows.length < 1000) return out;
+  }
+}
+
+// ---------- Kommentare ----------
+export const COMMENTS_NOT_READY = 'Kommentare sind auf dem Server noch nicht eingerichtet: Bitte supabase/009_lernstand_kommentare.sql im Supabase „SQL Editor“ ausführen.';
+const commentError = (msg: string) => (/comments|relation|schema cache|does not exist/i.test(msg) ? new Error(COMMENTS_NOT_READY) : new Error(friendly(msg)));
+
+export async function fetchComments(fileId: string): Promise<Comment[]> {
+  const res = await sb().from('comments').select('id, file_id, user_id, parent_id, body, created_at').eq('file_id', fileId).order('created_at');
+  if (res.error) throw commentError(res.error.message);
+  return ((res.data ?? []) as Row[]).map((r) => ({
+    id: String(r.id),
+    fileId: String(r.file_id),
+    userId: (r.user_id as string | null) ?? null,
+    parentId: (r.parent_id as string | null) ?? null,
+    body: String(r.body),
+    createdAt: String(r.created_at),
+  }));
+}
+export async function addComment(fileId: string, body: string, parentId: string | null): Promise<void> {
+  const res = await sb().from('comments').insert({ file_id: fileId, body, parent_id: parentId });
+  if (res.error) throw commentError(res.error.message);
+}
+export async function deleteComment(id: string): Promise<void> {
+  const res = await sb().from('comments').delete().eq('id', id).select('id');
+  if (res.error) throw commentError(res.error.message);
+  if (!res.data?.length) throw new Error('Dazu hast du keine Berechtigung.');
 }
 
 // ---------- Dateispeicher ----------
