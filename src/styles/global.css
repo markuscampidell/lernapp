@@ -2420,3 +2420,5 @@ textarea.text-line.doc-title {
   width: 100%;
 }
 .link.danger { color: var(--critical); }
+.choice:disabled { opacity: 0.55; cursor: default; }
+.choice strong { display: inline-flex; align-items: center; gap: 6px; }

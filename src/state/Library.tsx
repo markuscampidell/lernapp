@@ -73,6 +73,10 @@ interface LibraryValue {
   deleteProblem: (folderIds: string[], fileIds: string[]) => string | null;
   moveProblem: (folderIds: string[], fileIds: string[], targetId: string | null) => string | null;
   shareProblem: (folderId: string) => string | null;
+  /** Warum diese Datei nicht in einem eigenen Ordner geteilt werden kann (null = geht). */
+  shareFileProblem: (fileId: string) => string | null;
+  /** Neuen Ordner (Name = Dateiname) an derselben Stelle anlegen, die Datei hineinlegen und nur ihn teilen. Gibt die Ordner-ID zurück. */
+  shareFile: (fileId: string, userIds: string[], onProgress?: (msg: string) => void) => Promise<string>;
   /** Ordner mit "!" (neue Inhalte von anderen oder neu geteilt). */
   unread: Set<string>;
   /** Zeitpunkt, ab dem Einträge in diesem Ordner als neu gelten. */
@@ -847,6 +851,67 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [outerRootsIn, folders, files, refreshRemote],
   );
 
+  const shareFileProblem = useCallback(
+    (fileId: string) => {
+      const file = files.find((f) => f.id === fileId);
+      if (!file) return 'Datei nicht gefunden.';
+      if (!me) return 'Melde dich an, um zu teilen.';
+      const parent = byId.get(file.folderId);
+      if (!parent) return 'Ordner nicht gefunden.';
+      if (parent.shareId && !isOwner(parent.shareId))
+        return 'Diese Datei liegt in einem geteilten Ordner von jemand anderem – dort kann nur der ganze Ordner geteilt werden.';
+      if (orphans.has(parent.id)) return 'Dieser geteilte Ordner ist gerade nicht verfügbar.';
+      if (depthOf(folders, parent.id) >= MAX_DEPTH) return 'Hier ist kein weiterer Unterordner möglich (maximale Ordnertiefe).';
+      if (!online) return offlineError().message;
+      return null;
+    },
+    [files, me, byId, isOwner, orphans, folders, online],
+  );
+
+  const shareFile = useCallback<LibraryValue['shareFile']>(
+    async (fileId, userIds, onProgress) => {
+      const problem = shareFileProblem(fileId);
+      if (problem) throw new Error(problem);
+      const file = files.find((f) => f.id === fileId)!;
+      const parent = byId.get(file.folderId)!;
+      onProgress?.('Datei wird vorbereitet …');
+      const bundle = await makeBundle(folders, files, [], [file.id], loadBlob);
+      const rootId = newId();
+      const created = new Date().toISOString();
+      // Auf dem Server ist die alte ID noch belegt – dann eine neue.
+      const newFileId = file.shareId ? newId() : file.id;
+      const moved = {
+        folders: [{ id: rootId, parentId: null, name: file.name, createdAt: created }],
+        files: bundle.files.map((f) => ({ ...f, id: newFileId, folderId: rootId })),
+      };
+      const shareId = await remote.createShare(rootId);
+      try {
+        onProgress?.('Hochladen …');
+        await remote.importBundle(shareId, null, moved);
+        // In einem eigenen geteilten Ordner (z. B. „Auf allen Geräten“) dort einhängen.
+        if (parent.shareId) await remote.setInside(shareId, parent.id);
+        await remote.addMembers(shareId, userIds);
+      } catch (e) {
+        await remote.deleteShare(shareId, [], []).catch(() => {});
+        throw e;
+      }
+      onProgress?.('Wird aufgeräumt …');
+      if (parent.shareId) {
+        if (file.access) await remote.setAccess('files', newFileId, file.access).catch(() => {});
+        await remote.copyChecks(new Map([[file.id, newFileId]])).catch(() => {});
+        const outer = parent.shareId;
+        await remote.deleteMany(folders.filter((f) => f.shareId === outer), files.filter((f) => f.shareId === outer), [], [file.id]);
+      } else {
+        // Ordner auf dem Gerät: Platzhalter für den neuen geteilten Ordner an derselben Stelle, Datei hier entfernen.
+        await local.putPlaceholder({ id: rootId, parentId: parent.id, name: file.name, shareId, createdAt: created, createdBy: me });
+        await local.deleteMany(localData, [], [file.id]);
+      }
+      await reload();
+      return rootId;
+    },
+    [shareFileProblem, files, byId, folders, me, localData, reload],
+  );
+
   const shareFolder = useCallback<LibraryValue['shareFolder']>(
     async (folderId, userIds, onProgress) => {
       const problem = shareProblem(folderId);
@@ -1143,6 +1208,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       isNewSince,
       markSeen,
       shareFolder,
+      shareFileProblem,
+      shareFile,
       stopSharing,
       addMembers,
       removeMember,
@@ -1163,7 +1230,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
       user, online, snap, userName, avatarOf, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
-      shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
+      shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, shareFileProblem, shareFile, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
       handovers, rawSnap, handoverStats, claimHandover, declineHandover, ownedRoots, deleteAccount, sync, retrySync,
     ],
   );

@@ -89,7 +89,6 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   // Bei Unterordnern geteilter Ordner verwaltet "Personen" den obersten geteilten Ordner.
   const rootOfShare = folder?.shareId ? folders.find((f) => f.id === lib.shareOf(folder)?.rootId) : folder;
   const shareTarget = sheet === 'shareSub' ? folder : rootOfShare;
-  const outerAlone = ownSub && lib.peopleOf(folder!.shareId).length <= 1;
 
   // "Neu"-Markierung: Stand vom Öffnen merken, dann als gesehen markieren.
   const [since] = useState(() => (folder ? lib.seenAt(folder.id) : undefined));
@@ -272,7 +271,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
               {folder.description && <p className="muted break">{folder.description}</p>}
             </div>
           </header>
-          <SharedInfo folder={folder} onPeople={() => setSheet(outerAlone ? 'shareSub' : 'share')} />
+          <SharedInfo folder={folder} onPeople={() => setSheet(ownSub ? 'shareSub' : 'share')} />
           <div className="action-row">
             <button className="btn primary" onClick={() => setSheet('menu')} disabled={!canAdd}>
               <Icon name="plus" size={18} /> Hinzufügen <Icon name="chevron" size={16} />

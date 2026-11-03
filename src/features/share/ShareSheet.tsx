@@ -27,7 +27,14 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
   }, [refreshRemote, user?.id]);
 
   const memberIds = useMemo(() => (share ? lib.members.filter((m) => m.shareId === share.id).map((m) => m.userId) : []), [lib.members, share]);
-  const exclude = useMemo(() => new Set([...(user ? [user.id] : []), ...memberIds, ...(share ? [share.ownerId] : [])]), [user, memberIds, share]);
+  // Wer den Ordner schon über einen äußeren geteilten Ordner sieht (bzw. beim eigens Teilen eines Unterordners: über dessen Ordner).
+  const above = share ? lib.parentShareOf(share.id) : folder.shareId ? lib.shareOf(folder) : undefined;
+  const inherited = useMemo(() => new Set(above ? lib.peopleOf(above.id) : []), [above, lib]);
+  // Wer ihn schon sieht, muss nicht noch einmal hinzugefügt werden.
+  const exclude = useMemo(
+    () => new Set([...(user ? [user.id] : []), ...memberIds, ...(share ? [share.ownerId] : []), ...inherited]),
+    [user, memberIds, share, inherited],
+  );
 
   const run = async (label: string, fn: () => Promise<unknown>) => {
     setBusy(label);
@@ -118,6 +125,15 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
   const parentName = parent ? lib.folders.find((f) => f.id === parent.rootId)?.name ?? '…' : '';
   const viaParent = parent ? lib.peopleOf(parent.id).filter((id) => !people.includes(id)) : [];
   const direct = owner || memberIds.includes(user.id);
+  /** Unterordner (eigens geteilt) darin, zu denen diese Person zusätzlich direkt hinzugefügt ist. */
+  const innerSharesWith = (personId: string) =>
+    lib.shares
+      .filter((s) => {
+        if (s.id === share.id || !lib.members.some((m) => m.shareId === s.id && m.userId === personId)) return false;
+        for (let p = lib.parentShareOf(s.id), i = 0; p && i < 16; p = lib.parentShareOf(p.id), i++) if (p.id === share.id) return true;
+        return false;
+      })
+      .map((s) => lib.folders.find((f) => f.id === s.rootId)?.name ?? '…');
 
   return (
     <Sheet
@@ -188,13 +204,22 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
                     {lib.userName(id)}
                     {id === user.id && <span className="muted"> (du)</span>}
                   </strong>
-                  <span className="muted small">{id === share.ownerId ? 'Besitzer' : 'Mitglied'}</span>
+                  <span className="muted small">
+                    {id === share.ownerId ? 'Besitzer' : inherited.has(id) ? `Mitglied von „${parentName}“` : 'Mitglied'}
+                  </span>
                 </div>
-                {owner && id !== share.ownerId && (
+                {/* Wer über den äußeren Ordner Zugriff hat, kann hier nicht entfernt werden – dort entfernen. */}
+                {owner && id !== share.ownerId && !inherited.has(id) && (
                   <button
                     className="btn ghost small danger"
                     disabled={!!busy || !lib.online}
-                    onClick={() => confirm(`${lib.userName(id)} aus „${folder.name}“ entfernen?`) && run('…', () => lib.removeMember(share.id, id))}
+                    onClick={() => {
+                      const keeps = innerSharesWith(id);
+                      const text =
+                        `${lib.userName(id)} aus „${folder.name}“ entfernen?` +
+                        (keeps.length ? `\n\n${lib.userName(id)} wurde auch eigens zu ${keeps.map((n) => `„${n}“`).join(', ')} hinzugefügt und sieht ${keeps.length === 1 ? 'diesen Ordner' : 'diese Ordner'} weiterhin.` : '');
+                      if (confirm(text)) run('…', () => lib.removeMember(share.id, id));
+                    }}
                   >
                     Entfernen
                   </button>

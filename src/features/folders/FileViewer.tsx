@@ -4,19 +4,24 @@ import { pathOf } from '../../domain/tree';
 import { loadBlob } from '../../storage/blobs';
 import { useLibrary } from '../../state/Library';
 import { Icon } from '../../components/Icon';
-import { downloadBlob, fileKind, formatDate, formatSize, fullName, KIND_LABEL } from '../../lib/files';
+import { downloadBlob, fileKind, formatDate, formatSize, fullName, isTouchDevice, KIND_LABEL } from '../../lib/files';
 import { PdfView } from './PdfView';
 import { useBackToClose } from '../../lib/router';
 import { FileEditorSheet } from './FileEditorSheet';
 import { CardsPanel, QuizPanel } from '../study/StudyPanels';
 import { DocPanel } from '../docs/DocPanel';
+import { FileShareSheet } from '../share/FileShareSheet';
+import { ShareSheet } from '../share/ShareSheet';
+import { cloudEnabled } from '../../cloud/supabase';
+import { afterBack } from '../../lib/router';
+import type { Folder } from '../../domain/types';
 import { ChartPanel } from '../charts/ChartPanel';
 
 const MAX_TEXT = 2 * 1024 * 1024;
 
 /** Vollbild-Ansicht einer Datei mit Vorschau und Aktionen. */
 export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose: () => void }) {
-  const { files, folders, me, userName } = useLibrary();
+  const { files, folders, me, userName, isOrphan } = useLibrary();
   // Immer die aktuelle Version (nach Umbenennen/Verschieben).
   const file = files.find((f) => f.id === initial.id);
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -24,6 +29,9 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const [text, setText] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [missing, setMissing] = useState(false);
+  // Teilen: erst Auswahl (ganzer Ordner / nur diese Datei), dann ggf. der normale Teilen-Dialog des Ordners.
+  const [sharing, setSharing] = useState(false);
+  const [shareFolder, setShareFolder] = useState<Folder | null>(null);
 
   const kind = fileKind(initial);
   const readsText = kind === 'text' || kind === 'flashcards' || kind === 'quiz' || kind === 'richtext' || kind === 'chart';
@@ -64,8 +72,10 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   if (!file) return null;
 
   const name = fullName(file);
+  // „Senden“ = an eine andere App übergeben (System-Teilen-Menü, z. B. WhatsApp, Mail). Nur auf Handys/Tablets –
+  // am PC ist das Menü oft nicht vorhanden oder tut nichts. Mit Personen teilt man über den Ordner.
   const shareable = (() => {
-    if (!blob || !navigator.canShare) return false;
+    if (!blob || !isTouchDevice || !navigator.canShare) return false;
     try {
       return navigator.canShare({ files: [new File([blob], name, { type: file.mime })] });
     } catch {
@@ -77,8 +87,10 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
     if (!blob) return;
     try {
       await navigator.share({ files: [new File([blob], name, { type: file.mime })], title: file.name });
-    } catch {
-      /* abgebrochen */
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return; // abgebrochen
+      alert('Senden hat nicht geklappt – die Datei wird stattdessen heruntergeladen.');
+      downloadBlob(blob, name);
     }
   };
   const open = () => url && window.open(url, '_blank', 'noopener');
@@ -137,8 +149,13 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
             <Icon name="open" />
           </button>
         )}
+        {cloudEnabled && !isOrphan(file.folderId) && (
+          <button className="icon-btn" aria-label="Teilen" title="Teilen" onClick={() => setSharing(true)}>
+            <Icon name="users" />
+          </button>
+        )}
         {shareable && (
-          <button className="icon-btn" aria-label="Teilen" title="Teilen" onClick={share}>
+          <button className="icon-btn" aria-label="An andere App senden" title="An andere App senden" onClick={share}>
             <Icon name="share" />
           </button>
         )}
@@ -162,6 +179,17 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
         {body}
       </div>
       {editing && <FileEditorSheet file={file} onClose={() => setEditing(false)} />}
+      {sharing && (
+        <FileShareSheet
+          file={file}
+          onClose={() => setSharing(false)}
+          onFolder={(target) => {
+            setSharing(false);
+            afterBack(() => setShareFolder(target));
+          }}
+        />
+      )}
+      {shareFolder && <ShareSheet folder={shareFolder} onClose={() => setShareFolder(null)} />}
     </div>
   );
 }
