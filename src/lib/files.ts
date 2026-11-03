@@ -13,6 +13,7 @@ export type FileKind =
   | 'flashcards'
   | 'quiz'
   | 'richtext'
+  | 'chart'
   | 'other';
 
 const EXT: Record<string, FileKind> = {
@@ -20,6 +21,7 @@ const EXT: Record<string, FileKind> = {
   karten: 'flashcards',
   quiz: 'quiz',
   dokument: 'richtext',
+  diagramm: 'chart',
   pdf: 'pdf',
   ppt: 'presentation', pptx: 'presentation', odp: 'presentation', key: 'presentation', pps: 'presentation', ppsx: 'presentation',
   doc: 'document', docx: 'document', odt: 'document', rtf: 'document', pages: 'document',
@@ -61,6 +63,7 @@ export const KIND_LABEL: Record<FileKind, string> = {
   flashcards: 'Karteikarten',
   quiz: 'Quiz',
   richtext: 'Text-Dokument',
+  chart: 'Diagramm',
   other: 'Datei',
 };
 

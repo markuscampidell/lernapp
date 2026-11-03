@@ -27,6 +27,11 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
   unter „Geteilte Ordner“ nur, was andere mit einem teilen.
 - **Konto löschen**: Eigene geteilte Ordner gehen an eine gewählte Person (oder werden gelöscht). Sie sieht einen Hinweis und kann
   übernehmen – weiter geteilt als Besitzer oder in „Meine Ordner“ auf ihr Gerät – oder ablehnen. Nach 30 Tagen ohne Entscheidung wird alles gelöscht.
+- **Text-Dokumente**: Überschriften, Listen, Bilder, Formeln und **Checklisten**. Häkchen gehören dem Konto (auf allen eigenen
+  Geräten gleich, andere sehen sie nicht); in geteilten Ordnern lässt sich pro Checkliste „Gemeinsam“ wählen – dann gelten die Häkchen für alle.
+- **Diagramme**: Säulen, Balken, Linie, Kreis, Ring – Werte als Tabelle oder als Text („Mathe: 12“ pro Zeile). „Kopieren“ legt das
+  Diagramm in die Zwischenablage (auch als Bild für andere Apps); in einem Text-Dokument einfügen (Strg+V bzw. lange tippen → Einfügen)
+  oder dort über das Diagramm-Symbol in der Leiste. Eingefügte Diagramme lassen sich im Dokument antippen und bearbeiten.
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
 ## Entwickeln
@@ -54,7 +59,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
 3. *SQL Editor*: Inhalt von `supabase/schema.sql` einfügen und ausführen (Tabellen, Rechte, Dateispeicher),
    danach genauso `supabase/002_rechte.sql` (Rechte pro Datei/Ordner)
    , `supabase/003_verschachtelt.sql` (geteilte Ordner in geteilten Ordnern)
-   und `supabase/004_konto_loeschen.sql` (Konto löschen & geteilte Ordner übergeben).
+   , `supabase/004_konto_loeschen.sql` (Konto löschen & geteilte Ordner übergeben)
+   und `supabase/005_checklisten.sql` (Häkchen in Checklisten pro Konto bzw. gemeinsam).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

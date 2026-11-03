@@ -20,6 +20,8 @@ import { ShareSheet } from '../share/ShareSheet';
 import { CardsEditor } from '../study/CardsEditor';
 import { QuizEditor } from '../study/QuizEditor';
 import { DocEditor } from '../docs/DocEditor';
+import { ChartEditor } from '../charts/ChartEditor';
+import { parseChart } from '../charts/chart';
 import { FileEditorSheet } from './FileEditorSheet';
 import { parseCards, parseQuiz } from '../study/format';
 import { loadBlob } from '../../storage/blobs';
@@ -61,12 +63,12 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
-  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | null>(null);
+  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
   // Bearbeiten direkt aus der Liste (ohne die Datei zu öffnen).
   const [editing, setEditing] = useState<
-    { kind: 'folder'; folder: Folder } | { kind: 'file'; file: FileItem } | { kind: 'cards' | 'quiz' | 'doc'; file: FileItem; text: string } | null
+    { kind: 'folder'; folder: Folder } | { kind: 'file'; file: FileItem } | { kind: 'cards' | 'quiz' | 'doc' | 'chart'; file: FileItem; text: string } | null
   >(null);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -182,20 +184,20 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   });
   const newProp = (item: Folder | FileItem) => ({ isNew: isNewSince(item, since) });
 
-  /** Karteikarten/Quiz/Dokumente öffnen direkt den Inhalts-Editor, andere Dateien Name/Beschreibung/Ort. */
+  /** Karteikarten/Quiz/Dokumente/Diagramme öffnen direkt den Inhalts-Editor, andere Dateien Name/Beschreibung/Ort. */
   const startEdit = async (item: Folder | FileItem) => {
     if (!('folderId' in item)) return setEditing({ kind: 'folder', folder: item });
     const k = fileKind(item);
-    const editor = k === 'flashcards' ? 'cards' : k === 'quiz' ? 'quiz' : k === 'richtext' ? 'doc' : null;
+    const editor = k === 'flashcards' ? 'cards' : k === 'quiz' ? 'quiz' : k === 'richtext' ? 'doc' : k === 'chart' ? 'chart' : null;
     if (!editor) return setEditing({ kind: 'file', file: item });
     const blob = await loadBlob(item.blobId);
     if (!blob) return alert('Die Datei konnte nicht geladen werden – bist du online?');
     setEditing({ kind: editor, file: item, text: await blob.text() });
   };
-  // ✏️ nur für Dateien mit bearbeitbarem Inhalt (Karteikarten, Quiz, Text-Dokumente).
+  // ✏️ nur für Dateien mit bearbeitbarem Inhalt (Karteikarten, Quiz, Text-Dokumente, Diagramme).
   const editProp = (item: Folder | FileItem) => ({
     onEdit:
-      'folderId' in item && ['flashcards', 'quiz', 'richtext'].includes(fileKind(item)) && canModify(item) && (!item.shareId || lib.online)
+      'folderId' in item && ['flashcards', 'quiz', 'richtext', 'chart'].includes(fileKind(item)) && canModify(item) && (!item.shareId || lib.online)
         ? () => startEdit(item)
         : undefined,
   });
@@ -428,6 +430,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
       {sheet === 'note' && folder && <NoteSheet folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'cards' && folder && <CardsEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'quiz' && folder && <QuizEditor folderId={folder.id} onClose={() => setSheet(null)} />}
+      {sheet === 'chart' && folder && <ChartEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'add' && folder && (
         <AddFilesSheet folder={folder} items={staged} onChange={setStaged} onMore={() => pickFiles()} onClose={() => setSheet(null)} />
       )}
@@ -457,6 +460,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
       {editing?.kind === 'cards' && <CardsEditor file={editing.file} initial={parseCards(editing.text).cards} onClose={() => setEditing(null)} />}
       {editing?.kind === 'quiz' && <QuizEditor file={editing.file} initial={parseQuiz(editing.text).questions} onClose={() => setEditing(null)} />}
       {editing?.kind === 'doc' && <DocEditor file={editing.file} initial={editing.text} onClose={() => setEditing(null)} />}
+      {editing?.kind === 'chart' && <ChartEditor file={editing.file} initial={parseChart(editing.text)} onClose={() => setEditing(null)} />}
     </section>
   );
 }
@@ -620,14 +624,15 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
   );
 }
 
-type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz';
+type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz' | 'chart';
 const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; text: string; touchOnly?: boolean }[] = [
   { id: 'files', icon: 'upload', title: 'Dateien durchsuchen', text: 'PDFs, Bilder, Präsentationen, Videos … von deinem Gerät' },
   { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', text: 'Direkt mit der Kamera', touchOnly: true },
-  { id: 'doc', icon: 'richdoc', title: 'Text-Dokument', text: 'Formatierter Text mit Überschriften, Listen und Bildern' },
+  { id: 'doc', icon: 'richdoc', title: 'Text-Dokument', text: 'Formatierter Text mit Überschriften, Listen, Checklisten und Bildern' },
   { id: 'note', icon: 'text', title: 'Notiz', text: 'Schnell ein paar Zeilen reiner Text' },
   { id: 'cards', icon: 'cards', title: 'Karteikarten', text: 'Vorder- und Rückseite, mit Lernmodus' },
   { id: 'quiz', icon: 'quiz', title: 'Quiz', text: 'Multiple Choice mit Auswertung' },
+  { id: 'chart', icon: 'chart', title: 'Diagramm', text: 'Säulen, Balken, Linie, Kreis – auch in Text-Dokumente einfügbar' },
 ];
 
 /** Auswahl, was in den Ordner hinzugefügt werden soll. */

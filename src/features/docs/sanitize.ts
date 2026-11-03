@@ -1,5 +1,6 @@
 // Text-Dokumente sind HTML. Weil sie auch von anderen Personen stammen können (geteilte Ordner),
 // wird vor dem Anzeigen/Einfügen alles entfernt, was nicht ausdrücklich erlaubt ist.
+import { chartJson, parseChart } from '../charts/chart';
 
 export const DOC_EXT = 'dokument';
 export const DOC_MIME = 'application/vnd.lernapp.dokument+html';
@@ -14,6 +15,8 @@ const alignOf = (el: HTMLElement) => {
 };
 
 const safeImage = (src: string) => /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(src);
+const safeId = (id: string | null) => (id && /^[A-Za-z0-9_-]{1,40}$/.test(id) ? id : null);
+
 const safeLink = (href: string) => /^(https?:|mailto:)/i.test(href.trim());
 
 function clean(node: Node, out: Node, doc: Document) {
@@ -56,6 +59,14 @@ function clean(node: Node, out: Node, doc: Document) {
       }
       return;
     }
+    // Eingebettetes Diagramm: nur die Daten werden gespeichert, gezeichnet wird beim Anzeigen.
+    if (el.hasAttribute('data-chart') && (tag === 'figure' || tag === 'div' || tag === 'span' || tag === 'p')) {
+      const fig = doc.createElement('figure');
+      fig.className = 'chart';
+      fig.setAttribute('data-chart', chartJson(parseChart(el.getAttribute('data-chart') ?? '')));
+      out.appendChild(fig);
+      return;
+    }
     if (tag === 'a') {
       const href = el.getAttribute('href') ?? '';
       const target = safeLink(href) ? doc.createElement('a') : doc.createDocumentFragment();
@@ -76,6 +87,15 @@ function clean(node: Node, out: Node, doc: Document) {
     if (target instanceof HTMLElement && ALIGNABLE.has(mapped)) {
       const a = alignOf(el);
       if (a) target.setAttribute('style', `text-align: ${a}`);
+    }
+    // Checklisten: Klasse, Modus (gemeinsam) und die IDs der Punkte (für die Häkchen) behalten.
+    if (target instanceof HTMLElement && mapped === 'ul' && el.classList.contains('checklist')) {
+      target.className = 'checklist';
+      if (el.getAttribute('data-shared') === '1') target.setAttribute('data-shared', '1');
+    }
+    if (target instanceof HTMLElement && mapped === 'li') {
+      const id = safeId(el.getAttribute('data-id'));
+      if (id) target.setAttribute('data-id', id);
     }
     clean(el, target, doc);
     out.appendChild(target);

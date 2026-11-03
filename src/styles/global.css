@@ -2110,3 +2110,203 @@ textarea.text-line.doc-title {
   flex-direction: column;
   align-items: flex-start;
 }
+
+/* ---------- Checklisten ---------- */
+.doc-content ul.checklist {
+  list-style: none;
+  padding-left: 2em;
+}
+.doc-content ul.checklist > li {
+  position: relative;
+  margin: 0.15em 0;
+}
+.doc-content ul.checklist > li::before {
+  content: '';
+  position: absolute;
+  left: -1.7em;
+  top: 0.22em;
+  width: 1.15em;
+  height: 1.15em;
+  border: 2px solid var(--text-3);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.doc-content ul.checklist > li.done::before {
+  border-color: var(--good);
+  background: var(--good)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")
+    center / 85% no-repeat;
+}
+.doc-content ul.checklist > li.done {
+  color: var(--text-3);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-3) 70%, transparent);
+}
+/* In der Ansicht ist der ganze Punkt antippbar */
+.doc-panel .doc-content ul.checklist > li {
+  cursor: pointer;
+}
+.doc-panel .doc-content ul.checklist > li a {
+  cursor: pointer;
+}
+.checklist-bar,
+.chart-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.checklist-bar p {
+  margin: 0;
+}
+.chart-bar {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.chart-bar strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.chart-bar .btn.primary {
+  margin-left: auto;
+}
+
+/* ---------- Diagramme ---------- */
+.add-icon.add-chart,
+.file-thumb.kind-chart,
+.kind-chip.kind-chart { color: var(--good); background: var(--good-bg); }
+.chart-preview {
+  padding: 12px;
+}
+.chart-preview svg,
+.doc-content figure.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.doc-content figure.chart {
+  position: relative;
+  margin: 0.6em 0 0.9em;
+  padding: 6px 0;
+  border-radius: 12px;
+}
+.doc-editable figure.chart {
+  cursor: pointer;
+  user-select: none;
+}
+.doc-editable figure.chart:hover {
+  background: var(--surface-2);
+}
+.doc-editable figure.chart.selected {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+.chart-copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--text-2);
+  background: var(--surface-2);
+  opacity: 0.85;
+}
+.chart-copy:hover {
+  opacity: 1;
+  color: var(--text);
+}
+@media (hover: hover) {
+  .doc-content figure.chart .chart-copy {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .doc-content figure.chart:hover .chart-copy,
+  .doc-content figure.chart .chart-copy:focus-visible {
+    opacity: 0.9;
+  }
+}
+.chart-editor .chart-types button {
+  padding: 7px 8px;
+}
+.small-seg {
+  padding: 3px;
+}
+.small-seg button {
+  padding: 4px 12px;
+  font-size: 0.85rem;
+}
+.chart-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+.chart-rows > .btn {
+  align-self: flex-start;
+}
+.chart-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chart-row .text-line {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.chart-swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.chart-editor .chart-row input.chart-value {
+  flex: 0 0 88px;
+  width: 88px;
+  padding-left: 10px;
+  padding-right: 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.chart-values-toggle {
+  align-self: end;
+  min-height: 44px;
+}
+.chart-table-wrap {
+  padding: 6px 16px;
+}
+.chart-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.chart-table td {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.chart-table tr:last-child td {
+  border-bottom: 0;
+}
+.chart-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.chart-pick-label {
+  margin: 8px 2px 0;
+}
+.chart-panel .doc-panel-actions {
+  gap: 8px;
+  flex-wrap: wrap;
+}

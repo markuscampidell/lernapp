@@ -10,6 +10,7 @@ import { useBackToClose } from '../../lib/router';
 import { FileEditorSheet } from './FileEditorSheet';
 import { CardsPanel, QuizPanel } from '../study/StudyPanels';
 import { DocPanel } from '../docs/DocPanel';
+import { ChartPanel } from '../charts/ChartPanel';
 
 const MAX_TEXT = 2 * 1024 * 1024;
 
@@ -25,7 +26,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const [missing, setMissing] = useState(false);
 
   const kind = fileKind(initial);
-  const readsText = kind === 'text' || kind === 'flashcards' || kind === 'quiz' || kind === 'richtext';
+  const readsText = kind === 'text' || kind === 'flashcards' || kind === 'quiz' || kind === 'richtext' || kind === 'chart';
   useBackToClose(onClose);
 
   // Neu laden, wenn sich der Inhalt ändert (z. B. Karteikarten bearbeitet).
@@ -98,6 +99,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   else if (kind === 'flashcards' && text !== null) body = <CardsPanel file={file} text={text} />;
   else if (kind === 'quiz' && text !== null) body = <QuizPanel file={file} text={text} />;
   else if (kind === 'richtext' && text !== null) body = <DocPanel file={file} text={text} />;
+  else if (kind === 'chart' && text !== null) body = <ChartPanel file={file} text={text} />;
   else
     body = (
       <div className="empty viewer-fallback">

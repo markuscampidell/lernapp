@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { TextLine } from '../../components/TextLine';
 import { Icon, type IconName } from '../../components/Icon';
@@ -8,6 +8,14 @@ import { DetailsButton } from '../study/DetailsButton';
 import { DOC_EXT, DOC_MIME, imageToDataUrl, sanitizeHtml } from './sanitize';
 import { loadKatex, renderMathIn, renderMathSpan } from '../../lib/math';
 import { useKatex } from '../../components/MathText';
+import { newId } from '../../lib/id';
+import { useLibrary } from '../../state/Library';
+import { applyChecks, checkboxHit, useChecks } from './checks';
+import { chartFigure, chartFromPaste, parseChart, renderChartsIn, type Chart } from '../charts/chart';
+import { ChartEditor } from '../charts/ChartEditor';
+import { useChartCopy } from '../charts/ChartPanel';
+import { ChartInsertSheet } from './ChartInsertSheet';
+import { afterBack } from '../../lib/router';
 
 const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const blank = (c: string | undefined) => c === undefined || /\s/.test(c);
@@ -33,6 +41,24 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
   const [formula, setFormula] = useState<HTMLElement | null>(null);
   const [tex, setTex] = useState('');
   const [display, setDisplay] = useState(false);
+  // Checkliste, in der der Cursor steht (für den Schalter "gemeinsam abhaken").
+  const [checklist, setChecklist] = useState<HTMLUListElement | null>(null);
+  const [listShared, setListShared] = useState(false);
+  const checks = useChecks(file);
+  const { folders, shareOf, peopleOf } = useLibrary();
+  // Nur in Ordnern, die wirklich mit anderen geteilt sind, gibt es die Wahl "jeder für sich" / "gemeinsam".
+  const inShared = (() => {
+    const item = file ?? folders.find((f) => f.id === folderId);
+    const share = item?.shareId ? shareOf(item) : undefined;
+    return !!share && peopleOf(share.id).length > 1;
+  })();
+  // Diagramme: ausgewähltes Diagramm, Einfüge-Auswahl, Diagramm-Editor (neu oder bestehendes).
+  const [chartEl, setChartEl] = useState<HTMLElement | null>(null);
+  const chartData = useMemo(() => (chartEl ? parseChart(chartEl.dataset.chart ?? '') : null), [chartEl]);
+  const chartCopy = useChartCopy(chartData);
+  const [chartSheet, setChartSheet] = useState(false);
+  const [chartEdit, setChartEdit] = useState<{ el: HTMLElement | null; chart?: Chart } | null>(null);
+  const savedRange = useRef<Range | null>(null);
   const katexOk = useKatex(!!formula);
   useEffect(() => {
     if (katexOk && formula) renderMathSpan(formula, true);
@@ -43,6 +69,7 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     if (!el) return;
     el.innerHTML = sanitizeHtml(initial) || '<p><br></p>';
     renderMathIn(el, true);
+    renderChartsIn(el, { editable: true });
     document.execCommand('defaultParagraphSeparator', false, 'p');
     if (file) el.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,12 +140,17 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     const update = () => {
       if (!editor.current?.contains(document.getSelection()?.anchorNode ?? null)) return;
       const block = String(document.queryCommandValue('formatBlock')).toLowerCase();
+      const ul = listAt();
+      const isCheck = !!ul?.classList.contains('checklist');
+      setChecklist(isCheck ? ul : null);
+      setListShared(isCheck && ul!.dataset.shared === '1');
       setState({
         bold: document.queryCommandState('bold'),
         italic: document.queryCommandState('italic'),
         underline: document.queryCommandState('underline'),
         h2: block === 'h2',
-        ul: document.queryCommandState('insertUnorderedList'),
+        ul: document.queryCommandState('insertUnorderedList') && !isCheck,
+        check: isCheck,
         ol: document.queryCommandState('insertOrderedList'),
         center: document.queryCommandState('justifyCenter'),
         right: document.queryCommandState('justifyRight'),
@@ -134,6 +166,132 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     setDirty(true);
     requestAnimationFrame(measure);
   };
+  // ---------- Checklisten ----------
+  /** Liste (ul), in der der Cursor steht. */
+  function listAt(): HTMLUListElement | null {
+    const n = document.getSelection()?.anchorNode ?? null;
+    const el = n instanceof HTMLElement ? n : n?.parentElement;
+    const ul = el?.closest('ul') as HTMLUListElement | null;
+    return ul && editor.current?.contains(ul) ? ul : null;
+  }
+  /** Jeder Punkt einer Checkliste braucht eine eigene ID (an ihr hängen die Häkchen). Enter kopiert IDs mit – doppelte erneuern. */
+  const ensureIds = () => {
+    const seen = new Set<string>();
+    editor.current?.querySelectorAll<HTMLLIElement>('ul.checklist > li').forEach((li) => {
+      if (!li.dataset.id || seen.has(li.dataset.id)) li.dataset.id = newId().replace(/-/g, '').slice(0, 16);
+      seen.add(li.dataset.id);
+    });
+  };
+  const refreshChecks = () => {
+    if (!editor.current) return;
+    ensureIds();
+    applyChecks(editor.current, checks.isDone);
+  };
+  useEffect(() => {
+    if (editor.current) applyChecks(editor.current, checks.isDone);
+  }, [checks.isDone]);
+
+  const toggleChecklist = () => {
+    editor.current?.focus();
+    const ul = listAt();
+    if (ul?.classList.contains('checklist')) {
+      cmd('insertUnorderedList'); // Liste aufheben
+    } else {
+      if (!ul) document.execCommand('insertUnorderedList');
+      const now = listAt();
+      if (now) {
+        now.classList.add('checklist');
+        if (inShared && checklist?.dataset.shared === '1') now.dataset.shared = '1';
+      }
+      setDirty(true);
+    }
+    refreshChecks();
+    setChecklist(listAt()?.classList.contains('checklist') ? listAt() : null);
+    setState((st) => ({ ...st, check: !!listAt()?.classList.contains('checklist'), ul: false }));
+  };
+  const bulletList = () => {
+    const ul = listAt();
+    if (ul?.classList.contains('checklist')) {
+      // Checkliste -> normale Aufzählung
+      ul.classList.remove('checklist');
+      delete ul.dataset.shared;
+      ul.querySelectorAll('li.done').forEach((li) => li.classList.remove('done'));
+      setChecklist(null);
+      setState((st) => ({ ...st, check: false, ul: true }));
+      setDirty(true);
+      return;
+    }
+    cmd('insertUnorderedList');
+  };
+  const setShared = (shared: boolean) => {
+    if (!checklist) return;
+    if (shared) checklist.dataset.shared = '1';
+    else delete checklist.dataset.shared;
+    setListShared(shared);
+    setDirty(true);
+    refreshChecks();
+  };
+  const tick = (li: HTMLLIElement) => {
+    ensureIds();
+    if (!checks.enabled) {
+      setErr('Abhaken geht, sobald das Dokument gespeichert ist.');
+      return;
+    }
+    checks.toggle(li.dataset.id!, li.parentElement?.dataset.shared === '1');
+  };
+
+  // ---------- Diagramme ----------
+  const selectChart = (el: HTMLElement | null) => {
+    editor.current?.querySelectorAll('figure.chart.selected').forEach((x) => x !== el && x.classList.remove('selected'));
+    el?.classList.add('selected');
+    setChartEl(el);
+  };
+  /** Cursor-Position merken, bevor ein Dialog den Fokus nimmt. */
+  const rememberCursor = () => {
+    const sel = document.getSelection();
+    savedRange.current = sel && sel.rangeCount && editor.current?.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
+  };
+  const restoreCursor = () => {
+    editor.current?.focus();
+    const r = savedRange.current;
+    const sel = document.getSelection();
+    if (r && sel && editor.current?.contains(r.startContainer)) {
+      sel.removeAllRanges();
+      sel.addRange(r);
+    } else if (sel && editor.current) {
+      // ans Ende
+      const end = document.createRange();
+      end.selectNodeContents(editor.current);
+      end.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(end);
+    }
+  };
+  const insertCharts = (list: Chart[]) => {
+    if (!list.length) return;
+    restoreCursor();
+    cmd('insertHTML', list.map(chartFigure).join('') + '<p><br></p>');
+    if (editor.current) renderChartsIn(editor.current, { editable: true });
+    selectChart(null);
+  };
+  const editChartDone = (c: Chart) => {
+    const target = chartEdit?.el;
+    setChartEdit(null);
+    if (target && target.isConnected) {
+      target.dataset.chart = JSON.stringify(c);
+      renderChartsIn(editor.current!, { editable: true });
+      target.classList.add('selected');
+      setChartEl(null);
+      setTimeout(() => selectChart(target), 0);
+      setDirty(true);
+    } else insertCharts([c]);
+  };
+  const deleteChart = () => {
+    chartEl?.remove();
+    setChartEl(null);
+    setDirty(true);
+  };
+
   // Aktuellen Absatztyp direkt abfragen (der gemerkte Zustand kann nach Enter veraltet sein).
   const toggleBlock = (tag: 'h2' | 'h3') => {
     editor.current?.focus();
@@ -178,6 +336,21 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
   };
 
   const onPaste = (e: React.ClipboardEvent) => {
+    // Diagramm aus der App? (vor Bildern prüfen – kopierte Diagramme bringen auch ein Bild mit)
+    const chart = chartFromPaste(e.clipboardData);
+    if (chart && chart !== 'html') {
+      e.preventDefault();
+      rememberCursor();
+      insertCharts([chart]);
+      return;
+    }
+    if (chart === 'html') {
+      e.preventDefault();
+      cmd('insertHTML', sanitizeHtml(e.clipboardData.getData('text/html')));
+      if (editor.current) renderChartsIn(editor.current, { editable: true });
+      refreshChecks();
+      return;
+    }
     const imgs = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
     if (imgs.length) {
       e.preventDefault();
@@ -188,6 +361,8 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     if (html) {
       e.preventDefault();
       cmd('insertHTML', sanitizeHtml(html));
+      if (editor.current) renderChartsIn(editor.current, { editable: true });
+      refreshChecks();
     }
   };
 
@@ -268,6 +443,20 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
 
   const onEditorClick = (e: React.MouseEvent) => {
     const t = e.target as HTMLElement;
+    const box = checkboxHit(e);
+    if (box && editor.current?.contains(box)) {
+      e.preventDefault();
+      tick(box);
+      return;
+    }
+    const fig = t.closest?.('figure.chart') as HTMLElement | null;
+    if (fig && editor.current?.contains(fig)) {
+      if (formula) finishFormula();
+      setImage(null);
+      selectChart(fig);
+      return;
+    }
+    if (chartEl) selectChart(null);
     const math = t.closest?.('span.math') as HTMLElement | null;
     if (math && editor.current?.contains(math)) {
       selectFormula(math);
@@ -283,6 +472,13 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (chartEl) {
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        deleteChart();
+      } else if (e.key !== 'Shift') selectChart(null);
+      return;
+    }
     if (!image) return;
     if (e.key === 'Backspace' || e.key === 'Delete') {
       e.preventDefault();
@@ -315,9 +511,19 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     { icon: 'alignCenter', label: 'Zentriert', on: state.center, run: () => align('center') },
     { icon: 'alignRight', label: 'Rechtsbündig', on: state.right, run: () => align('right') },
     'sep',
-    { icon: 'listBullet', label: 'Aufzählung', on: state.ul, run: () => cmd('insertUnorderedList') },
+    { icon: 'listBullet', label: 'Aufzählung', on: state.ul, run: bulletList },
     { icon: 'listNumber', label: 'Nummerierung', on: state.ol, run: () => cmd('insertOrderedList') },
+    { icon: 'checklist', label: 'Checkliste', on: state.check, run: toggleChecklist },
+    'sep',
     { icon: 'image', label: 'Bild einfügen', run: () => imageInput.current?.click() },
+    {
+      icon: 'chart',
+      label: 'Diagramm einfügen',
+      run: () => {
+        rememberCursor();
+        setChartSheet(true);
+      },
+    },
     { icon: 'sigma', label: 'Formel einfügen', on: !!formula, run: () => (formula ? finishFormula() : insertFormula()) },
   ];
 
@@ -394,6 +600,39 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
             </div>
           </div>
         )}
+        {checklist && inShared && (
+          <div className="card checklist-bar" data-no-swipe onMouseDown={(e) => e.target === e.currentTarget && e.preventDefault()}>
+            <div className="segmented" role="radiogroup" aria-label="Wer hakt ab?">
+              <button type="button" className={!listShared ? 'active' : ''} aria-pressed={!listShared} onMouseDown={(e) => e.preventDefault()} onClick={() => setShared(false)}>
+                <Icon name="user" size={16} /> Jeder für sich
+              </button>
+              <button type="button" className={listShared ? 'active' : ''} aria-pressed={listShared} onMouseDown={(e) => e.preventDefault()} onClick={() => setShared(true)}>
+                <Icon name="users" size={16} /> Gemeinsam
+              </button>
+            </div>
+            <p className="muted small">
+              {listShared
+                ? 'Häkchen gelten für alle Personen im geteilten Ordner.'
+                : 'Jede Person hakt für sich ab – deine Häkchen siehst nur du (auf allen deinen Geräten).'}
+            </p>
+          </div>
+        )}
+        {chartEl && chartData && (
+          <div className="card chart-bar" data-no-swipe>
+            <strong className="grow ellipsis">
+              <Icon name="chart" size={16} /> {chartData.title || 'Diagramm'}
+            </strong>
+            <button className="btn ghost small danger" onClick={deleteChart}>
+              <Icon name="trash" size={16} /> Löschen
+            </button>
+            <button className="btn ghost small" onClick={chartCopy.run} disabled={!chartCopy.prepared}>
+              <Icon name={chartCopy.done ? 'check' : 'copy'} size={16} /> {chartCopy.done ? 'Kopiert' : 'Kopieren'}
+            </button>
+            <button className="btn primary small" onClick={() => setChartEdit({ el: chartEl, chart: chartData })}>
+              <Icon name="edit" size={16} /> Bearbeiten
+            </button>
+          </div>
+        )}
         <div className="doc-edit-wrap" ref={wrap}>
           <div
             ref={editor}
@@ -407,6 +646,7 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
             onInput={(e) => {
               setDirty(true);
               measure();
+              if (editor.current?.querySelector('ul.checklist')) refreshChecks();
               const ev = e.nativeEvent as InputEvent;
               if (ev.inputType === 'insertText' && ev.data?.endsWith('$')) autoFormula();
             }}
@@ -442,7 +682,22 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
           }}
         />
         {err && <p className="notice critical">{err}</p>}
+        {checks.notReady && <p className="notice warning">Häkchen werden noch nicht synchronisiert: Bitte supabase/005_checklisten.sql im Supabase „SQL Editor“ ausführen.</p>}
       </div>
+      {chartSheet && (
+        <ChartInsertSheet
+          onClose={() => setChartSheet(false)}
+          onNew={() => {
+            setChartSheet(false);
+            afterBack(() => setChartEdit({ el: null }));
+          }}
+          onPick={(c) => {
+            setChartSheet(false);
+            afterBack(() => insertCharts([c]));
+          }}
+        />
+      )}
+      {chartEdit && <ChartEditor initial={chartEdit.chart} onClose={() => setChartEdit(null)} onDone={editChartDone} />}
     </StudyScreen>
   );
 }
