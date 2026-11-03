@@ -48,13 +48,21 @@ export function WheelSpinner({ wheel, actions }: { wheel: Wheel; actions?: React
     setResult(pending.current);
   };
 
+  /** Gezogenen Eintrag für die nächsten Drehungen herausnehmen (nur hier, die Datei bleibt unverändert). */
+  const takeOut = () => {
+    if (!result) return;
+    setRemoved((r) => new Set(r).add(result.id));
+    setResult(null);
+  };
+
   const reset = () => {
     setRemoved(new Set());
     setResult(null);
   };
 
   const left = wheel.removePicked && result ? active.length - 1 : active.length;
-  const allGone = wheel.removePicked && all.length > 0 && left <= 0 && !spinning;
+  const allGone = all.length > 0 && left <= 0 && !spinning;
+  const anyOut = removed.size > 0 || (wheel.removePicked && !!result);
 
   return (
     <div className="wheel-spinner">
@@ -74,7 +82,12 @@ export function WheelSpinner({ wheel, actions }: { wheel: Wheel; actions?: React
       </div>
       <div className="wheel-actions">
         {actions}
-        {wheel.removePicked && removed.size + (result ? 1 : 0) > 0 && (
+        {!wheel.removePicked && result && !spinning && (
+          <button type="button" className="btn ghost small" onClick={takeOut} title="Nur für die nächsten Drehungen – die Einträge bleiben gespeichert">
+            <Icon name="close" size={16} /> Rausnehmen
+          </button>
+        )}
+        {anyOut && (
           <button type="button" className="btn ghost small" onClick={reset} disabled={spinning}>
             Zurücksetzen
           </button>
@@ -83,8 +96,8 @@ export function WheelSpinner({ wheel, actions }: { wheel: Wheel; actions?: React
           <Icon name="wheel" size={18} /> Drehen
         </button>
       </div>
-      {wheel.removePicked && all.length > 0 && (
-        <p className="muted small wheel-left">{allGone ? 'Alle Einträge wurden gezogen.' : `Noch ${left} von ${all.length} im Rad.`}</p>
+      {(wheel.removePicked || removed.size > 0) && all.length > 0 && (
+        <p className="muted small wheel-left">{allGone ? 'Keine Einträge mehr im Rad – „Zurücksetzen“ holt alle zurück.' : `Noch ${left} von ${all.length} im Rad.`}</p>
       )}
     </div>
   );
