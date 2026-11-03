@@ -384,7 +384,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   );
   const accessOf = useCallback((item: Item): Access => item.access ?? inheritedAccessOf(item), [inheritedAccessOf]);
   const mine = useCallback((item: Item) => !item.shareId || isOwner(item.shareId) || (!!me && item.createdBy === me), [isOwner, me]);
-  const canModify = useCallback((item: Item) => mine(item) || accessOf(item) !== 'read', [mine, accessOf]);
+  // Den obersten Ordner eines geteilten Ordners (Name, Bild) ändert nur der Besitzer – die Rechte gelten nur für den Inhalt.
+  const canModify = useCallback(
+    (item: Item) => mine(item) || (accessOf(item) !== 'read' && !('parentId' in item && isRoot(item))),
+    [mine, accessOf, isRoot],
+  );
   const canDeleteItem = useCallback((item: Item) => mine(item) || (accessOf(item) === 'delete' && !('parentId' in item && isRoot(item))), [mine, accessOf, isRoot]);
   const canEditFolder = canModify;
   const canSetAccess = useCallback((item: Item) => !!item.shareId && !!me && (isOwner(item.shareId) || item.createdBy === me), [isOwner, me]);

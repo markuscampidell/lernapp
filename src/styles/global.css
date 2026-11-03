@@ -2443,3 +2443,21 @@ textarea.text-line.doc-title {
 .people-group > p {
   margin: 0;
 }
+.access-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.access-desc {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-2);
+}
+.access-option.on .access-desc {
+  color: color-mix(in srgb, var(--info) 75%, var(--text-2));
+}
+.access-option .radio-dot {
+  align-self: flex-start;
+  margin-top: 2px;
+}
