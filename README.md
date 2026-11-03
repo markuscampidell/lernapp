@@ -65,7 +65,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
    , `supabase/003_verschachtelt.sql` (geteilte Ordner in geteilten Ordnern)
    , `supabase/004_konto_loeschen.sql` (Konto löschen & geteilte Ordner übergeben)
    , `supabase/005_checklisten.sql` (Häkchen in Checklisten pro Konto bzw. gemeinsam)
-   und `supabase/006_profilbilder.sql` (Profilbilder).
+   , `supabase/006_profilbilder.sql` (Profilbilder)
+   und `supabase/007_rechte_vererben.sql` (Rechte einheitlich vererben, auch vom obersten Ordner).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

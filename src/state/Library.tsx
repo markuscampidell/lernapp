@@ -368,19 +368,19 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         const f = byId.get(id);
         if (!f?.shareId || f.createdBy !== creator) return 'read';
         if (f.access) return f.access;
-        if (isRoot(f)) return 'read';
+        // Auch über den obersten Ordner hinaus: liegt er in einem anderen geteilten Ordner, zeigt parentId dorthin (sonst Ende = „Nur lesen“).
         id = f.parentId;
       }
       return 'read';
     },
-    [byId, isRoot],
+    [byId],
   );
   const inheritedAccessOf = useCallback(
     (item: Item): Access => {
       if ('folderId' in item) return inheritFrom(item.folderId, item.createdBy);
-      return isRoot(item) ? 'edit' : inheritFrom(item.parentId, item.createdBy);
+      return inheritFrom(item.parentId, item.createdBy);
     },
-    [inheritFrom, isRoot],
+    [inheritFrom],
   );
   const accessOf = useCallback((item: Item): Access => item.access ?? inheritedAccessOf(item), [inheritedAccessOf]);
   const mine = useCallback((item: Item) => !item.shareId || isOwner(item.shareId) || (!!me && item.createdBy === me), [isOwner, me]);
