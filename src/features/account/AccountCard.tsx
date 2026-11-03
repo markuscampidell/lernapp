@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../cloud/auth';
 import { MIN_PASSWORD } from '../../cloud/supabase';
 import { Icon } from '../../components/Icon';
 import { DeleteAccountSheet } from './DeleteAccountSheet';
 import { useLibrary } from '../../state/Library';
 import { formatSize } from '../../lib/files';
+import { Avatar } from '../../components/Avatar';
+import { AvatarSheet } from './AvatarSheet';
+import { removeAvatar } from '../../cloud/remote';
 
 /** Anmelden/Registrieren – oder, wenn angemeldet, Konto-Infos (Abmelden, Passwort ändern). */
 export function AccountCard({ showAccount = true }: { showAccount?: boolean }) {
@@ -104,6 +107,19 @@ function AccountInfo() {
   const [status, setStatus] = useState<{ kind: 'good' | 'critical'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { profiles, refreshRemote, online } = useLibrary();
+  const [picked, setPicked] = useState<File | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const avatarPath = profiles.find((p) => p.id === user!.id)?.avatarPath;
+  const dropAvatar = async () => {
+    if (!confirm('Profilbild entfernen?')) return;
+    try {
+      await removeAvatar(user!.id, avatarPath);
+      await refreshRemote();
+    } catch (e) {
+      setStatus({ kind: 'critical', text: e instanceof Error ? e.message : 'Das hat nicht geklappt.' });
+    }
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,12 +139,39 @@ function AccountInfo() {
   return (
     <div className="card stack">
       <div className="person">
-        <span className="avatar">{user!.username.slice(0, 1)}</span>
+        <button className="avatar-edit" onClick={() => photoInput.current?.click()} disabled={!online} aria-label="Profilbild ändern" title="Profilbild ändern">
+          <Avatar id={user!.id} name={user!.username} size="lg" />
+          <span className="avatar-edit-badge" aria-hidden="true">
+            <Icon name="camera" size={14} />
+          </span>
+        </button>
         <div className="card-main">
           <span className="muted small">Angemeldet als</span>
           <strong className="ellipsis">{user!.username}</strong>
+          <span className="input-row wrap avatar-links">
+            <button className="link" onClick={() => photoInput.current?.click()} disabled={!online}>
+              {avatarPath ? 'Profilbild ändern' : 'Profilbild hinzufügen'}
+            </button>
+            {avatarPath && (
+              <button className="link danger" onClick={dropAvatar} disabled={!online}>
+                Entfernen
+              </button>
+            )}
+          </span>
         </div>
+        <input
+          ref={photoInput}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) setPicked(f);
+            e.target.value = '';
+          }}
+        />
       </div>
+      {picked && <AvatarSheet file={picked} onClose={() => setPicked(null)} />}
       {changing ? (
         <form className="account-form" onSubmit={save}>
           <input type="text" name="username" autoComplete="username" value={user!.username} readOnly hidden />

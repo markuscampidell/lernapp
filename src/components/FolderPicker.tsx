@@ -83,8 +83,8 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
                   >
                     <FolderThumb folder={f} />
                     <div className="card-main">
-                      <strong className="ellipsis">{f.name}</strong>
-                      <span className="muted small ellipsis">{path}</span>
+                      <strong className="wrap-text">{f.name}</strong>
+                      <span className="muted small wrap-text">{path}</span>
                     </div>
                     <Icon name="chevron" />
                   </button>
@@ -136,8 +136,8 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
                       <button className="card card-btn row-card" disabled={disabled} onClick={() => setCurrent(k.id)}>
                         <FolderThumb folder={k} />
                         <div className="card-main">
-                          <strong className="ellipsis">{k.name}</strong>
-                          {k.description && <span className="muted small ellipsis">{k.description}</span>}
+                          <strong className="wrap-text">{k.name}</strong>
+                          {k.description && <span className="muted small wrap-text">{k.description}</span>}
                         </div>
                         <Icon name="chevron" />
                       </button>

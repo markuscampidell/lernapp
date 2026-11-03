@@ -104,7 +104,7 @@ export function FileEditorSheet({ file, onClose, onDeleted }: { file: FileItem; 
           <button className="card card-btn row-card" onClick={() => setPicking(true)} disabled={!editable}>
             <Icon name="folder" />
             <div className="card-main">
-              <span className="ellipsis">{pathOf(folders, folderId).map((p) => p.name).join(' / ')}</span>
+              <span className="wrap-text">{pathOf(folders, folderId).map((p) => p.name).join(' / ')}</span>
             </div>
             {editable && <span className="link">Verschieben</span>}
           </button>

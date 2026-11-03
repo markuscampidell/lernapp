@@ -1,3 +1,4 @@
+import { Avatar } from '../../components/Avatar';
 import { useMemo, useState } from 'react';
 import type { Profile } from '../../cloud/remote';
 import { SearchBox } from '../../components/SearchBox';
@@ -29,7 +30,7 @@ export function UserPicker({ profiles, exclude, selected, onChange }: { profiles
         <div className="people people-scroll">
           {list.map((p) => (
             <button key={p.id} type="button" className={`person${selected.has(p.id) ? ' selected' : ''}`} onClick={() => toggle(p.id)} aria-pressed={selected.has(p.id)}>
-              <span className="avatar">{selected.has(p.id) ? <Icon name="check" size={18} /> : p.username.slice(0, 1)}</span>
+              <Avatar id={p.id} name={p.username}>{selected.has(p.id) ? <Icon name="check" size={18} /> : undefined}</Avatar>
               <strong className="grow ellipsis">{p.username}</strong>
             </button>
           ))}

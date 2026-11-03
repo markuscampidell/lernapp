@@ -1,3 +1,4 @@
+import { Avatar } from '../../components/Avatar';
 import { useMemo, useState } from 'react';
 import { Sheet } from '../../components/Sheet';
 import { SearchBox } from '../../components/SearchBox';
@@ -118,7 +119,7 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
                       onClick={() => setChoice(p.id)}
                       aria-pressed={choice === p.id}
                     >
-                      <span className="avatar">{choice === p.id ? <Icon name="check" size={18} /> : p.username.slice(0, 1)}</span>
+                      <Avatar id={p.id} name={p.username}>{choice === p.id ? <Icon name="check" size={18} /> : undefined}</Avatar>
                       <strong className="grow ellipsis">{p.username}</strong>
                       {memberIds.has(p.id) && <span className="muted small">Mitglied</span>}
                     </button>

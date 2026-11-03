@@ -2310,3 +2310,113 @@ textarea.text-line.doc-title {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Lange Namen/Beschreibungen umbrechen statt mit „…“ abschneiden (auch sehr lange Wörter) */
+.wrap-text {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.card-main .muted.wrap-text {
+  display: block;
+}
+.viewer-title .wrap-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- Profilbilder ---------- */
+.avatar {
+  overflow: hidden;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 1.4rem;
+}
+.avatar-sm {
+  width: 16px;
+  height: 16px;
+  font-size: 0.6rem;
+  background: var(--surface-2);
+}
+.by-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.avatar-edit {
+  position: relative;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+}
+.avatar-edit .avatar {
+  background: var(--surface-2);
+}
+.avatar-edit-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 2px solid var(--surface);
+}
+.avatar-links {
+  gap: 14px;
+  margin-top: 2px;
+}
+.avatar-crop-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.avatar-crop {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #000;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.avatar-crop:active {
+  cursor: grabbing;
+}
+.avatar-crop img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  pointer-events: none;
+}
+.avatar-crop-mask {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 200px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.avatar-zoom {
+  width: 100%;
+  max-width: 260px;
+}
+.avatar-zoom input {
+  width: 100%;
+}
+.link.danger { color: var(--critical); }

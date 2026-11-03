@@ -127,7 +127,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
           <Icon name="back" />
         </button>
         <div className="viewer-title">
-          <strong className="ellipsis">{name}</strong>
+          <strong className="wrap-text">{name}</strong>
           <span className="muted small ellipsis">
             {KIND_LABEL[kind]} · {formatSize(file.size)} · {formatDate(file.createdAt)}
           </span>
@@ -152,7 +152,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
       <div className="viewer-body">
         {(file.description || where) && (
           <div className="viewer-info">
-            {file.description && <p>{file.description}</p>}
+            {file.description && <p className="break">{file.description}</p>}
             <p className="muted small">
               <Icon name="folder" size={14} /> {where}
               {file.shareId && ` · hinzugefügt von ${file.createdBy === me?.id ? 'dir' : userName(file.createdBy)}`}

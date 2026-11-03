@@ -4,6 +4,7 @@ import { counts, plural } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { FileThumb, FolderThumb } from '../../components/Thumbs';
 import { Icon } from '../../components/Icon';
+import { Avatar } from '../../components/Avatar';
 import { useLongPress } from '../../hooks/useLongPress';
 import { fileKind, formatSize, fullName, KIND_LABEL } from '../../lib/files';
 
@@ -52,7 +53,11 @@ function ItemCard({ onClick, onEdit, onInfo, onLongPress, selecting, selected, t
 /** "von Anna" bei geteilten Einträgen. */
 function ByChip({ id }: { id: string | null | undefined }) {
   const { me, userName } = useLibrary();
-  return <span className="chip by-chip">von {id && id === me?.id ? 'dir' : userName(id)}</span>;
+  return (
+    <span className="chip by-chip">
+      <Avatar id={id} size="sm" /> von {id && id === me?.id ? 'dir' : userName(id)}
+    </span>
+  );
 }
 
 /** Zeigt, wenn andere mehr als nur lesen dürfen. */
@@ -91,9 +96,9 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
   );
   return (
     <ItemCard {...rest} thumb={thumb} label={folder.name}>
-      <strong className="ellipsis">{folder.name}</strong>
-      {path && <span className="muted small ellipsis">{path}</span>}
-      {folder.description && <span className="muted small clamp-2">{folder.description}</span>}
+      <strong className="wrap-text">{folder.name}</strong>
+      {path && <span className="muted small wrap-text">{path}</span>}
+      {folder.description && <span className="muted small wrap-text">{folder.description}</span>}
       <span className="muted small">
         {share && share.ownerId !== me?.id && `Von ${userName(share.ownerId)} geteilt · `}
         {parts.length ? parts.join(' · ') : 'Leer'}
@@ -113,9 +118,9 @@ export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file:
   const kind = fileKind(file);
   return (
     <ItemCard {...rest} thumb={<FileThumb file={file} />} label={fullName(file)}>
-      <strong className="ellipsis">{fullName(file)}</strong>
-      {path && <span className="muted small ellipsis">{path}</span>}
-      {file.description && <span className="muted small clamp-2">{file.description}</span>}
+      <strong className="wrap-text">{fullName(file)}</strong>
+      {path && <span className="muted small wrap-text">{path}</span>}
+      {file.description && <span className="muted small wrap-text">{file.description}</span>}
       <span className="chips">
         {isNew && <span className="chip new-chip">Neu</span>}
         <span className={`chip kind-chip kind-${kind}`}>{KIND_LABEL[kind]}</span>

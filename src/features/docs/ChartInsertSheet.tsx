@@ -64,7 +64,7 @@ export function ChartInsertSheet({ onClose, onNew, onPick }: { onClose: () => vo
               <Icon name="chart" size={22} />
             </span>
             <div className="card-main">
-              <strong className="ellipsis">{f.name}</strong>
+              <strong className="wrap-text">{f.name}</strong>
               <span className="muted small ellipsis">{busy === f.id ? 'Lädt …' : pathOf(folders, f.folderId).map((p) => p.name).join(' / ')}</span>
             </div>
             <Icon name="chevron" />

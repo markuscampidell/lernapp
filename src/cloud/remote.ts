@@ -13,6 +13,8 @@ import { BUCKET, check, friendly, MAX_UPLOAD, supabase } from './supabase';
 export interface Profile {
   id: string;
   username: string;
+  /** Profilbild im öffentlichen Bucket "avatars" (siehe supabase/006_profilbilder.sql). */
+  avatarPath?: string | null;
 }
 export interface Share {
   id: string;
@@ -139,7 +141,7 @@ export async function fetchSnapshot(userId: string): Promise<Snapshot> {
     handovers: handovers ?? [],
     handoversReady: handovers !== null,
     userId,
-    profiles: profiles.map((r) => ({ id: String(r.id), username: String(r.username) })),
+    profiles: profiles.map((r) => ({ id: String(r.id), username: String(r.username), avatarPath: (r.avatar_path as string | null | undefined) ?? null })),
     shares: shares.map((r) => ({ id: String(r.id), ownerId: String(r.owner_id), rootId: String(r.root_id), createdAt: String(r.created_at), inside: (r.inside as string | null) ?? null })),
     members: members.map((r) => ({ shareId: String(r.share_id), userId: String(r.user_id), addedAt: String(r.added_at) })),
     folders: folders.map(toFolder),
@@ -400,4 +402,37 @@ export async function expireHandovers(): Promise<boolean> {
   const paths = ((data as string[] | null) ?? []).filter(Boolean);
   if (paths.length) await removePaths(paths);
   return paths.length > 0;
+}
+
+// ---------- Profilbild ----------
+const AVATARS = 'avatars';
+export const AVATARS_NOT_READY = 'Profilbilder sind auf dem Server noch nicht eingerichtet: Bitte supabase/006_profilbilder.sql im Supabase „SQL Editor“ ausführen.';
+
+/** Öffentliche Adresse eines Profilbilds. */
+export function avatarUrl(path: string): string {
+  return sb().storage.from(AVATARS).getPublicUrl(path).data.publicUrl;
+}
+
+const avatarError = (msg: string) =>
+  /avatar|bucket|not found|schema cache|column|does not exist/i.test(msg) ? new Error(AVATARS_NOT_READY) : new Error(friendly(msg));
+
+/** Neues Profilbild hochladen (altes wird danach entfernt). */
+export async function setAvatar(userId: string, blob: Blob, oldPath?: string | null): Promise<string> {
+  const path = `${userId}/${newId().replace(/-/g, '').slice(0, 20)}.jpg`;
+  const up = await sb().storage.from(AVATARS).upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: false });
+  if (up.error) throw avatarError(up.error.message);
+  const res = await sb().from('profiles').update({ avatar_path: path }).eq('id', userId);
+  if (res.error) {
+    await sb().storage.from(AVATARS).remove([path]).catch(() => {});
+    throw avatarError(res.error.message);
+  }
+  if (oldPath) await sb().storage.from(AVATARS).remove([oldPath]).catch(() => {});
+  return path;
+}
+
+/** Profilbild entfernen (wieder Anfangsbuchstabe). */
+export async function removeAvatar(userId: string, oldPath?: string | null): Promise<void> {
+  const res = await sb().from('profiles').update({ avatar_path: null }).eq('id', userId);
+  if (res.error) throw avatarError(res.error.message);
+  if (oldPath) await sb().storage.from(AVATARS).remove([oldPath]).catch(() => {});
 }

@@ -260,7 +260,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
             <FolderThumb folder={folder} size="lg" />
             <div className="grow">
               <h1 className="break">{folder.name}</h1>
-              {folder.description && <p className="muted">{folder.description}</p>}
+              {folder.description && <p className="muted break">{folder.description}</p>}
             </div>
           </header>
           <SharedInfo folder={folder} onPeople={() => setSheet('share')} />

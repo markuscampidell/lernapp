@@ -44,6 +44,8 @@ interface LibraryValue {
   members: Member[];
   profiles: Profile[];
   userName: (id: string | null | undefined) => string;
+  /** Adresse des Profilbilds einer Person (undefined = keins). */
+  avatarOf: (id: string | null | undefined) => string | undefined;
   shareOf: (item: Item | undefined) => Share | undefined;
   isRoot: (folder: Folder | undefined) => boolean;
   isOwner: (shareId: string | undefined) => boolean;
@@ -268,7 +270,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       timer = setTimeout(refreshRemote, 400);
     };
     const channel = client.channel(`lernapp-${me}`);
-    for (const table of ['shares', 'share_members', 'folders', 'files']) {
+    for (const table of ['shares', 'share_members', 'folders', 'files', 'profiles']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, soon);
     }
     channel.subscribe();
@@ -335,6 +337,19 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const profileMap = useMemo(() => new Map((snap?.profiles ?? []).map((p) => [p.id, p.username])), [snap]);
 
   const userName = useCallback((id: string | null | undefined) => (id ? profileMap.get(id) ?? 'Unbekannt' : 'Unbekannt'), [profileMap]);
+  const avatarMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of snap?.profiles ?? []) {
+      if (!p.avatarPath) continue;
+      try {
+        m.set(p.id, remote.avatarUrl(p.avatarPath));
+      } catch {
+        /* kein Server */
+      }
+    }
+    return m;
+  }, [snap]);
+  const avatarOf = useCallback((id: string | null | undefined) => (id ? avatarMap.get(id) : undefined), [avatarMap]);
   const shareOf = useCallback((item: Item | undefined) => (item?.shareId ? shareMap.get(item.shareId) : undefined), [shareMap]);
   const isOwner = useCallback((shareId: string | undefined) => !!shareId && !!me && shareMap.get(shareId)?.ownerId === me, [shareMap, me]);
   const isRoot = useCallback((f: Folder | undefined) => !!f?.shareId && shareMap.get(f.shareId)?.rootId === f.id, [shareMap]);
@@ -1050,6 +1065,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       members: snap?.members ?? [],
       profiles: snap?.profiles ?? [],
       userName,
+      avatarOf,
       shareOf,
       isRoot,
       isOwner,
@@ -1089,7 +1105,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
-      user, online, snap, userName, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
+      user, online, snap, userName, avatarOf, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
       shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
       handovers, rawSnap, handoverStats, claimHandover, declineHandover, ownedRoots, deleteAccount, sync, retrySync,
     ],

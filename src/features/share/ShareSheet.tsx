@@ -1,3 +1,4 @@
+import { Avatar } from '../../components/Avatar';
 import { useEffect, useMemo, useState } from 'react';
 import type { Folder } from '../../domain/types';
 import { subtreeIds } from '../../domain/tree';
@@ -164,7 +165,7 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
           <div className="people">
             {people.map((id) => (
               <div key={id} className="person">
-                <span className="avatar">{lib.userName(id).slice(0, 1)}</span>
+                <Avatar id={id} />
                 <div className="card-main">
                   <strong className="ellipsis">
                     {lib.userName(id)}

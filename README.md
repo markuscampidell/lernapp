@@ -25,6 +25,7 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
 - **„Meine Ordner“ auf allen Geräten** (Schalter im Konto): eigene Ordner werden automatisch hochgeladen („mit niemandem geteilt“)
   und erscheinen auf jedem Gerät, auf dem man angemeldet ist. Eigene Ordner stehen immer unter „Meine Ordner“,
   unter „Geteilte Ordner“ nur, was andere mit einem teilen.
+- **Profilbild** (Einstellungen → Konto): Bild wählen, Ausschnitt verschieben/zoomen; erscheint bei Personen und „von …“ an geteilten Einträgen.
 - **Konto löschen**: Eigene geteilte Ordner gehen an eine gewählte Person (oder werden gelöscht). Sie sieht einen Hinweis und kann
   übernehmen – weiter geteilt als Besitzer oder in „Meine Ordner“ auf ihr Gerät – oder ablehnen. Nach 30 Tagen ohne Entscheidung wird alles gelöscht.
 - **Text-Dokumente**: Überschriften, Listen, Bilder, Formeln und **Checklisten**. Häkchen gehören dem Konto (auf allen eigenen
@@ -60,7 +61,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
    danach genauso `supabase/002_rechte.sql` (Rechte pro Datei/Ordner)
    , `supabase/003_verschachtelt.sql` (geteilte Ordner in geteilten Ordnern)
    , `supabase/004_konto_loeschen.sql` (Konto löschen & geteilte Ordner übergeben)
-   und `supabase/005_checklisten.sql` (Häkchen in Checklisten pro Konto bzw. gemeinsam).
+   , `supabase/005_checklisten.sql` (Häkchen in Checklisten pro Konto bzw. gemeinsam)
+   und `supabase/006_profilbilder.sql` (Profilbilder).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

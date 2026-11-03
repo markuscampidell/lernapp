@@ -163,9 +163,9 @@ export function UploadView() {
             <div className="card-main">
               {folder ? (
                 <>
-                  <strong className="ellipsis">{folder.name}</strong>
+                  <strong className="wrap-text">{folder.name}</strong>
                   {folder.parentId && pathOf(folders, folder.parentId).length > 0 && (
-                    <span className="muted small ellipsis">{pathOf(folders, folder.parentId).map((p) => p.name).join(' / ')}</span>
+                    <span className="muted small wrap-text">{pathOf(folders, folder.parentId).map((p) => p.name).join(' / ')}</span>
                   )}
                   {folder.shareId && <span className="muted small">Geteilter Ordner</span>}
                 </>
