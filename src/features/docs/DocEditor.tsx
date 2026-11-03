@@ -5,16 +5,16 @@ import { Icon, type IconName } from '../../components/Icon';
 import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
-import { DOC_EXT, DOC_MIME, imageToDataUrl, sanitizeHtml } from './sanitize';
+import { DOC_EXT, DOC_MIME, imageToDataUrl, normalizeBlocks, sanitizeHtml } from './sanitize';
 import { loadKatex, renderMathIn, renderMathSpan } from '../../lib/math';
 import { useKatex } from '../../components/MathText';
 import { newId } from '../../lib/id';
 import { useLibrary } from '../../state/Library';
 import { applyChecks, checkboxHit, useChecks } from './checks';
-import { chartFigure, chartFromPaste, parseChart, renderChartsIn, type Chart } from '../charts/chart';
 import { ChartEditor } from '../charts/ChartEditor';
-import { useChartCopy } from '../charts/ChartPanel';
-import { ChartInsertSheet } from './ChartInsertSheet';
+import { WheelEditor } from '../wheel/WheelEditor';
+import { EmbedInsertSheet } from './EmbedInsertSheet';
+import { EMBED_SELECTOR, embedFigure, embedFromPaste, embedJson, embedOf, embedTitle, renderEmbedsIn, useEmbedCopy, type EmbedData, type EmbedKind } from './embeds';
 import { afterBack } from '../../lib/router';
 
 const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -28,6 +28,7 @@ const MIN_IMAGE = 40;
 /** Text-Dokument mit Formatierung und Bildern bearbeiten (wie ein einfaches Google Doc). */
 export function DocEditor({ file, folderId, initial = '', onClose }: { file?: FileItem; folderId?: string; initial?: string; onClose: () => void }) {
   const [name, setName] = useState(file?.name ?? '');
+  const [description, setDescription] = useState(file?.description ?? '');
   const [dirty, setDirty] = useState(false);
   const [state, setState] = useState<Record<string, boolean>>({});
   // Angeklicktes Bild (zum Größe ändern / Ausrichten / Löschen).
@@ -53,11 +54,12 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     return !!share && peopleOf(share.id).length > 1;
   })();
   // Diagramme: ausgewähltes Diagramm, Einfüge-Auswahl, Diagramm-Editor (neu oder bestehendes).
-  const [chartEl, setChartEl] = useState<HTMLElement | null>(null);
-  const chartData = useMemo(() => (chartEl ? parseChart(chartEl.dataset.chart ?? '') : null), [chartEl]);
-  const chartCopy = useChartCopy(chartData);
-  const [chartSheet, setChartSheet] = useState(false);
-  const [chartEdit, setChartEdit] = useState<{ el: HTMLElement | null; chart?: Chart } | null>(null);
+  // Eingebettetes (Diagramm/Glücksrad): ausgewähltes, Einfüge-Auswahl, Editor (neu oder bestehendes).
+  const [embedEl, setEmbedEl] = useState<HTMLElement | null>(null);
+  const embedData = useMemo(() => (embedEl ? embedOf(embedEl) : null), [embedEl]);
+  const embedCopy = useEmbedCopy(embedData);
+  const [insertKind, setInsertKind] = useState<EmbedKind | null>(null);
+  const [embedEdit, setEmbedEdit] = useState<{ el: HTMLElement | null; kind: EmbedKind; embed?: EmbedData } | null>(null);
   const savedRange = useRef<Range | null>(null);
   const katexOk = useKatex(!!formula);
   useEffect(() => {
@@ -68,8 +70,9 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     const el = editor.current;
     if (!el) return;
     el.innerHTML = sanitizeHtml(initial) || '<p><br></p>';
+    normalizeBlocks(el);
     renderMathIn(el, true);
-    renderChartsIn(el, { editable: true });
+    renderEmbedsIn(el, { editable: true });
     document.execCommand('defaultParagraphSeparator', false, 'p');
     if (file) el.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,8 +166,52 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
   const cmd = (command: string, value?: string) => {
     editor.current?.focus();
     document.execCommand(command, false, value);
+    normalize();
     setDirty(true);
     requestAnimationFrame(measure);
+  };
+  /** Listen, die der Browser in einen Absatz gelegt hat, herauslösen (sonst stimmen die Einzüge nicht). Cursor bleibt, wo er war. */
+  const normalize = () => {
+    const el = editor.current;
+    if (!el) return;
+    const sel = document.getSelection();
+    const node = sel?.anchorNode ?? null;
+    const off = sel?.anchorOffset ?? 0;
+    if (normalizeBlocks(el) && sel && node && el.contains(node)) {
+      try {
+        sel.collapse(node, off);
+      } catch {
+        /* Cursor nicht wiederherstellbar */
+      }
+    }
+  };
+
+  // ---------- Einrücken (Tab / Umschalt+Tab und Knöpfe) ----------
+  const MAX_INDENT = 8;
+  const indent = (out: boolean) => {
+    editor.current?.focus();
+    const n = document.getSelection()?.anchorNode ?? null;
+    const el = n instanceof HTMLElement ? n : n?.parentElement;
+    const li = el?.closest('li');
+    if (li && editor.current?.contains(li)) {
+      // In Listen: Punkt eine Ebene tiefer/höher (verschachtelte Liste).
+      cmd(out ? 'outdent' : 'indent');
+      // Verschachtelte Listen in Checklisten sind auch Checklisten (gleicher Modus).
+      editor.current?.querySelectorAll<HTMLElement>('ul.checklist ul:not(.checklist)').forEach((ul) => {
+        const top = ul.parentElement?.closest('ul.checklist') as HTMLElement | null;
+        ul.classList.add('checklist');
+        if (top?.dataset.shared === '1') ul.dataset.shared = '1';
+      });
+      refreshChecks();
+      return;
+    }
+    // Sonst: ganzen Absatz/Überschrift einrücken.
+    const block = el?.closest('p, h2, h3') as HTMLElement | null;
+    if (!block || !editor.current?.contains(block)) return;
+    const level = Math.max(0, Math.min(MAX_INDENT, Number(block.dataset.indent || 0) + (out ? -1 : 1)));
+    if (level) block.dataset.indent = String(level);
+    else delete block.dataset.indent;
+    setDirty(true);
   };
   // ---------- Checklisten ----------
   /** Liste (ul), in der der Cursor steht. */
@@ -240,11 +287,11 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     checks.toggle(li.dataset.id!, li.parentElement?.dataset.shared === '1');
   };
 
-  // ---------- Diagramme ----------
-  const selectChart = (el: HTMLElement | null) => {
-    editor.current?.querySelectorAll('figure.chart.selected').forEach((x) => x !== el && x.classList.remove('selected'));
+  // ---------- Diagramme & Glücksräder ----------
+  const selectEmbed = (el: HTMLElement | null) => {
+    editor.current?.querySelectorAll('figure.selected').forEach((x) => x !== el && x.classList.remove('selected'));
     el?.classList.add('selected');
-    setChartEl(el);
+    setEmbedEl(el);
   };
   /** Cursor-Position merken, bevor ein Dialog den Fokus nimmt. */
   const rememberCursor = () => {
@@ -267,28 +314,27 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
       sel.addRange(end);
     }
   };
-  const insertCharts = (list: Chart[]) => {
+  const insertEmbeds = (list: EmbedData[]) => {
     if (!list.length) return;
     restoreCursor();
-    cmd('insertHTML', list.map(chartFigure).join('') + '<p><br></p>');
-    if (editor.current) renderChartsIn(editor.current, { editable: true });
-    selectChart(null);
+    cmd('insertHTML', list.map(embedFigure).join('') + '<p><br></p>');
+    if (editor.current) renderEmbedsIn(editor.current, { editable: true });
+    selectEmbed(null);
   };
-  const editChartDone = (c: Chart) => {
-    const target = chartEdit?.el;
-    setChartEdit(null);
+  const editEmbedDone = (e: EmbedData) => {
+    const target = embedEdit?.el;
+    setEmbedEdit(null);
     if (target && target.isConnected) {
-      target.dataset.chart = JSON.stringify(c);
-      renderChartsIn(editor.current!, { editable: true });
-      target.classList.add('selected');
-      setChartEl(null);
-      setTimeout(() => selectChart(target), 0);
+      target.setAttribute(`data-${e.kind}`, embedJson(e));
+      renderEmbedsIn(editor.current!, { editable: true });
+      setEmbedEl(null);
+      setTimeout(() => selectEmbed(target), 0);
       setDirty(true);
-    } else insertCharts([c]);
+    } else insertEmbeds([e]);
   };
-  const deleteChart = () => {
-    chartEl?.remove();
-    setChartEl(null);
+  const deleteEmbed = () => {
+    embedEl?.remove();
+    setEmbedEl(null);
     setDirty(true);
   };
 
@@ -336,18 +382,18 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
   };
 
   const onPaste = (e: React.ClipboardEvent) => {
-    // Diagramm aus der App? (vor Bildern prüfen – kopierte Diagramme bringen auch ein Bild mit)
-    const chart = chartFromPaste(e.clipboardData);
-    if (chart && chart !== 'html') {
+    // Diagramm/Glücksrad aus der App? (vor Bildern prüfen – Kopien bringen auch ein Bild mit)
+    const embed = embedFromPaste(e.clipboardData);
+    if (embed && embed !== 'html') {
       e.preventDefault();
       rememberCursor();
-      insertCharts([chart]);
+      insertEmbeds([embed]);
       return;
     }
-    if (chart === 'html') {
+    if (embed === 'html') {
       e.preventDefault();
       cmd('insertHTML', sanitizeHtml(e.clipboardData.getData('text/html')));
-      if (editor.current) renderChartsIn(editor.current, { editable: true });
+      if (editor.current) renderEmbedsIn(editor.current, { editable: true });
       refreshChecks();
       return;
     }
@@ -361,7 +407,7 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     if (html) {
       e.preventDefault();
       cmd('insertHTML', sanitizeHtml(html));
-      if (editor.current) renderChartsIn(editor.current, { editable: true });
+      if (editor.current) renderEmbedsIn(editor.current, { editable: true });
       refreshChecks();
     }
   };
@@ -449,14 +495,14 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
       tick(box);
       return;
     }
-    const fig = t.closest?.('figure.chart') as HTMLElement | null;
+    const fig = t.closest?.(EMBED_SELECTOR) as HTMLElement | null;
     if (fig && editor.current?.contains(fig)) {
       if (formula) finishFormula();
       setImage(null);
-      selectChart(fig);
+      selectEmbed(fig);
       return;
     }
-    if (chartEl) selectChart(null);
+    if (embedEl) selectEmbed(null);
     const math = t.closest?.('span.math') as HTMLElement | null;
     if (math && editor.current?.contains(math)) {
       selectFormula(math);
@@ -472,11 +518,22 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (chartEl) {
+    // Umschalt+Enter wie Enter: immer eine neue Zeile (Absatz) – Abstand gibt es mit zweimal Enter.
+    if (e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && !image && !embedEl) {
+      e.preventDefault();
+      cmd('insertParagraph');
+      return;
+    }
+    if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && !image && !embedEl) {
+      e.preventDefault();
+      indent(e.shiftKey);
+      return;
+    }
+    if (embedEl) {
       if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
-        deleteChart();
-      } else if (e.key !== 'Shift') selectChart(null);
+        deleteEmbed();
+      } else if (e.key !== 'Shift') selectEmbed(null);
       return;
     }
     if (!image) return;
@@ -495,7 +552,7 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
   const submit = async () => {
     if (!name.trim()) return setErr('Gib dem Dokument einen Namen.');
     const html = sanitizeHtml(editor.current?.innerHTML ?? '');
-    if (await save(name, new Blob([html], { type: DOC_MIME }))) onClose();
+    if (await save(name, new Blob([html], { type: DOC_MIME }), description)) onClose();
   };
 
   const tools: ({ icon: IconName; label: string; on?: boolean; run: () => void } | 'sep')[] = [
@@ -514,6 +571,8 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     { icon: 'listBullet', label: 'Aufzählung', on: state.ul, run: bulletList },
     { icon: 'listNumber', label: 'Nummerierung', on: state.ol, run: () => cmd('insertOrderedList') },
     { icon: 'checklist', label: 'Checkliste', on: state.check, run: toggleChecklist },
+    { icon: 'outdent', label: 'Ausrücken (Umschalt+Tab)', run: () => indent(true) },
+    { icon: 'indent', label: 'Einrücken (Tab)', run: () => indent(false) },
     'sep',
     { icon: 'image', label: 'Bild einfügen', run: () => imageInput.current?.click() },
     {
@@ -521,7 +580,15 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
       label: 'Diagramm einfügen',
       run: () => {
         rememberCursor();
-        setChartSheet(true);
+        setInsertKind('chart');
+      },
+    },
+    {
+      icon: 'wheel',
+      label: 'Glücksrad einfügen',
+      run: () => {
+        rememberCursor();
+        setInsertKind('wheel');
       },
     },
     { icon: 'sigma', label: 'Formel einfügen', on: !!formula, run: () => (formula ? finishFormula() : insertFormula()) },
@@ -543,6 +610,15 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
     >
       <div className="doc-editor">
         <TextLine autoFocus={!file} value={name} onChange={(v) => (setName(v), setDirty(true))} placeholder="Titel des Dokuments" maxLength={120} className="doc-title" enterKeyHint="next" onEnter={() => editor.current?.focus()} />
+        <TextLine
+          value={description}
+          onChange={(v) => (setDescription(v), setDirty(true))}
+          placeholder="Beschreibung (optional)"
+          maxLength={500}
+          className="doc-desc"
+          enterKeyHint="next"
+          onEnter={() => editor.current?.focus()}
+        />
         <div className="doc-toolbar" role="toolbar" aria-label="Formatierung" data-no-swipe>
           {tools.map((t, i) =>
             t === 'sep' ? (
@@ -617,18 +693,18 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
             </p>
           </div>
         )}
-        {chartEl && chartData && (
+        {embedEl && embedData && (
           <div className="card chart-bar" data-no-swipe>
             <strong className="grow ellipsis">
-              <Icon name="chart" size={16} /> {chartData.title || 'Diagramm'}
+              <Icon name={embedData.kind === 'chart' ? 'chart' : 'wheel'} size={16} /> {embedTitle(embedData)}
             </strong>
-            <button className="btn ghost small danger" onClick={deleteChart}>
+            <button className="btn ghost small danger" onClick={deleteEmbed}>
               <Icon name="trash" size={16} /> Löschen
             </button>
-            <button className="btn ghost small" onClick={chartCopy.run} disabled={!chartCopy.prepared}>
-              <Icon name={chartCopy.done ? 'check' : 'copy'} size={16} /> {chartCopy.done ? 'Kopiert' : 'Kopieren'}
+            <button className="btn ghost small" onClick={embedCopy.run} disabled={!embedCopy.prepared}>
+              <Icon name={embedCopy.done ? 'check' : 'copy'} size={16} /> {embedCopy.done ? 'Kopiert' : 'Kopieren'}
             </button>
-            <button className="btn primary small" onClick={() => setChartEdit({ el: chartEl, chart: chartData })}>
+            <button className="btn primary small" onClick={() => setEmbedEdit({ el: embedEl, kind: embedData.kind, embed: embedData })}>
               <Icon name="edit" size={16} /> Bearbeiten
             </button>
           </div>
@@ -646,6 +722,7 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
             onInput={(e) => {
               setDirty(true);
               measure();
+              normalize();
               if (editor.current?.querySelector('ul.checklist')) refreshChecks();
               const ev = e.nativeEvent as InputEvent;
               if (ev.inputType === 'insertText' && ev.data?.endsWith('$')) autoFormula();
@@ -684,20 +761,35 @@ export function DocEditor({ file, folderId, initial = '', onClose }: { file?: Fi
         {err && <p className="notice critical">{err}</p>}
         {checks.notReady && <p className="notice warning">Häkchen werden noch nicht synchronisiert: Bitte supabase/005_checklisten.sql im Supabase „SQL Editor“ ausführen.</p>}
       </div>
-      {chartSheet && (
-        <ChartInsertSheet
-          onClose={() => setChartSheet(false)}
+      {insertKind && (
+        <EmbedInsertSheet
+          kind={insertKind}
+          onClose={() => setInsertKind(null)}
           onNew={() => {
-            setChartSheet(false);
-            afterBack(() => setChartEdit({ el: null }));
+            const kind = insertKind;
+            setInsertKind(null);
+            afterBack(() => setEmbedEdit({ el: null, kind }));
           }}
-          onPick={(c) => {
-            setChartSheet(false);
-            afterBack(() => insertCharts([c]));
+          onPick={(e) => {
+            setInsertKind(null);
+            afterBack(() => insertEmbeds([e]));
           }}
         />
       )}
-      {chartEdit && <ChartEditor initial={chartEdit.chart} onClose={() => setChartEdit(null)} onDone={editChartDone} />}
+      {embedEdit?.kind === 'chart' && (
+        <ChartEditor
+          initial={embedEdit.embed?.kind === 'chart' ? embedEdit.embed.data : undefined}
+          onClose={() => setEmbedEdit(null)}
+          onDone={(data) => editEmbedDone({ kind: 'chart', data })}
+        />
+      )}
+      {embedEdit?.kind === 'wheel' && (
+        <WheelEditor
+          initial={embedEdit.embed?.kind === 'wheel' ? embedEdit.embed.data : undefined}
+          onClose={() => setEmbedEdit(null)}
+          onDone={(data) => editEmbedDone({ kind: 'wheel', data })}
+        />
+      )}
     </StudyScreen>
   );
 }

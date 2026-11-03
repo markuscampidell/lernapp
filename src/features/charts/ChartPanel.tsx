@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
 import { Icon } from '../../components/Icon';
 import { downloadBlob } from '../../lib/files';
 import { ChartEditor } from './ChartEditor';
-import { chartSvg, copyChart, formatNumber, parseChart, prepareCopy, type Prepared } from './chart';
+import { chartSvg, formatNumber, parseChart } from './chart';
+import { useEmbedCopy } from '../docs/embeds';
 
 /** Ansicht einer Diagramm-Datei: Diagramm, Kopieren (zum Einfügen in Text-Dokumente), Bearbeiten. */
 export function ChartPanel({ file, text }: { file: FileItem; text: string }) {
@@ -12,7 +13,8 @@ export function ChartPanel({ file, text }: { file: FileItem; text: string }) {
   const chart = useMemo(() => parseChart(text), [text]);
   const svg = useMemo(() => chartSvg(chart), [chart]);
   const [editing, setEditing] = useState(false);
-  const copy = useChartCopy(chart);
+  const embed = useMemo(() => ({ kind: 'chart' as const, data: chart }), [chart]);
+  const copy = useEmbedCopy(embed);
   const editable = canModify(file) && (!file.shareId || online);
 
   return (
@@ -52,26 +54,4 @@ export function ChartPanel({ file, text }: { file: FileItem; text: string }) {
       {editing && <ChartEditor file={file} initial={chart} onClose={() => setEditing(false)} />}
     </div>
   );
-}
-
-/** Kopieren vorbereiten (Bild erzeugen), damit der Klick sofort in die Zwischenablage schreiben kann. */
-export function useChartCopy(chart: Parameters<typeof prepareCopy>[0] | null) {
-  const [prepared, setPrepared] = useState<Prepared | null>(null);
-  const [done, setDone] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    setPrepared(null);
-    setDone(false);
-    if (chart) prepareCopy(chart).then((p) => alive && setPrepared(p));
-    return () => {
-      alive = false;
-    };
-  }, [chart]);
-  const run = async () => {
-    if (!prepared) return;
-    await copyChart(prepared);
-    // Auch wenn nur die App-interne Kopie klappt, kann man in der App einfügen.
-    setDone(true);
-  };
-  return { prepared, done, run };
 }

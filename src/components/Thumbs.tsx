@@ -17,6 +17,7 @@ const KIND_ICON: Record<FileKind, IconName> = {
   quiz: 'quiz',
   richtext: 'richdoc',
   chart: 'chart',
+  wheel: 'wheel',
   other: 'file',
 };
 

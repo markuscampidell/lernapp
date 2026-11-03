@@ -36,6 +36,8 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
 - **Diagramme**: Säulen, Balken, Linie, Kreis, Ring – Werte als Tabelle oder als Text („Mathe: 12“ pro Zeile). „Kopieren“ legt das
   Diagramm in die Zwischenablage (auch als Bild für andere Apps); in einem Text-Dokument einfügen (Strg+V bzw. lange tippen → Einfügen)
   oder dort über das Diagramm-Symbol in der Leiste. Eingefügte Diagramme lassen sich im Dokument antippen und bearbeiten.
+- **Glücksrad**: Einträge als Liste oder Text („×2“ = doppelt so großes Feld), optional „Gezogene entfernen“. Kopieren und in
+  Text-Dokumente einfügen wie Diagramme – dort ist es drehbar (jede Person dreht für sich).
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
 ## Entwickeln

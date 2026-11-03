@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { TextLine } from '../../components/TextLine';
+import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
@@ -48,16 +49,17 @@ export function ChartEditor({
 }) {
   const embedded = !!onDone;
   const [name, setName] = useState(file?.name ?? '');
+  const [description, setDescription] = useState(file?.description ?? '');
   const [chart, setChart] = useState<Chart>(() => (initial ? { ...initial, points: initial.points.length ? initial.points : [newPoint()] } : emptyChart()));
   const [mode, setMode] = useState<'table' | 'text'>('table');
   const [text, setText] = useState('');
   // Rohtext der Zahlenfelder (damit "1," oder "-" beim Tippen stehen bleiben).
   const [raw, setRaw] = useState<Record<string, string>>({});
-  const start = useRef(JSON.stringify({ name, chart }));
+  const start = useRef(JSON.stringify({ name, description, chart }));
   const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: CHART_EXT, mime: CHART_MIME });
   const lastLabel = useRef<HTMLDivElement>(null);
 
-  const dirty = JSON.stringify({ name, chart }) !== start.current;
+  const dirty = JSON.stringify({ name, description, chart }) !== start.current;
   const svg = useMemo(() => chartSvg(chart), [chart]);
   const round = chart.chart === 'pie' || chart.chart === 'donut';
 
@@ -87,7 +89,7 @@ export function ChartEditor({
       return;
     }
     if (!name.trim()) return setErr('Gib dem Diagramm einen Namen.');
-    if (await save(name, chartBlob(c))) onClose();
+    if (await save(name, chartBlob(c), description)) onClose();
   };
 
   return (
@@ -113,6 +115,7 @@ export function ChartEditor({
             <TextLine autoFocus={!file} value={name} onChange={setName} placeholder="z. B. Noten im Semester" maxLength={120} />
           </div>
         )}
+        {!embedded && <DescriptionField value={description} onChange={setDescription} />}
 
         <div className="segmented chart-types" role="tablist" aria-label="Diagrammart" data-no-swipe>
           {CHART_TYPES.map((t) => (

@@ -14,6 +14,7 @@ export type FileKind =
   | 'quiz'
   | 'richtext'
   | 'chart'
+  | 'wheel'
   | 'other';
 
 const EXT: Record<string, FileKind> = {
@@ -22,6 +23,7 @@ const EXT: Record<string, FileKind> = {
   quiz: 'quiz',
   dokument: 'richtext',
   diagramm: 'chart',
+  gluecksrad: 'wheel',
   pdf: 'pdf',
   ppt: 'presentation', pptx: 'presentation', odp: 'presentation', key: 'presentation', pps: 'presentation', ppsx: 'presentation',
   doc: 'document', docx: 'document', odt: 'document', rtf: 'document', pages: 'document',
@@ -64,6 +66,7 @@ export const KIND_LABEL: Record<FileKind, string> = {
   quiz: 'Quiz',
   richtext: 'Text-Dokument',
   chart: 'Diagramm',
+  wheel: 'Glücksrad',
   other: 'Datei',
 };
 

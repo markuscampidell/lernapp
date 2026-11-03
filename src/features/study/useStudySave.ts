@@ -6,13 +6,14 @@ import { isRemoteBlob, remotePath } from '../../storage/blobs';
 
 /** Speichert eine Lern-Datei: neu im Ordner anlegen oder Inhalt (und Namen) einer bestehenden ersetzen. */
 export function useStudySave(opts: { file?: FileItem; folderId?: string; ext: string; mime: string }) {
-  const { addFiles, replaceFileContent, userName, me } = useLibrary();
+  const { addFiles, replaceFileContent, updateFile, userName, me } = useLibrary();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // Stand des Inhalts beim Öffnen – hat ihn inzwischen jemand anderes ersetzt, wird vor dem Überschreiben gewarnt.
   const base = useRef(opts.file && isRemoteBlob(opts.file.blobId) ? remotePath(opts.file.blobId) : null);
 
-  const save = async (name: string, blob: Blob) => {
+  /** description = Beschreibung (undefined = unverändert lassen). */
+  const save = async (name: string, blob: Blob, description?: string) => {
     setBusy(true);
     setErr(null);
     try {
@@ -30,10 +31,12 @@ export function useStudySave(opts: { file?: FileItem; folderId?: string; ext: st
           }
         }
         await replaceFileContent(opts.file, blob, title);
+        if (description !== undefined && description.trim() !== (opts.file.description ?? '').trim())
+          await updateFile({ ...opts.file, name: title }, { description: description.trim() });
         if (opts.file.shareId) base.current = (await contentInfo(opts.file.id).catch(() => null))?.blobPath ?? base.current;
       } else {
         const filename = `${title}.${opts.ext}`;
-        await addFiles(opts.folderId!, [{ file: new File([blob], filename, { type: opts.mime }), filename, name: title }]);
+        await addFiles(opts.folderId!, [{ file: new File([blob], filename, { type: opts.mime }), filename, name: title, description: description?.trim() || undefined }]);
       }
       return true;
     } catch (e) {

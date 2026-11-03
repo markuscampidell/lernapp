@@ -1,6 +1,6 @@
 // Text-Dokumente sind HTML. Weil sie auch von anderen Personen stammen können (geteilte Ordner),
 // wird vor dem Anzeigen/Einfügen alles entfernt, was nicht ausdrücklich erlaubt ist.
-import { chartJson, parseChart } from '../charts/chart';
+import { EMBED_KINDS, embedJson, parseEmbed } from './embeds';
 
 export const DOC_EXT = 'dokument';
 export const DOC_MIME = 'application/vnd.lernapp.dokument+html';
@@ -59,11 +59,12 @@ function clean(node: Node, out: Node, doc: Document) {
       }
       return;
     }
-    // Eingebettetes Diagramm: nur die Daten werden gespeichert, gezeichnet wird beim Anzeigen.
-    if (el.hasAttribute('data-chart') && (tag === 'figure' || tag === 'div' || tag === 'span' || tag === 'p')) {
+    // Eingebettetes Diagramm/Glücksrad: nur die Daten werden gespeichert, gezeichnet wird beim Anzeigen.
+    const kind = EMBED_KINDS.find((k) => el.hasAttribute(`data-${k}`));
+    if (kind && (tag === 'figure' || tag === 'div' || tag === 'span' || tag === 'p')) {
       const fig = doc.createElement('figure');
-      fig.className = 'chart';
-      fig.setAttribute('data-chart', chartJson(parseChart(el.getAttribute('data-chart') ?? '')));
+      fig.className = kind;
+      fig.setAttribute(`data-${kind}`, embedJson(parseEmbed(kind, el.getAttribute(`data-${kind}`) ?? '')));
       out.appendChild(fig);
       return;
     }
@@ -87,6 +88,9 @@ function clean(node: Node, out: Node, doc: Document) {
     if (target instanceof HTMLElement && ALIGNABLE.has(mapped)) {
       const a = alignOf(el);
       if (a) target.setAttribute('style', `text-align: ${a}`);
+      // Einrückung (Tab) von Absätzen/Überschriften: Stufe 1–8.
+      const ind = parseInt(el.getAttribute('data-indent') ?? '', 10);
+      if (mapped !== 'li' && ind >= 1 && ind <= 8) target.setAttribute('data-indent', String(ind));
     }
     // Checklisten: Klasse, Modus (gemeinsam) und die IDs der Punkte (für die Häkchen) behalten.
     if (target instanceof HTMLElement && mapped === 'ul' && el.classList.contains('checklist')) {
@@ -102,9 +106,64 @@ function clean(node: Node, out: Node, doc: Document) {
   });
 }
 
+const BLOCK_SEL = 'ul, ol, p, h2, h3, blockquote, pre, figure, div';
+/**
+ * Browser legen Listen beim Bearbeiten gern in einen Absatz (<p><ul>…</ul></p>) – das ist ungültig und verschiebt Einzüge.
+ * Absätze mit Blöcken darin werden aufgelöst: die Blöcke kommen davor, Text dazwischen in eigene Absätze.
+ * Gibt true zurück, wenn etwas geändert wurde.
+ */
+export function normalizeBlocks(root: ParentNode): boolean {
+  let changed = false;
+  // Listenpunkte ohne Liste (sonst steht der Punkt ganz links am Rand) in eine Liste packen.
+  for (const li of Array.from(root.querySelectorAll('li'))) {
+    const parent = li.parentElement;
+    if (!parent || parent.matches('ul, ol')) continue;
+    changed = true;
+    const prev = li.previousElementSibling;
+    if (prev?.matches('ul') && prev.getAttribute('data-orphans') === '1') prev.appendChild(li);
+    else {
+      const ul = li.ownerDocument.createElement('ul');
+      ul.setAttribute('data-orphans', '1');
+      parent.insertBefore(ul, li);
+      ul.appendChild(li);
+    }
+  }
+  root.querySelectorAll('ul[data-orphans]').forEach((ul) => ul.removeAttribute('data-orphans'));
+  for (let round = 0; round < 6; round++) {
+    const bad = Array.from(root.querySelectorAll('p')).filter((p) => Array.from(p.children).some((c) => c.matches(BLOCK_SEL)));
+    if (!bad.length) break;
+    changed = true;
+    for (const p of bad) {
+      const parent = p.parentNode;
+      if (!parent) continue;
+      const doc = p.ownerDocument;
+      let run: HTMLElement | null = null;
+      for (const node of Array.from(p.childNodes)) {
+        if (node.nodeType === Node.ELEMENT_NODE && (node as Element).matches(BLOCK_SEL)) {
+          run = null;
+          parent.insertBefore(node, p);
+          continue;
+        }
+        if (!run) {
+          run = doc.createElement('p');
+          if (p.style.textAlign) run.style.textAlign = p.style.textAlign;
+          if (p.dataset.indent) run.dataset.indent = p.dataset.indent;
+          parent.insertBefore(run, p);
+        }
+        run.appendChild(node);
+      }
+      p.remove();
+    }
+  }
+  // Leere Absätze, die dabei entstanden sind (nur Leerraum), entfernen.
+  if (changed) root.querySelectorAll('p').forEach((p) => !p.textContent?.trim() && !p.querySelector('img, br, span.math') && p.remove());
+  return changed;
+}
+
 /** Erlaubtes HTML übrig lassen (Absätze, Überschriften, Listen, Fett/Kursiv/…, Links, eingebettete Bilder). */
 export function sanitizeHtml(html: string): string {
   const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  normalizeBlocks(parsed.body);
   const doc = document.implementation.createHTMLDocument('');
   const root = doc.createElement('div');
   clean(parsed.body, root, doc);

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { TextLine } from '../../components/TextLine';
+import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { Pager, StudyScreen } from './StudyScreen';
 import { CARDS_EXT, CARDS_MIME, cardsBlob, newCard, type Card } from './format';
@@ -11,15 +12,16 @@ import { MathPreview } from '../../components/MathText';
 /** Karteikarten anlegen/bearbeiten: eine Karte pro Seite (Vorder- und Rückseite). */
 export function CardsEditor({ file, folderId, initial, onClose }: { file?: FileItem; folderId?: string; initial?: Card[]; onClose: () => void }) {
   const [name, setName] = useState(file?.name ?? '');
+  const [description, setDescription] = useState(file?.description ?? '');
   const [cards, setCards] = useState<Card[]>(() => (initial?.length ? initial : [newCard()]));
   const [index, setIndex] = useState(0);
-  const start = useRef(JSON.stringify({ name, cards }));
+  const start = useRef(JSON.stringify({ name, description, cards }));
   const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: CARDS_EXT, mime: CARDS_MIME });
   const frontRef = useRef<HTMLTextAreaElement>(null);
 
   const card = cards[Math.min(index, cards.length - 1)];
   const filled = useMemo(() => cards.filter((c) => c.front.trim() || c.back.trim()).length, [cards]);
-  const dirty = JSON.stringify({ name, cards }) !== start.current;
+  const dirty = JSON.stringify({ name, description, cards }) !== start.current;
 
   const update = (patch: Partial<Card>) => setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, ...patch } : c)));
   const go = (i: number) => {
@@ -45,7 +47,7 @@ export function CardsEditor({ file, folderId, initial, onClose }: { file?: FileI
   const submit = async () => {
     if (!name.trim()) return setErr('Gib den Karteikarten einen Namen.');
     if (filled === 0) return setErr('Füge mindestens eine Karte hinzu.');
-    if (await save(name, cardsBlob(cards))) onClose();
+    if (await save(name, cardsBlob(cards), description)) onClose();
   };
 
   return (
@@ -70,6 +72,7 @@ export function CardsEditor({ file, folderId, initial, onClose }: { file?: FileI
           </div>
           <TextLine autoFocus={!file} value={name} onChange={setName} placeholder="z. B. Vokabeln Kapitel 1" maxLength={120} enterKeyHint="next" onEnter={() => frontRef.current?.focus()} />
         </div>
+        <DescriptionField value={description} onChange={setDescription} />
 
         <Pager index={index} count={cards.length} noun="Karte" onIndex={go} />
 

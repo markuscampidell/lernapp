@@ -6,7 +6,13 @@ import { sanitizeHtml } from './sanitize';
 import { DocEditor } from './DocEditor';
 import { renderMathIn } from '../../lib/math';
 import { applyChecks, checkboxHit, useChecks } from './checks';
-import { copyChart, parseChart, prepareCopy, renderChartsIn, type Prepared } from '../charts/chart';
+import { createRoot, type Root } from 'react-dom/client';
+import { copyPrepared, embedOf, prepareEmbed, renderEmbedsIn, useEmbedCopy, type EmbedData, type Prepared } from './embeds';
+import { WheelSpinner } from '../wheel/WheelSpinner';
+import { parseWheel } from '../wheel/wheel';
+
+/** Drehbare Glücksräder im Dokument (je Figur eine React-Wurzel). */
+const WHEEL_ROOTS = new WeakMap<Element, Root>();
 
 /** Anzeige eines Text-Dokuments (bereinigtes HTML) mit Bearbeiten-Knopf, abhakbaren Checklisten und kopierbaren Diagrammen. */
 export function DocPanel({ file, text }: { file: FileItem; text: string }) {
@@ -22,13 +28,32 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
     const el = article.current;
     if (!el) return;
     renderMathIn(el);
-    renderChartsIn(el, { copyButton: true });
+    // Diagramme statisch (mit Kopieren-Knopf), Glücksräder drehbar (eigene kleine React-Wurzel je Rad).
+    renderEmbedsIn(el, { copyButton: true, skip: ['wheel'] });
     applyChecks(el, checks.isDone);
     const map = new Map<Element, Prepared>();
     prepared.current = map;
     el.querySelectorAll<HTMLElement>('figure.chart').forEach((fig) => {
-      prepareCopy(parseChart(fig.dataset.chart ?? '')).then((p) => map.set(fig, p));
+      const e = embedOf(fig);
+      if (e) prepareEmbed(e).then((p) => map.set(fig, p));
     });
+    const figs = Array.from(el.querySelectorAll<HTMLElement>('figure.wheel'));
+    figs.forEach((fig) => {
+      const wheel = parseWheel(fig.dataset.wheel ?? '');
+      let root = WHEEL_ROOTS.get(fig);
+      if (!root) WHEEL_ROOTS.set(fig, (root = createRoot(fig)));
+      root.render(<WheelSpinner wheel={wheel} actions={<EmbedCopyButton embed={{ kind: 'wheel', data: wheel }} />} />);
+    });
+    return () => {
+      // Erst nach dem aktuellen Rendern abbauen – und nur Räder, die nicht mehr im Dokument stehen.
+      setTimeout(() =>
+        figs.forEach((fig) => {
+          if (fig.isConnected) return;
+          WHEEL_ROOTS.get(fig)?.unmount();
+          WHEEL_ROOTS.delete(fig);
+        }),
+      );
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [html]);
   useEffect(() => {
@@ -39,10 +64,11 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
     const t = e.target as HTMLElement;
     const copyBtn = t.closest?.('.chart-copy') as HTMLButtonElement | null;
     if (copyBtn) {
-      const fig = copyBtn.closest('figure.chart');
-      const p = fig && (prepared.current.get(fig) ?? (await prepareCopy(parseChart((fig as HTMLElement).dataset.chart ?? ''))));
+      const fig = copyBtn.closest('figure');
+      const e = fig && embedOf(fig);
+      const p = fig && e && (prepared.current.get(fig) ?? (await prepareEmbed(e)));
       if (!p) return;
-      await copyChart(p);
+      await copyPrepared(p);
       const label = copyBtn.lastChild;
       if (label) label.textContent = ' Kopiert';
       setTimeout(() => label && (label.textContent = ' Kopieren'), 2000);
@@ -70,5 +96,16 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
       <article ref={article} className="doc-content card" onClick={onClick} dangerouslySetInnerHTML={{ __html: html || '<p class="muted">(leer)</p>' }} />
       {editing && <DocEditor file={file} initial={text} onClose={() => setEditing(false)} />}
     </div>
+  );
+}
+
+/** Kopieren-Knopf für ein eingebettetes Glücksrad in der Ansicht. */
+function EmbedCopyButton({ embed }: { embed: EmbedData }) {
+  const stable = useMemo(() => embed, [embed.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  const copy = useEmbedCopy(stable);
+  return (
+    <button type="button" className="btn ghost small" onClick={copy.run} disabled={!copy.prepared}>
+      <Icon name={copy.done ? 'check' : 'copy'} size={16} /> {copy.done ? 'Kopiert' : 'Kopieren'}
+    </button>
   );
 }

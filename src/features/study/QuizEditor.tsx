@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { TextLine } from '../../components/TextLine';
+import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { Pager, StudyScreen } from './StudyScreen';
 import { newAnswer, newQuestion, questionProblem, QUIZ_EXT, QUIZ_MIME, quizBlob, type Answer, type Question } from './format';
@@ -14,15 +15,16 @@ const LETTERS = 'ABCDEF';
 /** Multiple-Choice-Quiz anlegen/bearbeiten: eine Frage pro Seite. */
 export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileItem; folderId?: string; initial?: Question[]; onClose: () => void }) {
   const [name, setName] = useState(file?.name ?? '');
+  const [description, setDescription] = useState(file?.description ?? '');
   const [questions, setQuestions] = useState<Question[]>(() => (initial?.length ? initial : [newQuestion()]));
   const [index, setIndex] = useState(0);
-  const start = useRef(JSON.stringify({ name, questions }));
+  const start = useRef(JSON.stringify({ name, description, questions }));
   const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: QUIZ_EXT, mime: QUIZ_MIME });
   const questionRef = useRef<HTMLTextAreaElement>(null);
 
   const q = questions[Math.min(index, questions.length - 1)];
   const filled = questions.filter((x) => x.text.trim()).length;
-  const dirty = JSON.stringify({ name, questions }) !== start.current;
+  const dirty = JSON.stringify({ name, description, questions }) !== start.current;
   const bad = useMemo(() => new Set(questions.map((x, i) => (questionProblem(x) ? i : -1)).filter((i) => i >= 0)), [questions]);
   const problem = questionProblem(q);
 
@@ -56,7 +58,7 @@ export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileIt
       setIndex(first);
       return setErr(`Frage ${first + 1}: ${questionProblem(questions[first])}`);
     }
-    if (await save(name, quizBlob(questions))) onClose();
+    if (await save(name, quizBlob(questions), description)) onClose();
   };
 
   return (
@@ -81,6 +83,7 @@ export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileIt
           </div>
           <TextLine autoFocus={!file} value={name} onChange={setName} placeholder="z. B. Quiz Lineare Algebra" maxLength={120} enterKeyHint="next" onEnter={() => questionRef.current?.focus()} />
         </div>
+        <DescriptionField value={description} onChange={setDescription} />
 
         <Pager index={index} count={questions.length} noun="Frage" onIndex={go} marks={bad} />
 

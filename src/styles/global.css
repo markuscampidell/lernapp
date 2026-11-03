@@ -1835,7 +1835,8 @@ textarea.text-line.doc-title {
   margin-bottom: 0;
 }
 .doc-content p {
-  margin: 0 0 0.7em;
+  /* Kein Abstand zwischen Absätzen: Enter = neue Zeile, zweimal Enter = Leerzeile. */
+  margin: 0;
 }
 .doc-content h2 {
   margin: 1.1em 0 0.4em;
@@ -2460,4 +2461,110 @@ textarea.text-line.doc-title {
 .access-option .radio-dot {
   align-self: flex-start;
   margin-top: 2px;
+}
+
+/* ---------- Glücksrad ---------- */
+.add-icon.add-wheel,
+.file-thumb.kind-wheel,
+.kind-chip.kind-wheel { color: #d6a12a; background: color-mix(in srgb, #d6a12a 16%, var(--surface)); }
+.wheel-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.wheel-title {
+  font-size: 1.1rem;
+  text-align: center;
+}
+.wheel-stage {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  padding: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.wheel-stage:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.wheel-stage svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.wheel-result {
+  min-height: 1.8em;
+  font-size: 1.25rem;
+  text-align: center;
+}
+.wheel-result .muted {
+  font-size: 0.9rem;
+}
+.wheel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.wheel-left {
+  margin: 0;
+}
+select.wheel-weight {
+  flex: none;
+  width: 66px;
+}
+.doc-content figure.wheel {
+  margin: 0.6em 0 0.9em;
+  padding: 10px 0;
+  border-radius: 12px;
+}
+.doc-content figure.wheel > svg,
+.doc-content figure.wheel .wheel-stage svg {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  margin: 0 auto;
+}
+.doc-editable figure.wheel {
+  cursor: pointer;
+  user-select: none;
+}
+.doc-editable figure.wheel:hover {
+  background: var(--surface-2);
+}
+.doc-editable figure.wheel.selected {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+.doc-content figure.wheel .wheel-actions .btn {
+  font-size: 0.85rem;
+}
+/* Eingerückte Absätze (Tab) */
+.doc-content [data-indent='1'] { margin-left: 2em; }
+.doc-content [data-indent='2'] { margin-left: 4em; }
+.doc-content [data-indent='3'] { margin-left: 6em; }
+.doc-content [data-indent='4'] { margin-left: 8em; }
+.doc-content [data-indent='5'] { margin-left: 10em; }
+.doc-content [data-indent='6'] { margin-left: 12em; }
+.doc-content [data-indent='7'] { margin-left: 14em; }
+.doc-content [data-indent='8'] { margin-left: 16em; }
+/* Verschachtelte Listen: kein zusätzlicher Abstand unten */
+.doc-content li > ul,
+.doc-content li > ol,
+.doc-content ul > ul,
+.doc-content ol > ol,
+.doc-content ul > ol,
+.doc-content ol > ul {
+  margin-bottom: 0;
+}
+textarea.text-line.doc-desc {
+  margin-top: -6px;
+  padding-left: 4px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 0.95rem;
 }
