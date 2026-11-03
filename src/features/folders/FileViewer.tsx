@@ -10,11 +10,8 @@ import { useBackToClose } from '../../lib/router';
 import { FileEditorSheet } from './FileEditorSheet';
 import { CardsPanel, QuizPanel } from '../study/StudyPanels';
 import { DocPanel } from '../docs/DocPanel';
-import { FileShareSheet } from '../share/FileShareSheet';
 import { ShareSheet } from '../share/ShareSheet';
 import { cloudEnabled } from '../../cloud/supabase';
-import { afterBack } from '../../lib/router';
-import type { Folder } from '../../domain/types';
 import { ChartPanel } from '../charts/ChartPanel';
 
 const MAX_TEXT = 2 * 1024 * 1024;
@@ -29,9 +26,8 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const [text, setText] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [missing, setMissing] = useState(false);
-  // Teilen: erst Auswahl (ganzer Ordner / nur diese Datei), dann ggf. der normale Teilen-Dialog des Ordners.
+  // Personen: wer die Datei sieht (über ihren Ordner) – neue Personen sehen nur diese Datei.
   const [sharing, setSharing] = useState(false);
-  const [shareFolder, setShareFolder] = useState<Folder | null>(null);
 
   const kind = fileKind(initial);
   const readsText = kind === 'text' || kind === 'flashcards' || kind === 'quiz' || kind === 'richtext' || kind === 'chart';
@@ -150,7 +146,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
           </button>
         )}
         {cloudEnabled && !isOrphan(file.folderId) && (
-          <button className="icon-btn" aria-label="Teilen" title="Teilen" onClick={() => setSharing(true)}>
+          <button className="icon-btn" aria-label="Personen" title="Personen" onClick={() => setSharing(true)}>
             <Icon name="users" />
           </button>
         )}
@@ -179,17 +175,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
         {body}
       </div>
       {editing && <FileEditorSheet file={file} onClose={() => setEditing(false)} />}
-      {sharing && (
-        <FileShareSheet
-          file={file}
-          onClose={() => setSharing(false)}
-          onFolder={(target) => {
-            setSharing(false);
-            afterBack(() => setShareFolder(target));
-          }}
-        />
-      )}
-      {shareFolder && <ShareSheet folder={shareFolder} onClose={() => setShareFolder(null)} />}
+      {sharing && <ShareSheet file={file} onClose={() => setSharing(false)} />}
     </div>
   );
 }

@@ -25,9 +25,9 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
 - **„Meine Ordner“ auf allen Geräten** (Schalter im Konto): eigene Ordner werden automatisch hochgeladen („mit niemandem geteilt“)
   und erscheinen auf jedem Gerät, auf dem man angemeldet ist. Eigene Ordner stehen immer unter „Meine Ordner“,
   unter „Geteilte Ordner“ nur, was andere mit einem teilen.
-  Einzelne Unterordner lassen sich trotzdem eigens mit anderen teilen (Personen-Symbol im Unterordner) – sie sehen dann nur diesen Unterordner.
-- **Teilen aus einer Datei** (Personen-Symbol in der Datei-Ansicht): entweder den Ordner, in dem sie liegt, ganz normal teilen – oder nur diese Datei.
-  Dann entsteht an derselben Stelle ein Ordner mit ihrem Namen, die Datei kommt hinein und nur dieser Ordner wird geteilt.
+- **Personen** (Personen-Symbol in jedem Ordner und jeder Datei): zeigt, wer den Ordner/die Datei sieht – getrennt nach
+  „Von „Hauptordner““ (fest, nur dort änderbar) und „Nur in diesem Ordner“. Der Besitzer kann Personen hinzufügen; sie sehen dann nur
+  diesen Ordner bzw. nur diese Datei (dafür entsteht ein Ordner mit ihrem Namen). Funktioniert auch mit „Auf allen Geräten“.
 - **Profilbild** (Einstellungen → Konto): Bild wählen, Ausschnitt verschieben/zoomen; erscheint bei Personen und „von …“ an geteilten Einträgen.
 - **Konto löschen**: Eigene geteilte Ordner gehen an eine gewählte Person (oder werden gelöscht). Sie sieht einen Hinweis und kann
   übernehmen – weiter geteilt als Besitzer oder in „Meine Ordner“ auf ihr Gerät – oder ablehnen. Nach 30 Tagen ohne Entscheidung wird alles gelöscht.

@@ -1,20 +1,23 @@
-import { Avatar } from '../../components/Avatar';
 import { useEffect, useMemo, useState } from 'react';
-import type { Folder } from '../../domain/types';
+import type { FileItem, Folder } from '../../domain/types';
 import { subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { useAuth } from '../../cloud/auth';
 import { afterBack, folderHash, replace } from '../../lib/router';
 import { Sheet } from '../../components/Sheet';
 import { Icon } from '../../components/Icon';
+import { Avatar } from '../../components/Avatar';
 import { AccountCard } from '../account/AccountCard';
 import { UserPicker } from './UserPicker';
 
-/** Ordner teilen bzw. Personen eines geteilten Ordners verwalten. */
-export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () => void }) {
+/**
+ * „Personen“ eines Ordners oder einer Datei – überall gleich aufgebaut:
+ * Besitzer, dann wer über den übergeordneten geteilten Ordner Zugriff hat (fest), dann wer nur hier hinzugefügt wurde.
+ * Der Besitzer kann Personen hinzufügen; sie sehen dann nur diesen Ordner (bzw. nur diese Datei).
+ */
+export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder; file?: FileItem; onClose: () => void }) {
   const lib = useLibrary();
   const { user } = useAuth();
-  const share = lib.isRoot(folder) ? lib.shareOf(folder) : undefined;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -26,15 +29,42 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
     refreshRemote();
   }, [refreshRemote, user?.id]);
 
+  // Bei einer Datei: der Ordner, in dem sie liegt.
+  const folder = file ? lib.folders.find((f) => f.id === file.folderId) : target;
+  const name = file ? file.name : folder?.name ?? '…';
+  // Eigener geteilter Ordner (dieser Ordner ist dessen oberster) – nur bei Ordnern.
+  const share = !file && folder && lib.isRoot(folder) ? lib.shareOf(folder) : undefined;
+  // Der geteilte Ordner darüber, über den andere schon Zugriff haben.
+  const above = share ? lib.parentShareOf(share.id) : folder?.shareId ? lib.shareOf(folder) : undefined;
+  // Bei Dateien heißt die Gruppe wie der Ordner, in dem die Datei liegt; bei Ordnern wie der oberste geteilte Ordner darüber.
+  const aboveName = file ? folder?.name ?? '…' : above ? lib.folders.find((f) => f.id === above.rootId)?.name ?? '…' : '';
+  const aboveRootName = above ? lib.folders.find((f) => f.id === above.rootId)?.name ?? '…' : '';
+  const ownerId = share?.ownerId ?? above?.ownerId ?? user?.id ?? '';
+  const amOwner = !!user && ownerId === user.id;
+
   const memberIds = useMemo(() => (share ? lib.members.filter((m) => m.shareId === share.id).map((m) => m.userId) : []), [lib.members, share]);
-  // Wer den Ordner schon über einen äußeren geteilten Ordner sieht (bzw. beim eigens Teilen eines Unterordners: über dessen Ordner).
-  const above = share ? lib.parentShareOf(share.id) : folder.shareId ? lib.shareOf(folder) : undefined;
   const inherited = useMemo(() => new Set(above ? lib.peopleOf(above.id) : []), [above, lib]);
-  // Wer ihn schon sieht, muss nicht noch einmal hinzugefügt werden.
-  const exclude = useMemo(
-    () => new Set([...(user ? [user.id] : []), ...memberIds, ...(share ? [share.ownerId] : []), ...inherited]),
-    [user, memberIds, share, inherited],
-  );
+  const sorted = (ids: Iterable<string>) => [...new Set(ids)].sort((a, b) => lib.userName(a).localeCompare(lib.userName(b), 'de', { sensitivity: 'base' }));
+  const fromAbove = sorted([...inherited].filter((id) => id !== ownerId));
+  const onlyHere = sorted(memberIds.filter((id) => !inherited.has(id) && id !== ownerId));
+  // Wer schon Zugriff hat, kann nicht noch einmal hinzugefügt werden.
+  const exclude = useMemo(() => new Set([ownerId, ...(user ? [user.id] : []), ...memberIds, ...inherited]), [ownerId, user, memberIds, inherited]);
+
+  // Hinzufügen: in den eigenen geteilten Ordner – sonst wird der Ordner (bzw. die Datei in einem eigenen Ordner) neu geteilt.
+  const addProblem = !user
+    ? 'Melde dich an.'
+    : file
+    ? lib.shareFileProblem(file.id)
+    : share
+    ? amOwner
+      ? lib.online
+        ? null
+        : 'Offline – Änderungen sind gerade nicht möglich.'
+      : 'Nur der Besitzer kann Personen hinzufügen.'
+    : folder
+    ? lib.shareProblem(folder.id)
+    : 'Ordner nicht gefunden.';
+  const canAdd = amOwner && !addProblem;
 
   const run = async (label: string, fn: () => Promise<unknown>) => {
     setBusy(label);
@@ -51,201 +81,221 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
     }
   };
 
-  // ---------- Nicht angemeldet ----------
   if (!user) {
     return (
-      <Sheet title="Ordner teilen" onClose={onClose}>
+      <Sheet title={`„${name}“ – Personen`} onClose={onClose}>
         <p className="muted">Zum Teilen brauchst du ein Konto. Melde dich an oder registriere dich – das dauert nur einen Moment.</p>
         <AccountCard />
       </Sheet>
     );
   }
+  if (!folder) return null;
 
-  // ---------- Noch nicht geteilt ----------
-  if (!share) {
-    const problem = lib.shareProblem(folder.id);
-    // Unterordner eines eigenen geteilten Ordners (z. B. „Auf allen Geräten“) wird eigens geteilt.
-    const outer = folder.shareId ? lib.shareOf(folder) : undefined;
-    const outerName = outer ? lib.folders.find((f) => f.id === outer.rootId)?.name ?? '…' : '';
-    const outerPeople = outer ? lib.peopleOf(outer.id).filter((id) => id !== user.id).map((id) => lib.userName(id)) : [];
-    const inner = [...subtreeIds(lib.folders, folder.id)].filter((id) => id !== folder.id && lib.isRoot(lib.folders.find((f) => f.id === id)));
+  const add = async () => {
+    const ids = [...selected];
+    if (share) {
+      if (await run('Wird hinzugefügt …', () => lib.addMembers(share.id, ids))) {
+        setSelected(new Set());
+        setAdding(false);
+      }
+      return;
+    }
+    let newId = folder.id;
+    const here = !file && location.hash.includes(encodeURIComponent(folder.id));
+    const ok = await run('Wird hinzugefügt …', async () => {
+      newId = file ? await lib.shareFile(file.id, ids, (msg) => setBusy(msg)) : await lib.shareFolder(folder.id, ids, (msg) => setBusy(msg));
+    });
+    if (!ok) return;
+    onClose();
+    // Unterordner wurde neu angelegt (neue ID) -> dorthin wechseln.
+    if (newId !== folder.id && here) afterBack(() => replace(folderHash(newId)));
+  };
+
+  // ---------- Personen hinzufügen ----------
+  if (adding) {
+    const inner = !file && !folder.shareId ? [...subtreeIds(lib.folders, folder.id)].filter((id) => id !== folder.id && lib.isRoot(lib.folders.find((f) => f.id === id))) : [];
     return (
       <Sheet
-        title={`„${folder.name}“ teilen`}
+        title="Personen hinzufügen"
         onClose={() => !busy && onClose()}
+        leading={
+          <button className="icon-btn" aria-label="Zurück" onClick={() => (setAdding(false), setSelected(new Set()))} disabled={!!busy}>
+            <Icon name="back" />
+          </button>
+        }
         footer={
-          <button
-            className="btn primary grow"
-            disabled={!!problem || !!busy}
-            onClick={async () => {
-              let newId = folder.id;
-              const here = location.hash.includes(encodeURIComponent(folder.id));
-              const ok = await run('Teilen …', async () => {
-                newId = await lib.shareFolder(folder.id, [...selected], (msg) => setBusy(msg));
-              });
-              if (!ok) return;
-              onClose();
-              // Unterordner wurde neu angelegt (neue ID) -> dorthin wechseln.
-              if (newId !== folder.id && here) afterBack(() => replace(folderHash(newId)));
-            }}
-          >
-            {busy ?? (selected.size ? `Mit ${selected.size} ${selected.size === 1 ? 'Person' : 'Personen'} teilen` : 'Teilen')}
+          <button className="btn primary grow" disabled={!selected.size || !!busy || !!addProblem} onClick={add}>
+            {busy ?? (selected.size ? `${selected.size} ${selected.size === 1 ? 'Person' : 'Personen'} hinzufügen` : 'Hinzufügen')}
           </button>
         }
       >
         <p className="muted small">
-          Der Ordner wird mit allem darin auf den Server geladen und bleibt bei dir unter „Meine Ordner“. Die ausgewählten Personen sehen ihn unter
-          „Geteilte Ordner“ und können Dateien und Unterordner hinzufügen. Ändern oder löschen dürfen sie nur, was sie selbst erstellt haben – du als
-          Besitzer darfst alles. Max. 50 MB pro Datei.
+          {file
+            ? `Die neuen Personen sehen nur diese Datei. Dafür entsteht in „${folder.name}“ der Ordner „${file.name}“, die Datei kommt hinein und nur er wird mit ihnen geteilt.`
+            : above
+            ? `Die neuen Personen sehen nur „${folder.name}“, nicht den Rest von „${aboveName}“.`
+            : share
+            ? `Die neuen Personen sehen „${folder.name}“ mit allem darin.`
+            : `„${folder.name}“ wird mit allem darin auf den Server geladen und bleibt bei dir unter „Meine Ordner“. Die Personen sehen ihn unter „Geteilte Ordner“. Max. 50 MB pro Datei.`}
         </p>
-        {outer && !problem && (
+        {inner.length > 0 && (
           <p className="notice info">
-            Liegt in „{outerName}“{outerPeople.length ? ` (geteilt mit ${outerPeople.join(', ')} – sie sehen ihn weiterhin)` : ''}. Die ausgewählten Personen sehen nur
-            diesen Ordner, nicht den Rest von „{outerName}“.
+            {inner.length === 1 ? 'Ein Ordner darin ist' : `${inner.length} Ordner darin sind`} bereits eigens geteilt – die neuen Personen sehen{' '}
+            {inner.length === 1 ? 'ihn' : 'sie'} mit.
           </p>
         )}
-        {inner.length > 0 && !problem && (
-          <p className="notice info">
-            {inner.length === 1 ? 'Ein Ordner darin ist' : `${inner.length} Ordner darin sind`} bereits geteilt. Die ausgewählten Personen sehen{' '}
-            {inner.length === 1 ? 'ihn' : 'sie'} mit – wer bisher nur {inner.length === 1 ? 'diesen Ordner' : 'diese Ordner'} hatte, sieht weiterhin nur{' '}
-            {inner.length === 1 ? 'ihn' : 'sie'}.
-          </p>
-        )}
-        {problem ? <p className="notice warning">{problem}</p> : <UserPicker profiles={lib.profiles} exclude={exclude} selected={selected} onChange={setSelected} />}
+        {addProblem ? <p className="notice warning">{addProblem}</p> : <UserPicker profiles={lib.profiles} exclude={exclude} selected={selected} onChange={setSelected} />}
         {err && <p className="notice critical">{err}</p>}
       </Sheet>
     );
   }
 
-  // ---------- Geteilt: Personen verwalten ----------
-  const owner = share.ownerId === user.id;
-  const people = [share.ownerId, ...memberIds];
-  // Liegt in einem anderen geteilten Ordner: dessen Personen sehen ihn mit.
-  const parent = lib.parentShareOf(share.id);
-  const parentName = parent ? lib.folders.find((f) => f.id === parent.rootId)?.name ?? '…' : '';
-  const viaParent = parent ? lib.peopleOf(parent.id).filter((id) => !people.includes(id)) : [];
-  const direct = owner || memberIds.includes(user.id);
-  /** Unterordner (eigens geteilt) darin, zu denen diese Person zusätzlich direkt hinzugefügt ist. */
-  const innerSharesWith = (personId: string) =>
-    lib.shares
+  // ---------- Personen ansehen ----------
+  // Verlassen: dort, wo ich wirklich Mitglied bin. Habe ich über einen äußeren Ordner Zugriff, hilft nur, den zu verlassen.
+  const meDirect = !!share && memberIds.includes(user.id) && !inherited.has(user.id);
+  const viaShare = (() => {
+    if (meDirect || amOwner) return undefined;
+    for (let s = above, i = 0; s && i < 16; s = lib.parentShareOf(s.id), i++) if (lib.members.some((m) => m.shareId === s!.id && m.userId === user.id)) return s;
+    return undefined;
+  })();
+  const aboveMember = !!viaShare;
+  const viaName = viaShare ? lib.folders.find((f) => f.id === viaShare.rootId)?.name ?? '…' : '';
+  const footer = busy ? (
+    <button className="btn ghost grow" disabled>
+      {busy}
+    </button>
+  ) : share && amOwner && onlyHere.length > 0 ? (
+    <button
+      className="btn ghost danger grow"
+      disabled={!lib.online}
+      onClick={async () => {
+        const text = above
+          ? `Teilen von „${folder.name}“ beenden?\n\nDie nur hier hinzugefügten Personen sehen den Ordner dann nicht mehr. Die Personen von „${aboveName}“ sehen ihn weiterhin.`
+          : lib.sync.on
+          ? `Teilen von „${folder.name}“ beenden?\n\nDie anderen Personen sehen den Ordner dann nicht mehr. Für dich bleibt er auf allen deinen Geräten.`
+          : `Teilen von „${folder.name}“ beenden?\n\nAlle Inhalte (auch die der anderen) werden auf dieses Gerät heruntergeladen und für alle anderen entfernt.`;
+        if (!confirm(text)) return;
+        if (await run('Wird beendet …', () => lib.stopSharing(share.id, (msg) => setBusy(msg)))) onClose();
+      }}
+    >
+      Teilen beenden
+    </button>
+  ) : meDirect || aboveMember ? (
+    <button
+      className="btn ghost danger grow"
+      disabled={!lib.online}
+      onClick={async () => {
+        const which = meDirect ? share! : viaShare!;
+        const whichName = meDirect ? folder.name : viaName;
+        if (!confirm(`„${whichName}“ verlassen? Du siehst den Ordner dann nicht mehr. Deine Einträge darin bleiben für die anderen erhalten.`)) return;
+        if (await run('Wird verlassen …', () => lib.leaveShare(which.id))) {
+          onClose();
+          afterBack(() => replace('#geteilt'));
+        }
+      }}
+    >
+      „{meDirect ? folder.name : viaName}“ verlassen
+    </button>
+  ) : undefined;
+
+  const removeOnlyHere = (id: string) => {
+    if (!share) return;
+    const keeps = innerSharesWith(id);
+    const text =
+      `${lib.userName(id)} aus „${folder.name}“ entfernen?` +
+      (keeps.length ? `\n\n${lib.userName(id)} wurde auch eigens zu ${keeps.map((n) => `„${n}“`).join(', ')} hinzugefügt und sieht ${keeps.length === 1 ? 'diesen Ordner' : 'diese Ordner'} weiterhin.` : '');
+    if (confirm(text)) run('Wird entfernt …', () => lib.removeMember(share.id, id));
+  };
+  /** Eigens geteilte Ordner darin, zu denen diese Person zusätzlich direkt hinzugefügt ist (behält dort Zugriff). */
+  function innerSharesWith(personId: string) {
+    return lib.shares
       .filter((s) => {
-        if (s.id === share.id || !lib.members.some((m) => m.shareId === s.id && m.userId === personId)) return false;
-        for (let p = lib.parentShareOf(s.id), i = 0; p && i < 16; p = lib.parentShareOf(p.id), i++) if (p.id === share.id) return true;
+        if (s.id === share!.id || !lib.members.some((m) => m.shareId === s.id && m.userId === personId)) return false;
+        for (let p = lib.parentShareOf(s.id), i = 0; p && i < 16; p = lib.parentShareOf(p.id), i++) if (p.id === share!.id) return true;
         return false;
       })
       .map((s) => lib.folders.find((f) => f.id === s.rootId)?.name ?? '…');
+  }
 
+  const nobody = fromAbove.length === 0 && onlyHere.length === 0;
   return (
-    <Sheet
-      title={`„${folder.name}“ – Personen`}
-      onClose={() => !busy && onClose()}
-      footer={
-        adding ? (
-          <>
-            <button className="btn ghost" onClick={() => (setAdding(false), setSelected(new Set()))} disabled={!!busy}>
-              Abbrechen
-            </button>
-            <button
-              className="btn primary grow"
-              disabled={!selected.size || !!busy}
-              onClick={async () => {
-                if (await run('Wird hinzugefügt …', () => lib.addMembers(share.id, [...selected]))) {
-                  setSelected(new Set());
-                  setAdding(false);
-                }
-              }}
-            >
-              {busy ?? `${selected.size || ''} hinzufügen`.trim()}
-            </button>
-          </>
-        ) : owner && (parent || lib.sync.on) && memberIds.length === 0 ? undefined : owner ? (
-          <button
-            className="btn ghost danger grow"
-            disabled={!!busy || !lib.online}
-            onClick={async () => {
-              const text = parent
-                ? `Teilen von „${folder.name}“ beenden?\n\nDie hier hinzugefügten Personen sehen den Ordner dann nicht mehr. Er bleibt in „${parentName}“ für alle Personen von dort.`
-                : lib.sync.on
-                ? `Teilen von „${folder.name}“ beenden?\n\nDie anderen Personen sehen den Ordner dann nicht mehr. Für dich bleibt er auf allen deinen Geräten.`
-                : `Teilen von „${folder.name}“ beenden?\n\nAlle Inhalte (auch die der anderen) werden auf dieses Gerät heruntergeladen und für alle anderen entfernt.`;
-              if (!confirm(text)) return;
-              if (await run('Wird beendet …', () => lib.stopSharing(share.id, (msg) => setBusy(msg)))) onClose();
-            }}
-          >
-            {busy ?? 'Teilen beenden'}
-          </button>
-        ) : !direct ? undefined : (
-          <button
-            className="btn ghost danger grow"
-            disabled={!!busy || !lib.online}
-            onClick={async () => {
-              if (!confirm(`„${folder.name}“ verlassen? Du siehst den Ordner dann nicht mehr. Deine Einträge darin bleiben für die anderen erhalten.`)) return;
-              if (await run('Wird verlassen …', () => lib.leaveShare(share.id))) {
-                onClose();
-                afterBack(() => replace('#geteilt'));
-              }
-            }}
-          >
-            {busy ?? 'Ordner verlassen'}
-          </button>
-        )
-      }
-    >
-      {adding ? (
-        <UserPicker profiles={lib.profiles} exclude={exclude} selected={selected} onChange={setSelected} />
-      ) : (
-        <>
+    <Sheet title={`„${name}“ – Personen`} onClose={() => !busy && onClose()} footer={footer}>
+      <div className="people">
+        <PersonRow id={ownerId} you={ownerId === user.id} label="Besitzer" />
+      </div>
+
+      {fromAbove.length > 0 && (
+        <section className="people-group">
+          <h3 className="people-group-title">
+            <Icon name="folder" size={15} /> Von „{aboveName}“
+          </h3>
+          <p className="muted small">
+            {file ? 'Alle Personen dieses Ordners sehen die Datei.' : `Alle Personen von „${aboveName}“ sehen diesen Ordner.`} Das lässt sich hier nicht ändern
+            {amOwner ? ` – nur in „${aboveRootName}“ selbst.` : '.'}
+          </p>
           <div className="people">
-            {people.map((id) => (
-              <div key={id} className="person">
-                <Avatar id={id} />
-                <div className="card-main">
-                  <strong className="ellipsis">
-                    {lib.userName(id)}
-                    {id === user.id && <span className="muted"> (du)</span>}
-                  </strong>
-                  <span className="muted small">
-                    {id === share.ownerId ? 'Besitzer' : inherited.has(id) ? `Mitglied von „${parentName}“` : 'Mitglied'}
-                  </span>
-                </div>
-                {/* Wer über den äußeren Ordner Zugriff hat, kann hier nicht entfernt werden – dort entfernen. */}
-                {owner && id !== share.ownerId && !inherited.has(id) && (
-                  <button
-                    className="btn ghost small danger"
-                    disabled={!!busy || !lib.online}
-                    onClick={() => {
-                      const keeps = innerSharesWith(id);
-                      const text =
-                        `${lib.userName(id)} aus „${folder.name}“ entfernen?` +
-                        (keeps.length ? `\n\n${lib.userName(id)} wurde auch eigens zu ${keeps.map((n) => `„${n}“`).join(', ')} hinzugefügt und sieht ${keeps.length === 1 ? 'diesen Ordner' : 'diese Ordner'} weiterhin.` : '');
-                      if (confirm(text)) run('…', () => lib.removeMember(share.id, id));
-                    }}
-                  >
-                    Entfernen
-                  </button>
-                )}
-              </div>
+            {fromAbove.map((id) => (
+              <PersonRow key={id} id={id} you={id === user.id} label="Mitglied" />
             ))}
           </div>
-          {parent && (
-            <p className="muted small">
-              Liegt in „{parentName}“ – {viaParent.length ? `außerdem sehen ihn ${viaParent.map((id) => (id === user.id ? 'du' : lib.userName(id))).join(', ')}.` : 'alle Personen von dort sehen ihn auch.'}
-            </p>
-          )}
-          {owner && (
-            <button className="btn ghost" onClick={() => setAdding(true)} disabled={!lib.online}>
-              <Icon name="plus" size={18} /> Personen hinzufügen
-            </button>
-          )}
-          <p className="muted small">
-            {owner
-              ? 'Mitglieder können Dateien und Unterordner hinzufügen und ihre eigenen Einträge ändern oder löschen. Du kannst alles ändern.'
-              : `Du kannst Dateien und Unterordner hinzufügen und deine eigenen Einträge ändern oder löschen. Alles andere verwaltet ${lib.userName(share.ownerId)}.`}
-          </p>
-          {!lib.online && <p className="notice warning">Offline – Änderungen sind gerade nicht möglich.</p>}
-        </>
+        </section>
       )}
+
+      {onlyHere.length > 0 && (
+        <section className="people-group">
+          <h3 className="people-group-title">
+            <Icon name="users" size={15} /> {above ? 'Nur in diesem Ordner' : 'Mitglieder'}
+          </h3>
+          {above && <p className="muted small">Diese Personen sehen nur „{folder.name}“, nicht den Rest von „{aboveName}“.</p>}
+          {(
+            <div className="people">
+              {onlyHere.map((id) => (
+                <PersonRow key={id} id={id} you={id === user.id} label="Mitglied">
+                  {amOwner && (
+                    <button className="btn ghost small danger" disabled={!!busy || !lib.online} onClick={() => removeOnlyHere(id)}>
+                      Entfernen
+                    </button>
+                  )}
+                </PersonRow>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {nobody && <p className="muted small">{file ? 'Nur du siehst diese Datei.' : 'Noch mit niemandem geteilt – nur du siehst diesen Ordner.'}</p>}
+
+      {amOwner && (
+        <button className="btn ghost" onClick={() => setAdding(true)} disabled={!canAdd} title={addProblem ?? undefined}>
+          <Icon name="plus" size={18} /> Personen hinzufügen
+        </button>
+      )}
+      {amOwner && addProblem && <p className="muted small">{addProblem}</p>}
+      <p className="muted small">
+        {amOwner
+          ? 'Mitglieder können Dateien und Unterordner hinzufügen und ihre eigenen Einträge ändern oder löschen. Du kannst alles ändern.'
+          : `Mitglieder können Dateien und Unterordner hinzufügen und ihre eigenen Einträge ändern oder löschen. Alles andere verwaltet ${lib.userName(ownerId)}.`}
+      </p>
+      {!lib.online && <p className="notice warning">Offline – Änderungen sind gerade nicht möglich.</p>}
       {err && <p className="notice critical">{err}</p>}
     </Sheet>
+  );
+}
+
+/** Eine Person in der Liste, rechts optional ein Knopf. */
+function PersonRow({ id, label, you, children }: { id: string; label: string; you?: boolean; children?: React.ReactNode }) {
+  const { userName } = useLibrary();
+  return (
+    <div className="person">
+      <Avatar id={id} />
+      <div className="card-main">
+        <strong className="ellipsis">
+          {userName(id)}
+          {you && <span className="muted"> (du)</span>}
+        </strong>
+        <span className="muted small">{label}</span>
+      </div>
+      {children}
+    </div>
   );
 }

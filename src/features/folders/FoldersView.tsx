@@ -63,7 +63,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
-  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'shareSub' | null>(null);
+  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
   // Bearbeiten direkt aus der Liste (ohne die Datei zu öffnen).
@@ -83,12 +83,8 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   const remote = !!folder?.shareId;
   const orphan = folder ? isOrphan(folder.id) : false;
   const canAdd = !!folder && !orphan && canAddIn(folder.id);
-  // Unterordner in einem eigenen geteilten Ordner (z. B. „Auf allen Geräten“) kann eigens mit weiteren Personen geteilt werden.
-  const ownSub = !!folder?.shareId && !isRoot(folder) && lib.isOwner(folder.shareId);
-  const showShare = cloudEnabled && !!folder && !orphan && (!folder.shareId || isRoot(folder) || ownSub);
-  // Bei Unterordnern geteilter Ordner verwaltet "Personen" den obersten geteilten Ordner.
-  const rootOfShare = folder?.shareId ? folders.find((f) => f.id === lib.shareOf(folder)?.rootId) : folder;
-  const shareTarget = sheet === 'shareSub' ? folder : rootOfShare;
+  // „Personen“ gibt es in jedem Ordner: wer ihn sieht (auch über übergeordnete Ordner) und – als Besitzer – Personen hinzufügen.
+  const showShare = cloudEnabled && !!folder && !orphan;
 
   // "Neu"-Markierung: Stand vom Öffnen merken, dann als gesehen markieren.
   const [since] = useState(() => (folder ? lib.seenAt(folder.id) : undefined));
@@ -251,12 +247,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
               ))}
             </nav>
             {showShare && (
-              <button
-                className="icon-btn"
-                aria-label={remote && !ownSub ? 'Personen' : 'Teilen'}
-                title={remote && !ownSub ? 'Personen' : 'Teilen'}
-                onClick={() => setSheet(ownSub ? 'shareSub' : 'share')}
-              >
+              <button className="icon-btn" aria-label="Personen" title="Personen" onClick={() => setSheet('share')}>
                 <Icon name="users" />
               </button>
             )}
@@ -271,7 +262,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
               {folder.description && <p className="muted break">{folder.description}</p>}
             </div>
           </header>
-          <SharedInfo folder={folder} onPeople={() => setSheet(ownSub ? 'shareSub' : 'share')} />
+          <SharedInfo folder={folder} onPeople={() => setSheet('share')} />
           <div className="action-row">
             <button className="btn primary" onClick={() => setSheet('menu')} disabled={!canAdd}>
               <Icon name="plus" size={18} /> Hinzufügen <Icon name="chevron" size={16} />
@@ -428,7 +419,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
         />
       )}
       {sheet === 'doc' && folder && <DocEditor folderId={folder.id} onClose={() => setSheet(null)} />}
-      {(sheet === 'share' || sheet === 'shareSub') && shareTarget && <ShareSheet folder={shareTarget} onClose={() => setSheet(null)} />}
+      {sheet === 'share' && folder && <ShareSheet folder={folder} onClose={() => setSheet(null)} />}
       {sheet === 'newFolder' && (
         <FolderEditorSheet parentId={folder?.id ?? null} onClose={() => setSheet(null)} onCreated={(f) => afterBack(() => openFolder(f.id))} />
       )}
@@ -621,7 +612,7 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
         <span className="grow">
           {alone ? (isRoot(folder) ? 'Auf allen deinen Geräten · mit niemandem geteilt' : `In „${root?.name ?? '…'}“ · auf allen deinen Geräten`) : isRoot(folder) ? `Geteilt von ${owner} · ${count} ${count === 1 ? 'Person' : 'Personen'}` : `In „${root?.name ?? '…'}“ (geteilt von ${owner}) · erstellt von ${folder.createdBy === me?.id ? 'dir' : userName(folder.createdBy)}`}
         </span>
-        <span className="link">{alone ? 'Teilen' : 'Personen'}</span>
+        <span className="link">Personen</span>
       </button>
       {!online && (
         <p className="notice warning">

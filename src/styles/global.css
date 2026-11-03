@@ -2422,3 +2422,24 @@ textarea.text-line.doc-title {
 .link.danger { color: var(--critical); }
 .choice:disabled { opacity: 0.55; cursor: default; }
 .choice strong { display: inline-flex; align-items: center; gap: 6px; }
+/* Personen: Gruppen „Von …“ / „Nur in diesem Ordner“ */
+.people-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.people-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.people-group > p {
+  margin: 0;
+}
