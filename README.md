@@ -25,6 +25,7 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
 - **„Meine Ordner“ auf allen Geräten** (Schalter im Konto): eigene Ordner werden automatisch hochgeladen („mit niemandem geteilt“)
   und erscheinen auf jedem Gerät, auf dem man angemeldet ist. Eigene Ordner stehen immer unter „Meine Ordner“,
   unter „Geteilte Ordner“ nur, was andere mit einem teilen.
+  Einzelne Unterordner lassen sich trotzdem eigens mit anderen teilen (Personen-Symbol im Unterordner) – sie sehen dann nur diesen Unterordner.
 - **Profilbild** (Einstellungen → Konto): Bild wählen, Ausschnitt verschieben/zoomen; erscheint bei Personen und „von …“ an geteilten Einträgen.
 - **Konto löschen**: Eigene geteilte Ordner gehen an eine gewählte Person (oder werden gelöscht). Sie sieht einen Hinweis und kann
   übernehmen – weiter geteilt als Besitzer oder in „Meine Ordner“ auf ihr Gerät – oder ablehnen. Nach 30 Tagen ohne Entscheidung wird alles gelöscht.

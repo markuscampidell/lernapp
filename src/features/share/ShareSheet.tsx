@@ -4,7 +4,7 @@ import type { Folder } from '../../domain/types';
 import { subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { useAuth } from '../../cloud/auth';
-import { afterBack, replace } from '../../lib/router';
+import { afterBack, folderHash, replace } from '../../lib/router';
 import { Sheet } from '../../components/Sheet';
 import { Icon } from '../../components/Icon';
 import { AccountCard } from '../account/AccountCard';
@@ -29,7 +29,7 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
   const memberIds = useMemo(() => (share ? lib.members.filter((m) => m.shareId === share.id).map((m) => m.userId) : []), [lib.members, share]);
   const exclude = useMemo(() => new Set([...(user ? [user.id] : []), ...memberIds, ...(share ? [share.ownerId] : [])]), [user, memberIds, share]);
 
-  const run = async (label: string, fn: () => Promise<void>) => {
+  const run = async (label: string, fn: () => Promise<unknown>) => {
     setBusy(label);
     setErr(null);
     try {
@@ -57,6 +57,10 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
   // ---------- Noch nicht geteilt ----------
   if (!share) {
     const problem = lib.shareProblem(folder.id);
+    // Unterordner eines eigenen geteilten Ordners (z. B. „Auf allen Geräten“) wird eigens geteilt.
+    const outer = folder.shareId ? lib.shareOf(folder) : undefined;
+    const outerName = outer ? lib.folders.find((f) => f.id === outer.rootId)?.name ?? '…' : '';
+    const outerPeople = outer ? lib.peopleOf(outer.id).filter((id) => id !== user.id).map((id) => lib.userName(id)) : [];
     const inner = [...subtreeIds(lib.folders, folder.id)].filter((id) => id !== folder.id && lib.isRoot(lib.folders.find((f) => f.id === id)));
     return (
       <Sheet
@@ -67,8 +71,15 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
             className="btn primary grow"
             disabled={!!problem || !!busy}
             onClick={async () => {
-              const ok = await run('Teilen …', () => lib.shareFolder(folder.id, [...selected], (msg) => setBusy(msg)));
-              if (ok) onClose();
+              let newId = folder.id;
+              const here = location.hash.includes(encodeURIComponent(folder.id));
+              const ok = await run('Teilen …', async () => {
+                newId = await lib.shareFolder(folder.id, [...selected], (msg) => setBusy(msg));
+              });
+              if (!ok) return;
+              onClose();
+              // Unterordner wurde neu angelegt (neue ID) -> dorthin wechseln.
+              if (newId !== folder.id && here) afterBack(() => replace(folderHash(newId)));
             }}
           >
             {busy ?? (selected.size ? `Mit ${selected.size} ${selected.size === 1 ? 'Person' : 'Personen'} teilen` : 'Teilen')}
@@ -80,6 +91,12 @@ export function ShareSheet({ folder, onClose }: { folder: Folder; onClose: () =>
           „Geteilte Ordner“ und können Dateien und Unterordner hinzufügen. Ändern oder löschen dürfen sie nur, was sie selbst erstellt haben – du als
           Besitzer darfst alles. Max. 50 MB pro Datei.
         </p>
+        {outer && !problem && (
+          <p className="notice info">
+            Liegt in „{outerName}“{outerPeople.length ? ` (geteilt mit ${outerPeople.join(', ')} – sie sehen ihn weiterhin)` : ''}. Die ausgewählten Personen sehen nur
+            diesen Ordner, nicht den Rest von „{outerName}“.
+          </p>
+        )}
         {inner.length > 0 && !problem && (
           <p className="notice info">
             {inner.length === 1 ? 'Ein Ordner darin ist' : `${inner.length} Ordner darin sind`} bereits geteilt. Die ausgewählten Personen sehen{' '}

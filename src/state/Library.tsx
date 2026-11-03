@@ -8,6 +8,7 @@ import { fullName } from '../lib/files';
 import { useAuth, type User } from '../cloud/auth';
 import { supabase } from '../cloud/supabase';
 import * as remote from '../cloud/remote';
+import { newId } from '../lib/id';
 import type { Handover, Member, Profile, Share, Snapshot } from '../cloud/remote';
 import * as local from './local';
 import { looseFiles, makeBundle, topLevel, type FolderInput, type NewFileInput } from './bundle';
@@ -78,7 +79,8 @@ interface LibraryValue {
   seenAt: (folderId: string) => string | undefined;
   isNewSince: (item: Item, since: string | undefined) => boolean;
   markSeen: (folderId: string) => void;
-  shareFolder: (folderId: string, userIds: string[], onProgress?: (msg: string) => void) => Promise<void>;
+  /** Teilt einen Ordner. Ein Unterordner eines eigenen geteilten Ordners wird dabei neu angelegt – zurück kommt die (ggf. neue) ID. */
+  shareFolder: (folderId: string, userIds: string[], onProgress?: (msg: string) => void) => Promise<string>;
   stopSharing: (shareId: string, onProgress?: (msg: string) => void) => Promise<void>;
   addMembers: (shareId: string, userIds: string[]) => Promise<void>;
   removeMember: (shareId: string, userId: string) => Promise<void>;
@@ -537,14 +539,21 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const f = byId.get(folderId);
       if (!f) return 'Ordner nicht gefunden.';
       if (!me) return 'Melde dich an, um Ordner zu teilen.';
-      if (f.shareId) return null; // schon geteilt -> Mitglieder verwalten
+      if (f.shareId && isRoot(f)) return null; // schon geteilt -> Mitglieder verwalten
+      // Unterordner eines eigenen geteilten Ordners (z. B. „Auf allen Geräten“): kann eigens mit weiteren Personen geteilt werden.
+      if (f.shareId) {
+        if (!isOwner(f.shareId)) return 'Nur der Besitzer kann einen Unterordner eigens mit weiteren Personen teilen.';
+        if (orphans.has(folderId)) return 'Dieser geteilte Ordner ist gerade nicht verfügbar.';
+        if (!online) return offlineError().message;
+        return null;
+      }
       if (orphans.has(folderId)) return 'Dieser geteilte Ordner ist gerade nicht verfügbar.';
       const foreign = sharedRootsIn(folderId).find((r) => !isOwner(r.shareId));
       if (foreign) return `„${f.name}“ enthält „${foreign.name}“, der dir nicht gehört.`;
       if (!online) return offlineError().message;
       return null;
     },
-    [byId, me, orphans, sharedRootsIn, isOwner, online],
+    [byId, me, orphans, sharedRootsIn, isOwner, isRoot, online],
   );
 
   // ---------- "!" – Neues von anderen ----------
@@ -793,10 +802,57 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   );
 
   // ---------- Teilen ----------
+  /**
+   * Unterordner eines eigenen geteilten Ordners eigens teilen: Er wird (mit neuen IDs, die alten sind auf dem Server belegt)
+   * als eigener geteilter Ordner angelegt, an derselben Stelle eingehängt und erst danach am alten Ort entfernt.
+   * Wer den äußeren Ordner hat, sieht ihn weiterhin; die neuen Personen sehen nur diesen Ordner.
+   */
+  const splitShare = useCallback(
+    async (sub: Folder, userIds: string[], onProgress?: (msg: string) => void): Promise<string> => {
+      const outer = sub.shareId!;
+      onProgress?.('Dateien werden vorbereitet …');
+      const nested = outerRootsIn(sub.id);
+      const bundle = await makeBundle(folders, files, [sub.id], [], loadBlob, nested.map((f) => f.id));
+      const ids = new Map<string, string>();
+      bundle.folders.forEach((f) => ids.set(f.id, newId()));
+      bundle.files.forEach((f) => ids.set(f.id, newId()));
+      const moved = {
+        folders: bundle.folders.map((f) => ({ ...f, id: ids.get(f.id)!, parentId: f.parentId && (ids.get(f.parentId) ?? null) })),
+        files: bundle.files.map((f) => ({ ...f, id: ids.get(f.id)!, folderId: f.folderId && (ids.get(f.folderId) ?? null) })),
+      };
+      const rootId = ids.get(sub.id)!;
+      const shareId = await remote.createShare(rootId);
+      try {
+        const total = moved.files.length;
+        onProgress?.(total ? `Wird übertragen … 0/${total}` : 'Wird übertragen …');
+        await remote.importBundle(shareId, null, moved, (n) => onProgress?.(`Wird übertragen … ${n}/${total}`));
+        await remote.setInside(shareId, sub.parentId);
+        for (const f of nested) await remote.setInside(f.shareId!, ids.get(f.parentId!) ?? sub.parentId);
+        await remote.addMembers(shareId, userIds);
+      } catch (e) {
+        for (const f of nested) await remote.setInside(f.shareId!, f.parentId).catch(() => {});
+        await remote.deleteShare(shareId, [], []).catch(() => {});
+        throw e;
+      }
+      onProgress?.('Wird aufgeräumt …');
+      // Eigene Rechte-Einstellungen und Häkchen mitnehmen (beides nicht im Paket).
+      for (const f of folders) if (f.shareId === outer && f.access && ids.has(f.id)) await remote.setAccess('folders', ids.get(f.id)!, f.access).catch(() => {});
+      for (const f of files) if (f.shareId === outer && f.access && ids.has(f.id)) await remote.setAccess('files', ids.get(f.id)!, f.access).catch(() => {});
+      await remote.copyChecks(new Map([...ids].filter(([old]) => files.some((f) => f.id === old)))).catch(() => {});
+      // Nur Einträge des äußeren Ordners löschen (eingehängte andere geteilte Ordner sind schon umgehängt).
+      await remote.deleteMany(folders.filter((f) => f.shareId === outer), files.filter((f) => f.shareId === outer), [sub.id], []);
+      await refreshRemote();
+      return rootId;
+    },
+    [outerRootsIn, folders, files, refreshRemote],
+  );
+
   const shareFolder = useCallback<LibraryValue['shareFolder']>(
     async (folderId, userIds, onProgress) => {
       const problem = shareProblem(folderId);
       if (problem) throw new Error(problem);
+      const sub = byId.get(folderId);
+      if (sub?.shareId) return splitShare(sub, userIds, onProgress);
       onProgress?.('Dateien werden vorbereitet …');
       // Bereits geteilte Ordner darin bleiben eigene geteilte Ordner und werden nur eingehängt.
       const nested = outerRootsIn(folderId);
@@ -815,8 +871,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       }
       await local.convertToPlaceholder(localData, folderId, shareId, me!);
       await reload();
+      return folderId;
     },
-    [shareProblem, outerRootsIn, folders, files, localData, reload],
+    [shareProblem, byId, splitShare, outerRootsIn, folders, files, localData, reload],
   );
 
   const stopSharing = useCallback<LibraryValue['stopSharing']>(

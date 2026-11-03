@@ -436,3 +436,14 @@ export async function removeAvatar(userId: string, oldPath?: string | null): Pro
   if (res.error) throw avatarError(res.error.message);
   if (oldPath) await sb().storage.from(AVATARS).remove([oldPath]).catch(() => {});
 }
+
+/** Häkchen von Checklisten auf neue Datei-IDs übertragen (z. B. wenn ein Unterordner eigens geteilt wird). Fehler werden ignoriert. */
+export async function copyChecks(idMap: Map<string, string>): Promise<void> {
+  const ids = [...idMap.keys()];
+  for (let i = 0; i < ids.length; i += 200) {
+    const res = await sb().from('checks').select('file_id, scope, item_id, done').in('file_id', ids.slice(i, i + 200));
+    if (res.error || !res.data?.length) continue;
+    const rows = (res.data as Row[]).map((r) => ({ file_id: idMap.get(String(r.file_id)), scope: r.scope, item_id: r.item_id, done: r.done }));
+    await sb().from('checks').upsert(rows, { onConflict: 'file_id,scope,item_id' });
+  }
+}
