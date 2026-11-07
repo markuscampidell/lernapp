@@ -5,6 +5,7 @@ import { Icon, type IconName } from '../../components/Icon';
 import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
+import { isTouchDevice } from '../../lib/files';
 import { DOC_EXT, DOC_MIME, imageToDataUrl, normalizeBlocks, sanitizeHtml } from './sanitize';
 import { loadKatex, renderMathIn, renderMathSpan } from '../../lib/math';
 import { useKatex } from '../../components/MathText';
@@ -37,6 +38,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, onClose }
   const editor = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
   const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: DOC_EXT, mime: DOC_MIME });
   // Angeklickte Formel (wird in der Formel-Leiste bearbeitet).
   const [formula, setFormula] = useState<HTMLElement | null>(null);
@@ -575,6 +577,8 @@ export function DocEditor({ file, folderId, initial = '', initialName, onClose }
     { icon: 'indent', label: 'Einrücken (Tab)', run: () => indent(false) },
     'sep',
     { icon: 'image', label: 'Bild einfügen', run: () => imageInput.current?.click() },
+    // Auf Handys/Tablets: direkt die Kamera öffnen – das Foto landet sofort im Dokument (nicht erst in der Galerie).
+    ...(isTouchDevice ? [{ icon: 'camera' as const, label: 'Foto aufnehmen', run: () => cameraInput.current?.click() }] : []),
     {
       icon: 'chart',
       label: 'Diagramm einfügen',
@@ -747,6 +751,17 @@ export function DocEditor({ file, folderId, initial = '', initialName, onClose }
           )}
         </div>
         {image && <p className="muted small">Bild ausgewählt: an den Ecken/Kanten ziehen zum Vergrößern/Verkleinern, Ausrichten mit der Leiste, Entf/⌫ löscht es.</p>}
+        <input
+          ref={cameraInput}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          hidden
+          onChange={(e) => {
+            if (e.target.files) insertImages(e.target.files);
+            e.target.value = '';
+          }}
+        />
         <input
           ref={imageInput}
           type="file"
