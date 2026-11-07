@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Access, FileItem, Folder } from '../domain/types';
 import { subtreeIds } from '../domain/tree';
 import { newId } from '../lib/id';
-import { formatSize, fullName, kindOf, makeThumbnail, splitName } from '../lib/files';
+import { formatSize, fullName, kindOf, makeThumbnail, shrinkImage, splitName } from '../lib/files';
 import { cacheBlob, forgetCached, isRemoteBlob, REMOTE, remotePath } from '../storage/blobs';
 import type { Bundle, FolderInput, NewFileInput } from '../state/bundle';
 import { clean } from '../state/local';
@@ -364,7 +364,18 @@ export async function updateFolder(folder: Folder, input: FolderInput): Promise<
   if (input.image !== undefined && folder.imageId) await removePaths([remotePath(folder.imageId)]);
 }
 
-export async function addFiles(shareId: string, folderId: string, items: NewFileInput[], onProgress?: (done: number) => void): Promise<void> {
+export async function addFiles(shareId: string, folderId: string, input: NewFileInput[], onProgress?: (done: number) => void): Promise<void> {
+  // Große Fotos vorher verkleinern – spart Platz auf dem Server und Datenvolumen beim Öffnen.
+  const items: NewFileInput[] = [];
+  for (const it of input) {
+    const split = splitName(it.filename);
+    const small = await shrinkImage(it.file, it.file.type, split.ext);
+    if (small.blob === it.file) items.push(it);
+    else {
+      const filename = `${split.name}.${small.ext}`;
+      items.push({ ...it, filename, file: new File([small.blob], filename, { type: small.mime }) });
+    }
+  }
   await ensureSpace(items.reduce((n, it) => n + it.file.size, 0));
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
@@ -446,7 +457,14 @@ export async function deleteMany(folders: Folder[], files: FileItem[], folderIds
 }
 
 /** Lädt ein Bündel in einen geteilten Ordner hoch (IDs bleiben erhalten). targetId null = neuer oberster Ordner. */
-export async function importBundle(shareId: string, targetId: string | null, bundle: Bundle, onProgress?: (done: number) => void): Promise<void> {
+export async function importBundle(shareId: string, targetId: string | null, original: Bundle, onProgress?: (done: number) => void): Promise<void> {
+  // Große Fotos vorher verkleinern (die Kopie auf dem Server – nicht die Datei auf dem Gerät).
+  const files: Bundle['files'] = [];
+  for (const f of original.files) {
+    const small = await shrinkImage(f.blob, f.mime, f.ext);
+    files.push(small.blob === f.blob ? f : { ...f, blob: small.blob, mime: small.mime, ext: small.ext, size: small.blob.size });
+  }
+  const bundle: Bundle = { ...original, files };
   await ensureSpace(
     bundle.folders.reduce((n, f) => n + (f.image?.size ?? 0), 0) +
       bundle.files.reduce((n, f) => n + f.blob.size + (f.thumb?.size ?? 0), 0),

@@ -114,6 +114,42 @@ export async function makeThumbnail(blob: Blob, max = 320): Promise<Blob | undef
   }
 }
 
+// ---------- Fotos verkleinern (vor dem Hochladen auf den Server) ----------
+const SHRINK_MAX = 2048; // längste Seite in Pixeln – reicht zum Lesen und Zoomen
+const SHRINK_MIN_BYTES = 400 * 1024; // kleinere Bilder bleiben, wie sie sind
+const SHRINKABLE = /^image\/(jpeg|png|webp|heic|heif|avif|bmp)$/i;
+
+/**
+ * Verkleinert große Fotos (höchstens 2048 px, JPEG). Gibt das Original zurück, wenn es klein genug ist,
+ * kein passendes Bild ist (z. B. GIF/SVG), Transparenz hat oder die Verkleinerung kaum etwas spart.
+ */
+export async function shrinkImage(blob: Blob, mime: string, ext: string): Promise<{ blob: Blob; mime: string; ext: string }> {
+  const keep = { blob, mime, ext };
+  if (blob.size < SHRINK_MIN_BYTES || !SHRINKABLE.test(mime)) return keep;
+  try {
+    const bmp = await createImageBitmap(blob);
+    const scale = Math.min(1, SHRINK_MAX / Math.max(bmp.width, bmp.height));
+    const w = Math.max(1, Math.round(bmp.width * scale));
+    const h = Math.max(1, Math.round(bmp.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    // Durchsichtige Bilder (Logos, Grafiken) nicht in JPEG umwandeln – das gäbe schwarze/weiße Flächen.
+    if (!/jpe?g|heic|heif/i.test(mime)) {
+      const px = ctx.getImageData(0, 0, w, h).data;
+      for (let i = 3; i < px.length; i += 4) if (px[i] < 255) return keep;
+    }
+    const out = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.85));
+    if (!out || out.size > blob.size * 0.9) return keep;
+    return { blob: out, mime: 'image/jpeg', ext: /^jpe?g$/i.test(ext) ? ext : 'jpg' };
+  } catch {
+    return keep;
+  }
+}
+
 /** Datei herunterladen bzw. an das System übergeben. */
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
