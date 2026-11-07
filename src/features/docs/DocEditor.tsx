@@ -140,6 +140,49 @@ export function DocEditor({ file, folderId, initial = '', initialName, onClose }
     target.addEventListener('pointercancel', up);
   };
 
+  // ---------- Bild drehen / spiegeln ----------
+  // Das Bild wird neu gezeichnet und ersetzt – so sieht es überall gleich aus (auch in älteren App-Versionen).
+  const [turning, setTurning] = useState(false);
+  const transformImage = async (op: 'left' | 'right' | 'flipH' | 'flipV') => {
+    const img = image;
+    if (!img || turning) return;
+    setTurning(true);
+    try {
+      if (!img.complete) await img.decode().catch(() => {});
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      if (!w || !h) throw new Error('leer');
+      const rotate = op === 'left' || op === 'right';
+      const canvas = document.createElement('canvas');
+      canvas.width = rotate ? h : w;
+      canvas.height = rotate ? w : h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      if (op === 'right') ctx.rotate(Math.PI / 2);
+      if (op === 'left') ctx.rotate(-Math.PI / 2);
+      if (op === 'flipH') ctx.scale(-1, 1);
+      if (op === 'flipV') ctx.scale(1, -1);
+      ctx.drawImage(img, -w / 2, -h / 2);
+      const src = img.getAttribute('src') ?? '';
+      // PNG behält Transparenz, alles andere wird JPEG (kleiner).
+      const url = /^data:image\/(png|gif)/i.test(src) ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.92);
+      // Beim Drehen bleibt die angezeigte Größe gleich: Die neue Breite ist die bisherige Höhe.
+      if (rotate && img.hasAttribute('width')) img.setAttribute('width', String(Math.max(24, Math.round(img.getBoundingClientRect().height))));
+      await new Promise<void>((res) => {
+        img.onload = () => res();
+        img.onerror = () => res();
+        img.src = url;
+      });
+      img.onload = img.onerror = null;
+      setDirty(true);
+      measure();
+    } catch {
+      setErr('Das Bild konnte nicht gedreht werden.');
+    } finally {
+      setTurning(false);
+    }
+  };
+
   // ---------- Formatierung ----------
   useEffect(() => {
     const update = () => {
@@ -747,10 +790,27 @@ export function DocEditor({ file, folderId, initial = '', initialName, onClose }
                 <span key={h} className={`img-handle h-${h}`} onPointerDown={startResize(h)} aria-hidden="true" />
               ))}
               <span className="img-size">{Math.round(box.width)} px</span>
+              <div
+                className={`img-tools${box.left + box.width + 52 <= (wrap.current?.clientWidth ?? 0) ? ' outside' : ''}`}
+                onPointerDown={(e) => e.preventDefault()}
+              >
+                {(
+                  [
+                    ['left', 'rotateLeft', '90° nach links drehen'],
+                    ['right', 'rotateRight', '90° nach rechts drehen'],
+                    ['flipH', 'flipH', 'Horizontal spiegeln (links ↔ rechts)'],
+                    ['flipV', 'flipV', 'Vertikal spiegeln (oben ↔ unten)'],
+                  ] as const
+                ).map(([op, icon, label]) => (
+                  <button key={op} type="button" aria-label={label} title={label} disabled={turning} onClick={() => transformImage(op)}>
+                    <Icon name={icon} size={18} />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
-        {image && <p className="muted small">Bild ausgewählt: an den Ecken/Kanten ziehen zum Vergrößern/Verkleinern, Ausrichten mit der Leiste, Entf/⌫ löscht es.</p>}
+        {image && <p className="muted small">Bild ausgewählt: an den Ecken/Kanten ziehen zum Vergrößern/Verkleinern, mit den Knöpfen am Rand drehen oder spiegeln, Ausrichten mit der Leiste, Entf/⌫ löscht es.</p>}
         <input
           ref={cameraInput}
           type="file"
