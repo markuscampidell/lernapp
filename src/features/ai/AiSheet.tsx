@@ -14,25 +14,32 @@ import { prepareMaterial, routeGuess, type Material } from './materials';
 import { buildPrompt, DEFAULT_SETTINGS, kindInfo, KINDS, parseAnswer, type AiKind, type AiResult, type AiSettings, type Parsed } from './recipes';
 
 // Eingaben überleben das Wechseln zur KI-App (auf Handys wird die App dabei manchmal neu geladen).
+// Ein unfertiger Entwurf gilt nur ein paar Stunden; nach „Im Editor öffnen“ wird er geleert.
+// Einstellungen wie Art, Niveau, Sprache und Anzahl bleiben dagegen als Vorgabe für das nächste Mal.
 const DRAFT_KEY = 'lernapp-ai-draft';
+const DRAFT_TTL = 2 * 60 * 60 * 1000;
 interface Draft {
   settings: AiSettings;
   ids: string[];
   answer: string;
+  savedAt?: number;
 }
+/** Nur die Vorgaben behalten – Thema, Wünsche, Materialien und Antwort leeren. */
+const keepPreferences = (s: AiSettings): AiSettings => ({ ...s, topic: '', extra: '' });
 function loadDraft(): Draft | null {
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | null;
     if (!d || typeof d !== 'object') return null;
-    return { settings: { ...DEFAULT_SETTINGS, ...d.settings }, ids: Array.isArray(d.ids) ? d.ids : [], answer: typeof d.answer === 'string' ? d.answer : '' };
+    const settings = { ...DEFAULT_SETTINGS, ...d.settings };
+    if (!d.savedAt || Date.now() - d.savedAt > DRAFT_TTL) return { settings: keepPreferences(settings), ids: [], answer: '' };
+    return { settings, ids: Array.isArray(d.ids) ? d.ids : [], answer: typeof d.answer === 'string' ? d.answer : '' };
   } catch {
     return null;
   }
 }
-function saveDraft(d: Draft | null) {
+function saveDraft(d: Draft) {
   try {
-    if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
-    else localStorage.removeItem(DRAFT_KEY);
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, savedAt: Date.now() }));
   } catch {
     /* privater Modus o. Ä. – dann eben ohne Entwurf */
   }
@@ -82,7 +89,17 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
   const set = (patch: Partial<AiSettings>) => setS((old) => ({ ...old, ...patch }));
   const info = kindInfo(s.kind);
 
-  useEffect(() => saveDraft({ settings: s, ids, answer }), [s, ids, answer]);
+  const finished = useRef(false);
+  useEffect(() => {
+    if (!finished.current) saveDraft({ settings: s, ids, answer });
+  }, [s, ids, answer]);
+
+  const openResult = (r: AiResult) => {
+    // Fertig: Beim nächsten Mal frisch anfangen, aber mit denselben Einstellungen.
+    finished.current = true;
+    saveDraft({ settings: keepPreferences(s), ids: [], answer: '' });
+    onResult(r);
+  };
 
   // Ausgewählte Dateien laden und auslesen (jede nur einmal).
   const selected = useMemo(() => ids.map((id) => files.find((f) => f.id === id)).filter((f): f is FileItem => !!f), [ids, files]);
@@ -190,6 +207,17 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
     }
   };
 
+  // Andere Art gewählt: Alles Eingegebene gehört zur alten Art und wird geleert.
+  const [cleared, setCleared] = useState(false);
+  const switchKind = (kind: AiKind) => {
+    const had = !!(s.topic.trim() || s.extra.trim() || ids.length || answer.trim());
+    set({ kind, count: kindInfo(kind).count?.def ?? s.count, topic: '', extra: '' });
+    setIds([]);
+    setAnswer('');
+    setRestored(false);
+    setCleared(had);
+  };
+
   const reset = () => {
     setS(DEFAULT_SETTINGS);
     setIds([]);
@@ -205,7 +233,7 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
       title="Mit KI erstellen"
       onClose={onClose}
       footer={
-        <button className="btn primary grow" disabled={!ok} onClick={() => ok && onResult(ok.result)}>
+        <button className="btn primary grow" disabled={!ok} onClick={() => ok && openResult(ok.result)}>
           {ok ? `${info.label} im Editor öffnen` : 'Erst die Antwort der KI einfügen'}
         </button>
       }
@@ -228,6 +256,14 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
         )}
 
         <Step n={++stepNo} title="Was soll erstellt werden?">
+          {cleared && (
+            <p className="notice info">
+              <span className="grow">Neue Art gewählt – Thema, Wünsche, Materialien und die eingefügte Antwort wurden geleert.</span>
+              <button className="link" onClick={() => setCleared(false)}>
+                OK
+              </button>
+            </p>
+          )}
           <div className="ai-kinds">
             {KINDS.map((k) => (
               <button
@@ -235,7 +271,7 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
                 type="button"
                 className={`ai-kind${k.id === s.kind ? ' on' : ''}`}
                 aria-pressed={k.id === s.kind}
-                onClick={() => k.id !== s.kind && set({ kind: k.id as AiKind, count: k.count?.def ?? s.count })}
+                onClick={() => k.id !== s.kind && switchKind(k.id)}
               >
                 <span className={`thumb add-icon add-${k.id}`}>
                   <Icon name={k.icon} size={20} />
