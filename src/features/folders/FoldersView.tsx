@@ -16,6 +16,8 @@ import { FileCard, FolderCard } from './Cards';
 import { FolderEditorSheet } from './FolderEditorSheet';
 import { FileViewer } from './FileViewer';
 import { NoteSheet } from './NoteSheet';
+import { AiSheet } from '../ai/AiSheet';
+import type { AiResult } from '../ai/recipes';
 import { ShareSheet } from '../share/ShareSheet';
 import { CardsEditor } from '../study/CardsEditor';
 import { QuizEditor } from '../study/QuizEditor';
@@ -65,7 +67,9 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
-  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | null>(null);
+  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'ai' | null>(null);
+  // Ergebnis von „Mit KI erstellen“ – öffnet den passenden Editor mit dem Inhalt.
+  const [aiResult, setAiResult] = useState<AiResult | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
   // Bearbeiten direkt aus der Liste (ohne die Datei zu öffnen).
@@ -433,6 +437,34 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
       {sheet === 'quiz' && folder && <QuizEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'chart' && folder && <ChartEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'wheel' && folder && <WheelEditor folderId={folder.id} onClose={() => setSheet(null)} />}
+      {sheet === 'ai' && folder && (
+        <AiSheet
+          folderId={folder.id}
+          onClose={() => setSheet(null)}
+          onResult={(r) => {
+            setSheet(null);
+            afterBack(() => setAiResult(r));
+          }}
+        />
+      )}
+      {aiResult && folder && (() => {
+        const close = () => setAiResult(null);
+        const name = aiResult.title || undefined;
+        switch (aiResult.kind) {
+          case 'cards':
+            return <CardsEditor folderId={folder.id} initial={aiResult.cards} initialName={name} onClose={close} />;
+          case 'quiz':
+            return <QuizEditor folderId={folder.id} initial={aiResult.questions} initialName={name} onClose={close} />;
+          case 'chart':
+            return <ChartEditor folderId={folder.id} initial={aiResult.chart} initialName={name} onClose={close} />;
+          case 'wheel':
+            return <WheelEditor folderId={folder.id} initial={aiResult.wheel} initialName={name} onClose={close} />;
+          case 'doc':
+            return <DocEditor folderId={folder.id} initial={aiResult.html} initialName={name} onClose={close} />;
+          case 'note':
+            return <NoteSheet folderId={folder.id} initialName={name} initialText={aiResult.text} onClose={close} />;
+        }
+      })()}
       {sheet === 'add' && folder && (
         <AddFilesSheet folder={folder} items={staged} onChange={setStaged} onMore={() => pickFiles()} onClose={() => setSheet(null)} />
       )}
@@ -627,7 +659,7 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
   );
 }
 
-type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz' | 'chart' | 'wheel';
+type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz' | 'chart' | 'wheel' | 'ai';
 const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; text: string; touchOnly?: boolean }[] = [
   { id: 'files', icon: 'upload', title: 'Dateien durchsuchen', text: 'PDFs, Bilder, Präsentationen, Videos … von deinem Gerät' },
   { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', text: 'Direkt mit der Kamera', touchOnly: true },
@@ -637,6 +669,7 @@ const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; text: string;
   { id: 'quiz', icon: 'quiz', title: 'Quiz', text: 'Multiple Choice mit Auswertung' },
   { id: 'chart', icon: 'chart', title: 'Diagramm', text: 'Säulen, Balken, Linie, Kreis – auch in Text-Dokumente einfügbar' },
   { id: 'wheel', icon: 'wheel', title: 'Glücksrad', text: 'Zufällig auswählen – auch in Text-Dokumente einfügbar' },
+  { id: 'ai', icon: 'sparkle', title: 'Mit KI erstellen', text: 'Prompt für ChatGPT, Claude & Co. – Antwort einfügen, fertig' },
 ];
 
 /** Auswahl, was in den Ordner hinzugefügt werden soll. */

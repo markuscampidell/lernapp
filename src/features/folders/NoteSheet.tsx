@@ -4,11 +4,11 @@ import { Sheet } from '../../components/Sheet';
 import { TextLine } from '../../components/TextLine';
 
 /** Schnell eine Textnotiz als .txt-Datei im Ordner anlegen. */
-export function NoteSheet({ folderId, onClose }: { folderId: string; onClose: () => void }) {
+export function NoteSheet({ folderId, initialName, initialText, onClose }: { folderId: string; initialName?: string; initialText?: string; onClose: () => void }) {
   const { addFiles } = useLibrary();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName ?? '');
   const [description, setDescription] = useState('');
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 

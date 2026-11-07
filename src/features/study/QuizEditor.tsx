@@ -13,8 +13,8 @@ const MAX_ANSWERS = 6;
 const LETTERS = 'ABCDEF';
 
 /** Multiple-Choice-Quiz anlegen/bearbeiten: eine Frage pro Seite. */
-export function QuizEditor({ file, folderId, initial, onClose }: { file?: FileItem; folderId?: string; initial?: Question[]; onClose: () => void }) {
-  const [name, setName] = useState(file?.name ?? '');
+export function QuizEditor({ file, folderId, initial, initialName, onClose }: { file?: FileItem; folderId?: string; initial?: Question[]; initialName?: string; onClose: () => void }) {
+  const [name, setName] = useState(file?.name ?? initialName ?? '');
   const [description, setDescription] = useState(file?.description ?? '');
   const [questions, setQuestions] = useState<Question[]>(() => (initial?.length ? initial : [newQuestion()]));
   const [index, setIndex] = useState(0);

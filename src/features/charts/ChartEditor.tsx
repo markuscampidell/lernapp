@@ -38,17 +38,20 @@ export function ChartEditor({
   file,
   folderId,
   initial,
+  initialName,
   onClose,
   onDone,
 }: {
   file?: FileItem;
   folderId?: string;
   initial?: Chart;
+  /** Startname einer neuen Datei (z. B. von „Mit KI erstellen“) */
+  initialName?: string;
   onClose: () => void;
   onDone?: (c: Chart) => void;
 }) {
   const embedded = !!onDone;
-  const [name, setName] = useState(file?.name ?? '');
+  const [name, setName] = useState(file?.name ?? initialName ?? '');
   const [description, setDescription] = useState(file?.description ?? '');
   const [chart, setChart] = useState<Chart>(() => (initial ? { ...initial, points: initial.points.length ? initial.points : [newPoint()] } : emptyChart()));
   const [mode, setMode] = useState<'table' | 'text'>('table');

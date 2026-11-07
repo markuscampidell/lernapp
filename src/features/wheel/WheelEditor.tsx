@@ -30,17 +30,20 @@ export function WheelEditor({
   file,
   folderId,
   initial,
+  initialName,
   onClose,
   onDone,
 }: {
   file?: FileItem;
   folderId?: string;
   initial?: Wheel;
+  /** Startname einer neuen Datei (z. B. von „Mit KI erstellen“) */
+  initialName?: string;
   onClose: () => void;
   onDone?: (w: Wheel) => void;
 }) {
   const embedded = !!onDone;
-  const [name, setName] = useState(file?.name ?? '');
+  const [name, setName] = useState(file?.name ?? initialName ?? '');
   const [description, setDescription] = useState(file?.description ?? '');
   const [wheel, setWheel] = useState<Wheel>(() => (initial ? { ...initial, entries: initial.entries.length ? initial.entries : [newEntry()] } : emptyWheel()));
   const [mode, setMode] = useState<'list' | 'text'>('list');

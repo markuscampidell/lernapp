@@ -2750,3 +2750,55 @@ textarea.text-line.doc-desc {
   align-items: center;
   gap: 10px;
 }
+
+/* ---------- Mit KI erstellen ---------- */
+.add-icon.add-ai { color: #8a4fd1; background: color-mix(in srgb, #8a4fd1 14%, var(--surface)); }
+.ai-sheet { gap: 18px; }
+.ai-intro { align-items: flex-start; }
+.ai-intro > svg { flex: none; margin-top: 2px; }
+.ai-step { display: flex; flex-direction: column; gap: 10px; }
+.ai-step-head { display: flex; align-items: center; gap: 10px; }
+.ai-step-head h3 { margin: 0; font-size: 1.02rem; }
+.ai-step-num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.ai-kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.ai-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--surface-2);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+}
+.ai-kind .thumb { width: 34px; height: 34px; margin-bottom: 2px; }
+.ai-kind.on { border-color: var(--accent); }
+.ai-sheet .block { display: block; }
+.ai-legend { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.ai-howto { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.chip.ai-route.text { color: var(--good); background: var(--good-bg); }
+.chip.ai-route.file { color: var(--info); background: var(--info-bg); }
+.chip.ai-route.skip,
+.chip.ai-route.loading { color: var(--text-2); }
+.ai-mats .card-main .small { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.ai-pick { cursor: pointer; }
+.ai-pick input[type='checkbox'] { flex: none; width: 20px; height: 20px; accent-color: var(--accent); }
+.ai-pick.disabled { opacity: 0.55; cursor: default; }
+.ai-pick.on { outline: 2px solid var(--accent); outline-offset: -2px; }
+textarea.ai-prompt,
+textarea.ai-answer { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; }
+.ai-mats > li,
+.ai-pick { display: flex; align-items: center; gap: 12px; }
+.ai-sheet .segmented button { flex: 1 1 auto; }

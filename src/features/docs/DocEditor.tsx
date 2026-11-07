@@ -26,8 +26,8 @@ const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const MIN_IMAGE = 40;
 
 /** Text-Dokument mit Formatierung und Bildern bearbeiten (wie ein einfaches Google Doc). */
-export function DocEditor({ file, folderId, initial = '', onClose }: { file?: FileItem; folderId?: string; initial?: string; onClose: () => void }) {
-  const [name, setName] = useState(file?.name ?? '');
+export function DocEditor({ file, folderId, initial = '', initialName, onClose }: { file?: FileItem; folderId?: string; initial?: string; initialName?: string; onClose: () => void }) {
+  const [name, setName] = useState(file?.name ?? initialName ?? '');
   const [description, setDescription] = useState(file?.description ?? '');
   const [dirty, setDirty] = useState(false);
   const [state, setState] = useState<Record<string, boolean>>({});
