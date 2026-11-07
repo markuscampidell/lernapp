@@ -9,6 +9,7 @@ import { AccountCard } from '../account/AccountCard';
 import { cloudEnabled, SERVER_LIMIT } from '../../cloud/supabase';
 import { useAuth } from '../../cloud/auth';
 import { serverUsage } from '../../cloud/remote';
+import { cacheLimit, cacheSize } from '../../storage/blobs';
 
 export function SettingsView() {
   const lib = useLibrary();
@@ -18,6 +19,7 @@ export function SettingsView() {
   const files = lib.files.filter((f) => !f.shareId);
   const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
+  const [cache, setCache] = useState<{ size: number; limit: number } | null>(null);
   const [status, setStatus] = useState<{ kind: 'good' | 'critical' | 'info'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingImport, setPendingImport] = useState<File | null>(null);
@@ -28,6 +30,9 @@ export function SettingsView() {
   useEffect(() => {
     navigator.storage?.estimate?.().then((e) => setUsage({ used: e.usage ?? 0, quota: e.quota ?? 0 })).catch(() => {});
     navigator.storage?.persisted?.().then(setPersisted).catch(() => {});
+    Promise.all([cacheSize(), cacheLimit()])
+      .then(([size, limit]) => setCache({ size, limit }))
+      .catch(() => {});
   }, [files.length]);
 
   const doExport = async () => {
@@ -122,8 +127,14 @@ export function SettingsView() {
         <p className="muted small">
           „Meine Ordner“ werden nur auf diesem Gerät gespeichert (im Browser) – nutze das Backup, um sie auf ein anderes Gerät zu
           übertragen. Geteilte Ordner liegen auf dem Server; geöffnete Dateien daraus werden hier zwischengespeichert, damit du sie
-          auch offline ansehen kannst.
+          auch offline ansehen kannst – aber nur begrenzt: Wird es zu viel, werden die am längsten nicht geöffneten wieder
+          entfernt (sie bleiben auf dem Server). „Meine Ordner“ sind davon nie betroffen.
         </p>
+        {cache && cache.size > 0 && (
+          <p className="muted small">
+            Zwischengespeicherte geteilte Dateien: {formatSize(cache.size)} von höchstens {formatSize(cache.limit)}
+          </p>
+        )}
         {persisted === false && (
           <div className="notice warning">
             <span className="grow">Der Browser darf die Daten bei Speicherknappheit löschen.</span>

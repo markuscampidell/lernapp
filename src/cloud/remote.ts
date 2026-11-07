@@ -4,8 +4,7 @@ import type { Access, FileItem, Folder } from '../domain/types';
 import { subtreeIds } from '../domain/tree';
 import { newId } from '../lib/id';
 import { formatSize, fullName, kindOf, makeThumbnail, splitName } from '../lib/files';
-import { db } from '../storage/db';
-import { isRemoteBlob, REMOTE, remotePath } from '../storage/blobs';
+import { cacheBlob, forgetCached, isRemoteBlob, REMOTE, remotePath } from '../storage/blobs';
 import type { Bundle, FolderInput, NewFileInput } from '../state/bundle';
 import { clean } from '../state/local';
 import { BUCKET, check, friendly, MAX_UPLOAD, SERVER_LIMIT, supabase } from './supabase';
@@ -275,7 +274,7 @@ async function upload(shareId: string, blob: Blob, contentType: string): Promise
   const { error } = await sb().storage.from(BUCKET).upload(path, blob, { contentType: contentType || 'application/octet-stream', upsert: false });
   if (error) throw new Error(friendly(error.message));
   // Gleich auf dem Gerät behalten: spart den Download und ist offline lesbar.
-  await db.putBlob(REMOTE + path, blob).catch(() => {});
+  await cacheBlob(REMOTE + path, blob);
   return path;
 }
 
@@ -285,7 +284,7 @@ async function removePaths(paths: string[]) {
     const { error } = await sb().storage.from(BUCKET).remove(list.slice(i, i + 100));
     if (error) console.warn('Dateien konnten nicht entfernt werden', error);
   }
-  await db.deleteBlobs(list.map((p) => REMOTE + p)).catch(() => {});
+  await forgetCached(list.map((p) => REMOTE + p)).catch(() => {});
 }
 
 const pathsOf = (folders: Folder[], files: FileItem[]) =>

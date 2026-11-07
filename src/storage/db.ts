@@ -67,6 +67,22 @@ export const db = {
   deleteBlobs: (ids: string[]) => write(['blobs'], (s) => ids.forEach((id) => s.blobs.delete(id))),
   /** Löscht alle Blobs, deren Schlüssel mit prefix beginnt (z. B. zwischengespeicherte geteilte Dateien). */
   deleteBlobsWithPrefix: (prefix: string) => write(['blobs'], (s) => s.blobs.delete(IDBKeyRange.bound(prefix, `${prefix}\uffff`))),
+  /** Schlüssel und Größe aller Blobs, deren Schlüssel mit prefix beginnt. */
+  blobSizes: async (prefix: string): Promise<{ id: string; size: number }[]> => {
+    const d = await open();
+    return new Promise((resolve, reject) => {
+      const out: { id: string; size: number }[] = [];
+      const req = d.transaction('blobs').objectStore('blobs').openCursor(IDBKeyRange.bound(prefix, `${prefix}\uffff`));
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) return resolve(out);
+        const v = c.value as Blob | undefined;
+        out.push({ id: String(c.key), size: v instanceof Blob ? v.size : 0 });
+        c.continue();
+      };
+      req.onerror = () => reject(req.error);
+    });
+  },
   /** Beliebige Zusatzdaten (z. B. zwischengespeicherte geteilte Ordner) – liegen ebenfalls im Blob-Speicher. */
   getMeta: async <T,>(key: string): Promise<T | undefined> => {
     const d = await open();

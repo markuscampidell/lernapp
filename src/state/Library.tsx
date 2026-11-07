@@ -3,7 +3,7 @@ import type { Access, FileItem, Folder } from '../domain/types';
 import { MAX_DEPTH, SHARED_ROOT } from '../domain/types';
 import { canMoveFolder, depthOf, subtreeIds } from '../domain/tree';
 import { db } from '../storage/db';
-import { loadBlob, REMOTE } from '../storage/blobs';
+import { clearCache, loadBlob } from '../storage/blobs';
 import { fileKind, fullName } from '../lib/files';
 import { useAuth, type User } from '../cloud/auth';
 import { supabase } from '../cloud/supabase';
@@ -1242,7 +1242,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const prevUser = useRef(me);
   useEffect(() => {
     if (prevUser.current && !me) {
-      db.deleteBlobsWithPrefix(REMOTE).catch(() => {});
+      clearCache().catch(() => {});
       db.setMeta(SNAPSHOT_KEY, null).catch(() => {});
     }
     prevUser.current = me;
