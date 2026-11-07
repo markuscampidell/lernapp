@@ -80,7 +80,7 @@ export const kindInfo = (k: AiKind) => KINDS.find((x) => x.id === k)!;
 const LEVEL: Record<AiSettings['level'], string> = {
   basic: 'Grundlagen – wichtigste Begriffe, Definitionen und einfache Beispiele; für jemanden, der gerade erst anfängt.',
   medium: 'Mittel – Begriffe, Definitionen, Zusammenhänge und typische Beispiele; wie in einer normalen Übung.',
-  exam: 'Prüfungsniveau – Anwendung, Begründungen, Herleitungen, Vergleiche, typische Fehler und Fallen; so, wie es in einer Prüfung drankommen könnte.',
+  exam: 'Prüfungsniveau (anspruchsvoll) – Anwendung, Begründungen, Herleitungen, Vergleiche und Transfer statt bloßem Wiedererkennen; typische Fehler und Fallen; so schwer, wie es in einer guten Prüfung drankommen könnte. Wer nur oberflächlich gelernt hat, soll hier scheitern.',
 };
 const LANGUAGE: Record<AiSettings['language'], string> = {
   de: 'Deutsch',
@@ -105,7 +105,7 @@ Ich gebe dir keine Materialien mit. Nutze dein Fachwissen${s.topic.trim() ? ` zu
   const lines = ['## Quellen'];
   if (text.length)
     lines.push(
-      `Ganz unten im Abschnitt „MATERIALIEN“ stehen ${text.length === 1 ? 'eine Datei' : `${text.length} Dateien`} als Text (der Dateiname steht jeweils in der Kopfzeile „===== MATERIAL …“).`,
+      `Ganz unten im Abschnitt „MATERIALIEN“ ${text.length === 1 ? 'steht eine Datei' : `stehen ${text.length} Dateien`} als Text (der Dateiname steht jeweils in der Kopfzeile „===== MATERIAL …“).`,
     );
   if (files.length)
     lines.push(
@@ -113,7 +113,12 @@ Ich gebe dir keine Materialien mit. Nutze dein Fachwissen${s.topic.trim() ? ` zu
     );
   lines.push(
     '- Stütze dich ausschließlich auf diese Materialien. Sie sind die Grundlage – nicht dein Allgemeinwissen.',
-    '- Erfinde nichts dazu. Ergänze höchstens gesichertes Grundwissen, das zum Verständnis direkt dazugehört.',
+    s.kind === 'quiz'
+      ? '- Richtige Antworten und Erklärungen: nichts erfinden – sie müssen durch die Materialien gedeckt sein. Ergänze höchstens gesichertes Grundwissen, das direkt dazugehört.'
+      : '- Erfinde nichts dazu. Ergänze höchstens gesichertes Grundwissen, das zum Verständnis direkt dazugehört.',
+    ...(s.kind === 'quiz'
+      ? ['- AUSNAHME – falsche Antworten: Die darfst und sollst du frei erfinden (siehe „Regeln für die falschen Antworten“). Sie müssen nicht aus den Materialien stammen, nur laut Materialien eindeutig falsch sein.']
+      : []),
     '- Übernimm Fachbegriffe, Schreibweisen, Bezeichnungen und Notation (Variablennamen, Symbole, Definitionen) genau so wie in den Materialien – auch wenn du es anders gewohnt bist.',
     '- Decke die Materialien möglichst gleichmäßig ab – nicht nur den Anfang. Wichtiges (Definitionen, Sätze, Merksätze, hervorgehobene Stellen) hat Vorrang.',
     '- Ignoriere Kopf- und Fußzeilen, Seitenzahlen, Inhaltsverzeichnisse, Literaturangaben und Organisatorisches (Termine, Abgaberegeln, Raumangaben).',
@@ -259,13 +264,23 @@ function quizPrompt(s: AiSettings, mats: Material[]): string {
     sources(s, mats),
     `## Regeln für gute Quizfragen
 - Jede Frage ist für sich allein verständlich und eindeutig – mit dem nötigen Wissen gibt es keinen Zweifel, was richtig ist.
-- Falsche Antworten (Distraktoren) sind plausibel: typische Denkfehler, Verwechslungen oder knapp danebenliegende Werte – nichts offensichtlich Absurdes oder Witziges.
-- Alle Antworten einer Frage sind ähnlich lang und im gleichen Stil formuliert, damit man die richtige nicht an der Form erkennt.
+- Abwechslungsreich: Verständnis, Anwendung, Vergleiche und Zusammenhänge – nicht nur Definitionen oder Jahreszahlen abfragen.
 - Keine Antworten wie „Alle genannten“, „Keine der Antworten“ oder „A und B“.
-- Die richtige Antwort steht an wechselnden Positionen (nicht immer an erster Stelle).
+- Die richtige Antwort steht an wechselnden Positionen (nicht immer an derselben Stelle).
 - Möglichst keine verneinten Fragen. Wenn doch, schreibe das NICHT in Großbuchstaben.
-- Abwechslungsreich: Verständnis, Anwendung und Zusammenhänge – nicht nur Definitionen abfragen.
-- "explanation": 1–3 Sätze, warum die richtige Antwort stimmt und – wenn hilfreich – warum der naheliegendste Fehler falsch ist.`,
+- "explanation": 1–3 Sätze, warum die richtige Antwort stimmt und warum der verlockendste Fehler falsch ist.
+
+## Regeln für die falschen Antworten (Distraktoren) – das Wichtigste am ganzen Quiz
+Ein Quiz ist nur so gut wie seine falschen Antworten. Sie müssen so überzeugend sein, dass nur jemand, der den Stoff wirklich kann, sicher die richtige findet.
+- Erfinde sie frei. Gute Quellen für falsche Antworten: knapp danebenliegende Zahlen und Jahreszahlen (z. B. 4. oder 6. statt 5. Jahrhundert), vertauschte Merkmale, plausible, aber falsche Deutungen oder Symbolik, Merkmale aus derselben Epoche/demselben Gebiet, die aber hier nicht zutreffen, typische Denkfehler und Verwechslungen.
+- „Knapp daneben“: Eine falsche Antwort unterscheidet sich von der richtigen möglichst nur in einem (höchstens zwei) Details – der Rest ist identisch oder genauso plausibel.
+- Gleiche Form: Alle Antworten einer Frage sind gleich aufgebaut, ähnlich lang, gleich genau und im gleichen Stil. Die richtige Antwort darf nicht die längste, genaueste oder „vorsichtigste“ sein und nicht als einzige Wörter aus der Frage wiederholen.
+- VERBOTEN – Antworten, die sich ohne Fachwissen ausschließen lassen:
+  - Namen, Personen, Orte, Gegenstände oder Jahreszahlen, die erkennbar zu einem anderen Thema/Werk gehören als dem, nach dem gefragt wird (z. B. bei einer Frage zu Werk A eine Antwort, die eine Person aus Werk B nennt).
+  - Antworten, die einfach die Beschreibung eines anderen Themas aus den Materialien sind.
+  - Absurde, witzige, offensichtlich übertriebene oder widersprüchliche Antworten.
+- Lieber eine Antwort, die zu 90 % stimmt und nur ein falsches Detail enthält, als eine, die komplett falsch ist.
+- Jede falsche Antwort muss trotzdem eindeutig falsch sein – nichts, worüber man streiten könnte.${s.level === 'exam' ? '\n- Auf Prüfungsniveau gilt das für JEDE Frage: alle falschen Antworten knapp daneben.' : s.level === 'basic' ? '\n- Auf Grundlagen-Niveau dürfen die falschen Antworten etwas deutlicher abweichen – aber trotzdem plausibel und ohne Hinweise aus anderen Themen.' : ''}`,
     MATH_JSON,
     jsonAnswerRules([
       `Jede Antwort hat "correct": true oder "correct": false (ohne Anführungszeichen).`,
@@ -288,20 +303,31 @@ function quizPrompt(s: AiSettings, mats: Material[]): string {
 }
 \`\`\`
 
-## Beispiel (nur zur Veranschaulichung des Formats – nicht übernehmen)
+## Beispiele (nur zur Veranschaulichung von Format und Schwierigkeit – nicht übernehmen)
+Beachte, wie die falschen Antworten jeweils nur in einem Detail abweichen:
 \`\`\`json
 {
-  "title": "Ableitungsregeln",
+  "title": "Beispiele",
   "questions": [
     {
-      "text": "Was ist die Ableitung von $f(x) = x^3$?",
+      "text": "Welche Kombination passt zum Kölner Dom?",
       "answers": [
-        { "text": "$x^2$", "correct": false },
-        { "text": "$3x^2$", "correct": true },
-        { "text": "$3x^3$", "correct": false },
-        { "text": "$\\\\frac{x^4}{4}$", "correct": false }
+        { "text": "Baubeginn 1248, romanischer Stil, Fertigstellung 1880", "correct": false },
+        { "text": "Baubeginn 1248, gotischer Stil, Fertigstellung 1880", "correct": true },
+        { "text": "Baubeginn 1348, gotischer Stil, Fertigstellung 1880", "correct": false },
+        { "text": "Baubeginn 1248, gotischer Stil, Fertigstellung 1780", "correct": false }
       ],
-      "explanation": "Nach der Potenzregel gilt $(x^n)' = n x^{n-1}$. $\\\\frac{x^4}{4}$ wäre eine Stammfunktion."
+      "explanation": "Der Dom wurde 1248 im gotischen Stil begonnen und erst 1880 vollendet. Die romanische Variante ist verlockend, weil viele ältere Kölner Kirchen romanisch sind."
+    },
+    {
+      "text": "Für $f(x) = x^3$ gilt:",
+      "answers": [
+        { "text": "$f'(x) = 3x^2$, also $f'(2) = 6$", "correct": false },
+        { "text": "$f'(x) = 3x^3$, also $f'(2) = 24$", "correct": false },
+        { "text": "$f'(x) = 3x^2$, also $f'(2) = 12$", "correct": true },
+        { "text": "$f'(x) = x^2$, also $f'(2) = 4$", "correct": false }
+      ],
+      "explanation": "Nach der Potenzregel ist $f'(x) = 3x^2$ und damit $f'(2) = 3 \\cdot 4 = 12$. Wer $3 \\cdot 2$ rechnet, vergisst das Quadrat."
     }
   ]
 }
@@ -311,10 +337,16 @@ function quizPrompt(s: AiSettings, mats: Material[]): string {
       s.multi ? 'Ist bei jeder Frage mindestens eine Antwort richtig?' : 'Ist bei jeder Frage genau eine Antwort richtig?',
       'Ist jede als richtig markierte Antwort wirklich richtig und jede als falsch markierte wirklich falsch?',
       'Steht die richtige Antwort an wechselnden Positionen?',
+      'Könnte jemand, der NICHT gelernt hat, die richtige Antwort durch Ausschließen finden (weil eine falsche Antwort zu einem anderen Thema gehört, absurd ist oder anders formuliert ist)? Dann schreibe die falschen Antworten um.',
+      'Weicht jede falsche Antwort nur in einem oder zwei Details von der richtigen ab und ist trotzdem eindeutig falsch?',
       'Ist das JSON gültig, und sind in Formeln alle Backslashes verdoppelt?',
     ]),
     materialsBlock(mats),
-    finalReminder([...JSON_REMINDER, `${hasMats ? `Bis zu ${s.count}` : `Genau ${s.count}`} Fragen mit je ${s.answers} Antworten, Sprache: ${LANGUAGE[s.language]}.`]),
+    finalReminder([
+      ...JSON_REMINDER,
+      `${hasMats ? `Bis zu ${s.count}` : `Genau ${s.count}`} Fragen mit je ${s.answers} Antworten, Sprache: ${LANGUAGE[s.language]}.`,
+      'Falsche Antworten frei erfinden, knapp daneben, gleich aufgebaut wie die richtige – keine Begriffe aus anderen Themen, nichts, was man ohne Wissen ausschließen kann.',
+    ]),
   ]);
 }
 
