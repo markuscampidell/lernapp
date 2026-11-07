@@ -10,7 +10,7 @@ import { FileThumb, FolderThumb } from '../../components/Thumbs';
 import { EmptyState } from '../../components/EmptyState';
 import { downloadBlob, fullName } from '../../lib/files';
 import { CHART_TYPES } from '../charts/chart';
-import { prepareMaterial, routeGuess, type Material } from './materials';
+import { attachmentsOf, prepareMaterial, routeGuess, type Material } from './materials';
 import { buildPrompt, DEFAULT_SETTINGS, kindInfo, KINDS, parseAnswer, type AiKind, type AiResult, type AiSettings, type Parsed } from './recipes';
 
 // Eingaben überleben das Wechseln zur KI-App (auf Handys wird die App dabei manchmal neu geladen).
@@ -118,11 +118,22 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
-  const list = useMemo(() => selected.map((f) => mats.get(f.id)).filter((m): m is Material => !!m), [selected, mats]);
+  // PDFs mit Text, die zusätzlich als Datei angehängt werden sollen (damit die KI auch Zeichnungen sieht)
+  const [attachPdf, setAttachPdf] = useState<Set<string>>(new Set());
+  const list = useMemo(
+    () =>
+      selected
+        .map((f) => mats.get(f.id))
+        .filter((m): m is Material => !!m)
+        .map((m) => (attachPdf.has(m.file.id) ? { ...m, attachOriginal: true } : m)),
+    [selected, mats, attachPdf],
+  );
   const loading = list.some((m) => m.status === 'loading') || list.length < selected.length;
   const asText = list.filter((m) => m.status === 'ready' && m.route === 'text');
-  const asFiles = list.filter((m) => m.status === 'ready' && m.route === 'file' && m.blob);
+  const attachments = useMemo(() => list.flatMap(attachmentsOf), [list]);
   const prompt = useMemo(() => buildPrompt(s, list), [s, list]);
+  // Ohne Thema und ohne Materialien weiß die KI nicht, worum es gehen soll.
+  const hasSource = !!s.topic.trim() || asText.length > 0 || attachments.length > 0 || loading;
 
   const parsed = useMemo((): { ok: Parsed } | { err: string } | null => {
     if (!answer.trim()) return null;
@@ -161,7 +172,7 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
     }
   };
 
-  const fileList = asFiles.map((m) => m.blob!) as File[];
+  const fileList = attachments;
   const canShareFiles = typeof navigator.canShare === 'function' && fileList.length > 0 && (() => {
     try {
       return navigator.canShare({ files: fileList });
@@ -290,7 +301,7 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
             </div>
             <TextLine value={s.topic} onChange={(v) => set({ topic: v })} placeholder="z. B. Ableitungsregeln, Kapitel 3, Zellbiologie …" maxLength={300} />
             <p className="muted small">
-              {asText.length + asFiles.length > 0
+              {asText.length + attachments.length > 0
                 ? 'Optional: Worauf soll sich die KI in deinen Materialien konzentrieren? Leer lassen = alles.'
                 : 'Ohne Materialien schreibt die KI aus ihrem eigenen Wissen zu diesem Thema.'}
             </p>
@@ -490,11 +501,13 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
           <ul className="ai-legend muted small">
             <li>
               <span className="chip ai-route text">Im Prompt</span> Text-Dokumente, Notizen, Karteikarten, PDFs mit Text, Word und PowerPoint: Der Text
-              wird ausgelesen und steht direkt im Prompt.
+              wird ausgelesen und steht direkt im Prompt. Bilder darin (z. B. Fotos in einem Text-Dokument oder auf Folien) werden
+              herausgelöst und direkt an die KI gegeben – im Text steht dann, wo sie hingehören.
             </li>
             <li>
               <span className="chip ai-route file">Direkt an die KI</span> Fotos, Bilder und eingescannte PDFs kann die App nicht lesen – die gibst du der
-              KI selbst mit (Schritt {stepNo + 1}). KIs wie ChatGPT können Bilder und Handschrift lesen.
+              KI selbst mit (Schritt {stepNo + 1}). KIs wie ChatGPT können Bilder und Handschrift lesen. Bei PDFs mit Text kannst du die Datei
+              zusätzlich anhängen, damit die KI auch Zeichnungen darin sieht.
             </li>
           </ul>
           <button className="btn ghost" onClick={() => setPicking(true)}>
@@ -514,8 +527,26 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
                         <span className={`chip ai-route ${route}`}>
                           {route === 'loading' ? 'Wird gelesen …' : route === 'text' ? 'Im Prompt' : route === 'file' ? 'Direkt an die KI' : 'Wird nicht verwendet'}
                         </span>{' '}
-                        {m?.note && <span className="muted">{m.note}</span>}
+                        {m?.images?.length ? <span className="chip ai-route file">+ {m.images.length} {m.images.length === 1 ? 'Bild' : 'Bilder'} direkt an die KI</span> : null}
+                        {m?.note && <span className="muted">{m.note.replace(/ · \d+ Bild(er)? direkt an die KI.*$/, '')}</span>}
                       </span>
+                      {m?.original && (
+                        <label className="ai-attach">
+                          <input
+                            type="checkbox"
+                            checked={attachPdf.has(f.id)}
+                            onChange={(e) =>
+                              setAttachPdf((old) => {
+                                const next = new Set(old);
+                                if (e.target.checked) next.add(f.id);
+                                else next.delete(f.id);
+                                return next;
+                              })
+                            }
+                          />
+                          <span className="small">PDF zusätzlich anhängen – damit die KI auch Zeichnungen und Bilder darin sieht</span>
+                        </label>
+                      )}
                     </div>
                     <button className="icon-btn" aria-label={`„${fullName(f)}“ entfernen`} onClick={() => setIds((x) => x.filter((id) => id !== f.id))}>
                       <Icon name="close" size={18} />
@@ -532,9 +563,9 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
           <ol className="ai-howto">
             <li>Tippe auf „Prompt kopieren“.</li>
             <li>Öffne deine KI (z. B. ChatGPT, Claude oder Gemini) und starte ein neues Gespräch.</li>
-            {asFiles.length > 0 && (
+            {attachments.length > 0 && (
               <li>
-                Hänge {asFiles.length === 1 ? 'die Datei' : `die ${asFiles.length} Dateien`} an, die „Direkt an die KI“ gehen:{' '}
+                Hänge {attachments.length === 1 ? 'die Datei' : `die ${attachments.length} Dateien`} an, die „Direkt an die KI“ gehen (Fotos, Scans und Bilder aus deinen Dokumenten):{' '}
                 {canShareFiles
                   ? 'Tippe auf „Dateien teilen“ und wähle deine KI-App – oder lade sie herunter und hänge sie in der KI über die Büroklammer bzw. das „+“ an.'
                   : 'Tippe auf „Dateien herunterladen“ und hänge sie in der KI über die Büroklammer bzw. das „+“ an.'}
@@ -542,6 +573,9 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
             )}
             <li>Füge den Prompt ins Eingabefeld der KI ein (lange tippen → „Einfügen“ bzw. Strg+V) und schick ihn ab.</li>
           </ol>
+          {!hasSource && (
+            <p className="notice warning">Gib zuerst ein Thema ein (Schritt 2) oder wähle Materialien aus (Schritt 3) – sonst weiß die KI nicht, worum es gehen soll.</p>
+          )}
           {loading && <p className="notice info">Materialien werden noch gelesen … warte kurz, bevor du den Prompt kopierst.</p>}
           {prompt.length > HUGE_PROMPT ? (
             <p className="notice critical">
@@ -556,29 +590,35 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
             <p className="muted small">
               Prompt: ca. {prompt.length.toLocaleString('de')} Zeichen
               {asText.length > 0 && ` · ${asText.length} ${asText.length === 1 ? 'Datei' : 'Dateien'} als Text`}
-              {asFiles.length > 0 && ` · ${asFiles.length} ${asFiles.length === 1 ? 'Datei' : 'Dateien'} zum Anhängen`}
+              {attachments.length > 0 && ` · ${attachments.length} ${attachments.length === 1 ? 'Datei' : 'Dateien'} zum Anhängen`}
             </p>
           )}
           <div className="input-row wrap">
-            <button className="btn primary" onClick={copyPrompt} disabled={loading}>
+            <button className="btn primary" onClick={copyPrompt} disabled={loading || !hasSource}>
               <Icon name="copy" size={18} /> Prompt kopieren
             </button>
-            {asFiles.length > 0 && canShareFiles && (
+            {attachments.length > 0 && canShareFiles && (
               <button className="btn ghost" onClick={shareFiles}>
                 <Icon name="share" size={18} /> Dateien teilen
               </button>
             )}
-            {asFiles.length > 0 && (
+            {attachments.length > 0 && (
               <button className="btn ghost" onClick={downloadFiles}>
                 <Icon name="download" size={18} /> Dateien herunterladen
               </button>
             )}
-            {canSharePrompt && !loading && (
+            {canSharePrompt && !loading && hasSource && (
               <button className="btn ghost" onClick={sharePrompt}>
                 <Icon name="share" size={18} /> Prompt teilen
               </button>
             )}
           </div>
+          {attachments.length > 10 && (
+            <p className="notice warning">
+              {attachments.length} Dateien zum Anhängen – viele KIs nehmen nur etwa 10 Dateien pro Nachricht. Schick sie notfalls in zwei Nachrichten
+              (zuerst einen Teil der Dateien mit „Hier kommen Materialien, warte noch“, dann den Rest mit dem Prompt) oder wähle weniger aus.
+            </p>
+          )}
           {copied && <p className="notice good">{copied}</p>}
           {actionErr && <p className="notice critical">{actionErr}</p>}
           <button className="link small" onClick={() => setShowPrompt((v) => !v)}>

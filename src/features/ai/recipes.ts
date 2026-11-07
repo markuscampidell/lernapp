@@ -5,7 +5,7 @@ import { parseCards, parseQuiz, type Card, type Question } from '../study/format
 import { CHART_TYPES, MAX_POINTS, parseChart, type Chart, type ChartType } from '../charts/chart';
 import { MAX_ENTRIES, parseWheel, type Wheel } from '../wheel/wheel';
 import { extractJson, markdownToHtml, splitTitle, unfence } from './answer';
-import type { Material } from './materials';
+import { attachmentsOf, type Material } from './materials';
 
 export type AiKind = 'cards' | 'quiz' | 'doc' | 'note' | 'chart' | 'wheel';
 
@@ -92,13 +92,13 @@ const LANGUAGE: Record<AiSettings['language'], string> = {
   material: 'dieselbe Sprache wie die Materialien (ohne Materialien: Deutsch)',
 };
 
-const usable = (mats: Material[]) => mats.filter((m) => (m.route === 'text' && m.text) || (m.route === 'file' && m.blob));
+const usable = (mats: Material[]) => mats.filter((m) => (m.route === 'text' && m.text) || attachmentsOf(m).length > 0);
 
 // ---------- Bausteine ----------
 
 function sources(s: AiSettings, mats: Material[]): string {
   const text = mats.filter((m) => m.route === 'text' && m.text);
-  const files = mats.filter((m) => m.route === 'file' && m.blob);
+  const files = mats.flatMap(attachmentsOf);
   if (!text.length && !files.length) {
     return `## Quellen
 Ich gebe dir keine Materialien mit. Nutze dein Fachwissen${s.topic.trim() ? ` zum Thema „${s.topic.trim()}“` : ''}.
@@ -113,9 +113,12 @@ Ich gebe dir keine Materialien mit. Nutze dein Fachwissen${s.topic.trim() ? ` zu
     );
   if (files.length)
     lines.push(
-      `${text.length ? 'Zusätzlich hänge' : 'Ich hänge'} ich ${files.length === 1 ? 'eine Datei' : `${files.length} Dateien`} direkt an diese Nachricht an: ${files.map((m) => `„${fullName(m.file)}“`).join(', ')}. Lies ${files.length === 1 ? 'sie' : 'sie alle'} vollständig und sorgfältig – auch Handschrift, Tafelbilder, Tabellen, Skizzen und Diagramme darin. Wenn du eine angekündigte Datei nicht siehst oder nicht lesen kannst, sag mir das in einem Satz, statt etwas zu erfinden.`,
+      `${text.length ? 'Zusätzlich hänge' : 'Ich hänge'} ich ${files.length === 1 ? 'eine Datei' : `${files.length} Dateien`} direkt an diese Nachricht an: ${files.map((f) => `„${f.name}“`).join(', ')}. Lies ${files.length === 1 ? 'sie' : 'sie alle'} vollständig und sorgfältig – auch Handschrift, Tafelbilder, Tabellen, Skizzen und Diagramme darin. Wenn du eine angekündigte Datei nicht siehst oder nicht lesen kannst, sag mir das in einem Satz, statt etwas zu erfinden.`,
     );
   lines.push(
+    ...(files.length && text.length
+      ? ['- Im Text stehen Platzhalter wie „[Bild: siehe angehängte Datei „…“]“. Dort gehört das jeweilige angehängte Bild hin – beziehe es an dieser Stelle mit ein (z. B. Tafelbilder, Skizzen, Diagramme, Tabellen als Bild).']
+      : []),
     '- Stütze dich ausschließlich auf diese Materialien. Sie sind die Grundlage – nicht dein Allgemeinwissen.',
     s.kind === 'quiz'
       ? '- Richtige Antworten und Erklärungen: nichts erfinden – sie müssen durch die Materialien gedeckt sein. Ergänze höchstens gesichertes Grundwissen, das direkt dazugehört.'
