@@ -449,20 +449,21 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
       )}
       {aiResult && folder && (() => {
         const close = () => setAiResult(null);
-        const name = aiResult.title || undefined;
+        const name = aiResult.title;
+        const desc = aiResult.description || undefined;
         switch (aiResult.kind) {
           case 'cards':
-            return <CardsEditor folderId={folder.id} initial={aiResult.cards} initialName={name} onClose={close} />;
+            return <CardsEditor folderId={folder.id} initial={aiResult.cards} initialName={name} initialDescription={desc} onClose={close} />;
           case 'quiz':
-            return <QuizEditor folderId={folder.id} initial={aiResult.questions} initialName={name} onClose={close} />;
+            return <QuizEditor folderId={folder.id} initial={aiResult.questions} initialName={name} initialDescription={desc} onClose={close} />;
           case 'chart':
-            return <ChartEditor folderId={folder.id} initial={aiResult.chart} initialName={name} onClose={close} />;
+            return <ChartEditor folderId={folder.id} initial={aiResult.chart} initialName={name} initialDescription={desc} onClose={close} />;
           case 'wheel':
-            return <WheelEditor folderId={folder.id} initial={aiResult.wheel} initialName={name} onClose={close} />;
+            return <WheelEditor folderId={folder.id} initial={aiResult.wheel} initialName={name} initialDescription={desc} onClose={close} />;
           case 'doc':
-            return <DocEditor folderId={folder.id} initial={aiResult.html} initialName={name} onClose={close} />;
+            return <DocEditor folderId={folder.id} initial={aiResult.html} initialName={name} initialDescription={desc} onClose={close} />;
           case 'note':
-            return <NoteSheet folderId={folder.id} initialName={name} initialText={aiResult.text} onClose={close} />;
+            return <NoteSheet folderId={folder.id} initialName={name} initialDescription={desc} initialText={aiResult.text} onClose={close} />;
         }
       })()}
       {sheet === 'add' && folder && (

@@ -13,9 +13,9 @@ const MAX_ANSWERS = 6;
 const LETTERS = 'ABCDEF';
 
 /** Multiple-Choice-Quiz anlegen/bearbeiten: eine Frage pro Seite. */
-export function QuizEditor({ file, folderId, initial, initialName, onClose }: { file?: FileItem; folderId?: string; initial?: Question[]; initialName?: string; onClose: () => void }) {
+export function QuizEditor({ file, folderId, initial, initialName, initialDescription, onClose }: { file?: FileItem; folderId?: string; initial?: Question[]; initialName?: string; initialDescription?: string; onClose: () => void }) {
   const [name, setName] = useState(file?.name ?? initialName ?? '');
-  const [description, setDescription] = useState(file?.description ?? '');
+  const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
   const [questions, setQuestions] = useState<Question[]>(() => (initial?.length ? initial : [newQuestion()]));
   const [index, setIndex] = useState(0);
   const start = useRef(JSON.stringify({ name, description, questions }));

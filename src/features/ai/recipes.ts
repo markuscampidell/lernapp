@@ -44,13 +44,17 @@ export const DEFAULT_SETTINGS: AiSettings = {
   removePicked: false,
 };
 
-export type AiResult =
+export type AiResult = (
   | { kind: 'cards'; title: string; cards: Card[] }
   | { kind: 'quiz'; title: string; questions: Question[] }
   | { kind: 'chart'; title: string; chart: Chart }
   | { kind: 'wheel'; title: string; wheel: Wheel }
   | { kind: 'doc'; title: string; html: string }
-  | { kind: 'note'; title: string; text: string };
+  | { kind: 'note'; title: string; text: string }
+) & {
+  /** Kurze Beschreibung der Datei (von der KI) */
+  description?: string;
+};
 
 export interface Parsed {
   result: AiResult;
@@ -215,11 +219,12 @@ function cardsPrompt(s: AiSettings, mats: Material[]): string {
 - Sinnvolle Reihenfolge: von den Grundlagen zu den schwierigeren Inhalten, Zusammengehöriges nacheinander.
 - Bei Definitionen und Sätzen alle Voraussetzungen nennen – nichts weglassen, was die Aussage verfälscht.`,
     MATH_JSON,
-    jsonAnswerRules([`"cards" enthält die Karten in der gewünschten Reihenfolge.`, `"title" ist ein kurzer, passender Name für den Kartenstapel (höchstens 60 Zeichen).`]),
+    jsonAnswerRules([`"cards" enthält die Karten in der gewünschten Reihenfolge.`, `"title" ist ein kurzer, passender Name für den Kartenstapel (höchstens 60 Zeichen).`, `"description" ist eine kurze Beschreibung (ein Satz, höchstens 150 Zeichen), worum es geht – z. B. Thema, Kapitel oder Umfang. Lass sie nur dann leer (""), wenn ich in meinen Wünschen ausdrücklich keine Beschreibung möchte.`]),
     `## Vorlage
 \`\`\`json
 {
   "title": "Kurzer Name für den Stapel",
+  "description": "Ein Satz, worum es geht",
   "cards": [
     { "front": "Vorderseite", "back": "Rückseite" }
   ]
@@ -230,6 +235,7 @@ function cardsPrompt(s: AiSettings, mats: Material[]): string {
 \`\`\`json
 {
   "title": "Analysis – Ableitungen",
+  "description": "Grundlegende Ableitungsregeln mit Beispielen aus Kapitel 2",
   "cards": [
     { "front": "Satz des Pythagoras", "back": "In einem rechtwinkligen Dreieck mit Hypotenuse $c$ gilt $a^2 + b^2 = c^2$." },
     { "front": "Was ist die Ableitung von $\\\\sin x$?", "back": "$\\\\frac{d}{dx}\\\\sin x = \\\\cos x$" },
@@ -285,11 +291,13 @@ Ein Quiz ist nur so gut wie seine falschen Antworten. Sie müssen so überzeugen
     jsonAnswerRules([
       `Jede Antwort hat "correct": true oder "correct": false (ohne Anführungszeichen).`,
       `"title" ist ein kurzer, passender Name für das Quiz (höchstens 60 Zeichen).`,
+      `"description" ist eine kurze Beschreibung (ein Satz, höchstens 150 Zeichen), worum es geht – z. B. Thema, Kapitel oder Umfang. Lass sie nur dann leer (""), wenn ich in meinen Wünschen ausdrücklich keine Beschreibung möchte.`,
     ]),
     `## Vorlage
 \`\`\`json
 {
   "title": "Kurzer Name für das Quiz",
+  "description": "Ein Satz, worum es geht",
   "questions": [
     {
       "text": "Frage",
@@ -308,6 +316,7 @@ Beachte, wie die falschen Antworten jeweils nur in einem Detail abweichen:
 \`\`\`json
 {
   "title": "Beispiele",
+  "description": "Zwei Beispielfragen mit knapp danebenliegenden falschen Antworten",
   "questions": [
     {
       "text": "Welche Kombination passt zum Kölner Dom?",
@@ -371,11 +380,12 @@ function chartPrompt(s: AiSettings, mats: Material[]): string {
 - Bei "line" sind die Punkte zeitlich bzw. nach der x-Achse sortiert. Bei "pie"/"donut" sind alle Werte positiv und ergeben zusammen das Ganze.
 - "showValues": true zeigt die Zahlen am Diagramm an (meist sinnvoll), false blendet sie aus.
 - Mögliche Werte für "chart": ${types}.`,
-    jsonAnswerRules([`"title" beschreibt, was das Diagramm zeigt (inkl. Zeitraum/Quelle, falls bekannt; höchstens 120 Zeichen).`]),
+    jsonAnswerRules([`"title" beschreibt, was das Diagramm zeigt (inkl. Zeitraum/Quelle, falls bekannt; höchstens 120 Zeichen).`, `"description" ist eine kurze Beschreibung (ein Satz, höchstens 150 Zeichen), worum es geht – z. B. Thema, Kapitel oder Umfang. Lass sie nur dann leer (""), wenn ich in meinen Wünschen ausdrücklich keine Beschreibung möchte.`]),
     `## Vorlage
 \`\`\`json
 {
   "title": "Was das Diagramm zeigt",
+  "description": "Ein Satz, worum es geht",
   "chart": "bar",
   "unit": "",
   "showValues": true,
@@ -389,6 +399,7 @@ function chartPrompt(s: AiSettings, mats: Material[]): string {
 \`\`\`json
 {
   "title": "Notenverteilung Klausur Analysis 1 (Beispielwerte)",
+  "description": "Anteil der Noten in Prozent, erfundene Beispielwerte",
   "chart": "bar",
   "unit": "%",
   "showValues": true,
@@ -423,11 +434,12 @@ function wheelPrompt(s: AiSettings, mats: Material[]): string {
 - "weight" ist eine ganze Zahl von 1 bis 10 und bestimmt die Größe des Feldes (2 = kommt doppelt so oft wie 1). Nimm normalerweise 1; nur besonders wichtige Einträge bekommen 2 oder 3.
 - Formeln sind möglich ($…$), sollten im Rad aber die Ausnahme sein.`,
     MATH_JSON,
-    jsonAnswerRules([`"title" ist ein kurzer, passender Name (höchstens 60 Zeichen).`]),
+    jsonAnswerRules([`"title" ist ein kurzer, passender Name (höchstens 60 Zeichen).`, `"description" ist eine kurze Beschreibung (ein Satz, höchstens 150 Zeichen), worum es geht – z. B. Thema, Kapitel oder Umfang. Lass sie nur dann leer (""), wenn ich in meinen Wünschen ausdrücklich keine Beschreibung möchte.`]),
     `## Vorlage
 \`\`\`json
 {
   "title": "Kurzer Name",
+  "description": "Ein Satz, worum es geht",
   "removePicked": ${s.removePicked},
   "entries": [
     { "label": "Eintrag", "weight": 1 }
@@ -439,6 +451,7 @@ function wheelPrompt(s: AiSettings, mats: Material[]): string {
 \`\`\`json
 {
   "title": "Wiederholung Lineare Algebra",
+  "description": "Zufällig ein Thema zum Wiederholen ziehen",
   "removePicked": ${s.removePicked},
   "entries": [
     { "label": "Basis & Dimension", "weight": 2 },
@@ -470,6 +483,8 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
     sources(s, mats),
     `## Aufbau und erlaubte Formatierung (Markdown)
 - Die allererste Zeile ist der Titel: "# Titel" (genau einmal, nur dort).
+- Die zweite Zeile ist eine kurze Beschreibung: "Beschreibung: …" (ein Satz, höchstens 150 Zeichen, worum es geht). Lass die Beschreibung nur weg, wenn ich in meinen Wünschen ausdrücklich keine möchte.
+- Danach eine Leerzeile und der eigentliche Text.
 - Abschnitte mit "## Überschrift", Unterabschnitte mit "### Überschrift" – keine tieferen Ebenen.
 - Absätze durch eine Leerzeile trennen.
 - Aufzählungen mit "- ", nummerierte Listen mit "1. ", Unterpunkte mit 2 Leerzeichen Einrückung.
@@ -483,7 +498,7 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
     `## Antwortformat (exakt einhalten)
 - Schreibe das ganze Dokument in genau einen Codeblock, der mit \`\`\`\`markdown (vier Backticks) beginnt und mit \`\`\`\` (vier Backticks) endet – so bleibt der Text beim Kopieren unverändert.
 - Vor und nach dem Codeblock steht nichts – keine Einleitung, keine Erklärung, keine Rückfrage.
-- Im Codeblock beginnt die erste Zeile mit "# " (Titel).`,
+- Im Codeblock: erste Zeile "# Titel", zweite Zeile "Beschreibung: …", dann eine Leerzeile.`,
     SELF_CHECK([
       'Ist alles fachlich korrekt und vollständig, ohne Erfundenes?',
       `Passen die Länge (${words}) und die Art (${DOC_STYLE_NAME[s.docStyle]})?`,
@@ -492,7 +507,7 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
     materialsBlock(mats),
     finalReminder([
       'Nur ein einziger Codeblock mit vier Backticks (````markdown … ````), nichts davor und nichts danach.',
-      'Erste Zeile "# Titel", dann "##"-Abschnitte.',
+      'Erste Zeile "# Titel", zweite Zeile "Beschreibung: …", dann "##"-Abschnitte.',
       'Keine Tabellen, kein HTML. Formeln in $…$.',
       `Sprache: ${LANGUAGE[s.language]}.`,
     ]),
@@ -513,18 +528,20 @@ function notePrompt(s: AiSettings, mats: Material[]): string {
     `## Antwortformat (exakt einhalten)
 - Antworte mit genau einem Codeblock, der mit \`\`\`text beginnt und mit \`\`\` endet. Nichts davor und nichts danach.
 - Erste Zeile im Codeblock: "Titel: " und ein kurzer Titel (höchstens 60 Zeichen).
+- Zweite Zeile: "Beschreibung: " und ein Satz, worum es geht (höchstens 150 Zeichen). Lass die Beschreibung nur weg, wenn ich in meinen Wünschen ausdrücklich keine möchte.
 - Dann eine Leerzeile, dann die Notiz.
 
 ## Beispiel (nur zur Veranschaulichung des Formats – nicht übernehmen)
 \`\`\`text
 Titel: Ableitungsregeln
+Beschreibung: Die drei wichtigsten Ableitungsregeln zum schnellen Nachschlagen
 
 - Potenzregel: (x^n)' = n·x^(n-1)
 - Produktregel: (f·g)' = f'·g + f·g'
 - Kettenregel: (f(g(x)))' = f'(g(x))·g'(x)
 \`\`\``,
     materialsBlock(mats),
-    finalReminder(['Nur ein einziger ```text-Codeblock, erste Zeile "Titel: …".', `Sprache: ${LANGUAGE[s.language]}.`]),
+    finalReminder(['Nur ein einziger ```text-Codeblock, erste Zeile "Titel: …", zweite Zeile "Beschreibung: …".', `Sprache: ${LANGUAGE[s.language]}.`]),
   ]);
 }
 
@@ -583,21 +600,43 @@ function countWarning(got: number, wanted: number, noun: string, plural: string,
   return `Du wolltest ${wanted} ${plural}, die KI hat ${got} ${got === 1 ? noun : plural} geliefert.`;
 }
 
+/** Name mit „(KI)“ am Ende, damit man sieht, was von einer KI stammt (lässt sich im Editor ändern). */
+export const KI_SUFFIX = ' (KI)';
+export function withKi(title: string, fallback: string): string {
+  const t = (title.trim() || fallback).replace(/\s*\((KI|AI)\)\s*$/i, '').slice(0, 120 - KI_SUFFIX.length).trim();
+  return `${t}${KI_SUFFIX}`;
+}
+
+/** „Beschreibung: …“ aus der ersten Zeile holen (Text-Dokument und Notiz). */
+function takeDescription(text: string): { description: string; rest: string } {
+  const m = text.match(/^\s*(?:>\s*)?\*{0,2}Beschreibung\*{0,2}\s*:\s*(.*)(\n|$)/i);
+  if (!m) return { description: '', rest: text };
+  return { description: m[1].replace(/[*_]/g, '').trim().slice(0, 500), rest: text.slice(m[0].length) };
+}
+
 export function parseAnswer(answer: string, s: AiSettings): Parsed {
+  const p = parseRaw(answer, s);
+  p.result.title = withKi(p.result.title, kindInfo(s.kind).label);
+  if (p.result.description) p.result.description = p.result.description.trim().slice(0, 500);
+  return p;
+}
+
+function parseRaw(answer: string, s: AiSettings): Parsed {
   const kind = s.kind;
   if (!answer.trim()) throw new Error('Füge zuerst die Antwort der KI ein.');
 
   if (kind === 'doc') {
     const md = unfence(answer);
     if (/^\s*\{[\s\S]*"(cards|questions|points|entries)"/.test(md)) throw new Error('Das ist JSON, kein Text-Dokument. Hast du oben die richtige Art gewählt?');
-    const { title, body } = splitTitle(md);
+    const { title, body: withDesc } = splitTitle(md);
+    const { description, rest: body } = takeDescription(withDesc);
     const html = markdownToHtml(body);
     if (!html.replace(/<[^>]+>/g, '').trim() && !html.includes('class="math"')) throw new Error('In der Antwort steht kein Text.');
     const sections = (body.match(/^##\s/gm) ?? []).length;
     const warnings: string[] = [];
     if (!title) warnings.push('Die KI hat keinen Titel („# …“) mitgeschickt – gib dem Dokument im Editor einen Namen.');
     if (/<\/?(div|table|span|p|br)\b/i.test(body)) warnings.push('Die KI hat HTML verwendet – das wird nur teilweise übernommen.');
-    return { result: { kind, title, html }, summary: `Text-Dokument${title ? ` „${title}“` : ''} mit ${sections} ${sections === 1 ? 'Abschnitt' : 'Abschnitten'} erkannt`, warnings };
+    return { result: { kind, title, html, description }, summary: `Text-Dokument${title ? ` „${title}“` : ''} mit ${sections} ${sections === 1 ? 'Abschnitt' : 'Abschnitten'} erkannt`, warnings };
   }
 
   if (kind === 'note') {
@@ -608,12 +647,14 @@ export function parseAnswer(answer: string, s: AiSettings): Parsed {
       title = m[1].trim().slice(0, 120);
       t = t.slice(m[0].length);
     }
-    t = t.trim();
+    const d = takeDescription(t);
+    t = d.rest.trim();
     if (!t) throw new Error('In der Antwort steht kein Text.');
-    return { result: { kind, title, text: t }, summary: `Notiz${title ? ` „${title}“` : ''} erkannt (${t.length.toLocaleString('de')} Zeichen)`, warnings: [] };
+    return { result: { kind, title, text: t, description: d.description }, summary: `Notiz${title ? ` „${title}“` : ''} erkannt (${t.length.toLocaleString('de')} Zeichen)`, warnings: [] };
   }
 
   const o = extractJson(answer);
+  const description = str(pick(o, 'description', 'beschreibung')).trim();
   const wrong = wrongKind(o, kind);
   if (wrong) throw new Error(wrong);
   const warnings: string[] = [];
@@ -633,7 +674,7 @@ export function parseAnswer(answer: string, s: AiSettings): Parsed {
     if (half) warnings.push(`${half} ${half === 1 ? 'Karte hat' : 'Karten haben'} eine leere Seite.`);
     const cw = countWarning(cards.length, s.count, 'Karte', 'Karten', false);
     if (cw) warnings.push(cw);
-    return { result: { kind, title: titleOf(o), cards }, summary: `${cards.length} ${cards.length === 1 ? 'Karte' : 'Karten'} erkannt`, warnings };
+    return { result: { kind, title: titleOf(o), cards, description }, summary: `${cards.length} ${cards.length === 1 ? 'Karte' : 'Karten'} erkannt`, warnings };
   }
 
   if (kind === 'quiz') {
@@ -664,7 +705,7 @@ export function parseAnswer(answer: string, s: AiSettings): Parsed {
     }
     const cw = countWarning(questions.length, s.count, 'Frage', 'Fragen', false);
     if (cw) warnings.push(cw);
-    return { result: { kind, title: titleOf(o), questions }, summary: `${questions.length} ${questions.length === 1 ? 'Frage' : 'Fragen'} erkannt`, warnings };
+    return { result: { kind, title: titleOf(o), questions, description }, summary: `${questions.length} ${questions.length === 1 ? 'Frage' : 'Fragen'} erkannt`, warnings };
   }
 
   if (kind === 'chart') {
@@ -684,7 +725,7 @@ export function parseAnswer(answer: string, s: AiSettings): Parsed {
     if (!chart.points.length) throw new Error('Keine Datenpunkte gefunden. Steht in der Antwort eine Liste "points" mit "label" und "value"?');
     if (s.chartType !== 'auto' && chart.chart !== s.chartType) warnings.push('Die KI hat einen anderen Diagrammtyp gewählt – du kannst ihn im Editor ändern.');
     if (/beispiel/i.test(chart.title)) warnings.push('Die KI hat Beispielwerte verwendet (keine echten Daten).');
-    return { result: { kind, title: chart.title, chart }, summary: `Diagramm mit ${chart.points.length} ${chart.points.length === 1 ? 'Wert' : 'Werten'} erkannt`, warnings };
+    return { result: { kind, title: chart.title, chart, description }, summary: `Diagramm mit ${chart.points.length} ${chart.points.length === 1 ? 'Wert' : 'Werten'} erkannt`, warnings };
   }
 
   // Glücksrad
@@ -698,5 +739,5 @@ export function parseAnswer(answer: string, s: AiSettings): Parsed {
   if (long) warnings.push(`${long} ${long === 1 ? 'Eintrag ist' : 'Einträge sind'} recht lang und passen evtl. schlecht ins Rad.`);
   const cw = countWarning(wheel.entries.length, s.count, 'Eintrag', 'Einträge', true);
   if (cw) warnings.push(cw);
-  return { result: { kind, title: wheel.title, wheel }, summary: `${wheel.entries.length} ${wheel.entries.length === 1 ? 'Eintrag' : 'Einträge'} erkannt`, warnings };
+  return { result: { kind, title: wheel.title, wheel, description }, summary: `${wheel.entries.length} ${wheel.entries.length === 1 ? 'Eintrag' : 'Einträge'} erkannt`, warnings };
 }

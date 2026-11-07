@@ -625,7 +625,7 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
                 </div>
               )}
               <p className="muted small">
-                Tippe unten auf „Im Editor öffnen“. Prüfe dort den Inhalt – auch eine KI macht Fehler – und tippe dann auf „Speichern“.
+                Tippe unten auf „Im Editor öffnen“. Dort sind Name und Beschreibung schon ausgefüllt – der Name endet auf „(KI)“, damit man sieht, was von einer KI stammt. Beides kannst du ändern. Prüfe auch den Inhalt – eine KI macht Fehler – und tippe dann auf „Speichern“.
               </p>
             </>
           )}

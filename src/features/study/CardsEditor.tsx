@@ -10,9 +10,9 @@ import { DetailsButton } from './DetailsButton';
 import { MathPreview } from '../../components/MathText';
 
 /** Karteikarten anlegen/bearbeiten: eine Karte pro Seite (Vorder- und Rückseite). */
-export function CardsEditor({ file, folderId, initial, initialName, onClose }: { file?: FileItem; folderId?: string; initial?: Card[]; initialName?: string; onClose: () => void }) {
+export function CardsEditor({ file, folderId, initial, initialName, initialDescription, onClose }: { file?: FileItem; folderId?: string; initial?: Card[]; initialName?: string; initialDescription?: string; onClose: () => void }) {
   const [name, setName] = useState(file?.name ?? initialName ?? '');
-  const [description, setDescription] = useState(file?.description ?? '');
+  const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
   const [cards, setCards] = useState<Card[]>(() => (initial?.length ? initial : [newCard()]));
   const [index, setIndex] = useState(0);
   const start = useRef(JSON.stringify({ name, description, cards }));
