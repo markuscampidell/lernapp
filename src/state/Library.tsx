@@ -4,11 +4,12 @@ import { MAX_DEPTH, SHARED_ROOT } from '../domain/types';
 import { canMoveFolder, depthOf, subtreeIds } from '../domain/tree';
 import { db } from '../storage/db';
 import { loadBlob, REMOTE } from '../storage/blobs';
-import { fullName } from '../lib/files';
+import { fileKind, fullName } from '../lib/files';
 import { useAuth, type User } from '../cloud/auth';
 import { supabase } from '../cloud/supabase';
 import * as remote from '../cloud/remote';
 import { newId } from '../lib/id';
+import { comparable, mergeParts, summarize, type ChangePart } from '../features/changes/diff';
 import type { Handover, Member, Profile, Share, Snapshot } from '../cloud/remote';
 import * as local from './local';
 import { looseFiles, makeBundle, topLevel, type FolderInput, type NewFileInput } from './bundle';
@@ -47,6 +48,10 @@ interface LibraryValue {
   userName: (id: string | null | undefined) => string;
   /** Kommentare an einer Datei: Anzahl und ob es neue von anderen gibt (seit ich sie zuletzt gelesen habe). */
   commentInfo: (fileId: string) => { count: number; unread: boolean };
+  /** Was andere seit meinem letzten Öffnen an der Datei geändert haben – pro Person zusammengefasst. */
+  changesFor: (fileId: string) => { userId: string | null; parts: ChangePart[]; at: string }[];
+  /** Änderungen dieser Datei als gesehen markieren (beim Öffnen). */
+  markChangesSeen: (fileId: string) => void;
   /** Kommentare dieser Datei als gelesen merken. */
   markCommentsRead: (fileId: string) => void;
   /** Adresse des Profilbilds einer Person (undefined = keins). */
@@ -280,7 +285,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       timer = setTimeout(refreshRemote, 400);
     };
     const channel = client.channel(`lernapp-${me}`);
-    for (const table of ['shares', 'share_members', 'folders', 'files', 'profiles', 'comments']) {
+    for (const table of ['shares', 'share_members', 'folders', 'files', 'profiles', 'comments', 'file_changes']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, soon);
     }
     channel.subscribe();
@@ -396,6 +401,32 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
+  // Änderungen anderer, die ich noch nicht gesehen habe (gerade gesehene sofort ausblenden, bevor der Server antwortet).
+  const [justSeen, setJustSeen] = useState<Set<string>>(new Set());
+  const changesFor = useCallback(
+    (fileId: string) => {
+      const seen = new Set(snap?.changesSeen ?? []);
+      const mine = (snap?.changes ?? []).filter((c) => c.fileId === fileId && c.userId !== user?.id && !seen.has(c.id) && !justSeen.has(c.id));
+      const byUser = new Map<string | null, typeof mine>();
+      mine.forEach((c) => byUser.set(c.userId, [...(byUser.get(c.userId) ?? []), c]));
+      return [...byUser.entries()].map(([userId, list]) => ({
+        userId,
+        parts: mergeParts(list.map((c) => c.summary as ChangePart[])),
+        at: list[list.length - 1].createdAt,
+      }));
+    },
+    [snap, user?.id, justSeen],
+  );
+  const markChangesSeen = useCallback(
+    (fileId: string) => {
+      const seen = new Set(snap?.changesSeen ?? []);
+      const ids = (snap?.changes ?? []).filter((c) => c.fileId === fileId && c.userId !== user?.id && !seen.has(c.id)).map((c) => c.id);
+      if (!ids.length) return;
+      setJustSeen((prev) => new Set([...prev, ...ids]));
+      remote.markChangesSeen(fileId).catch(() => {});
+    },
+    [snap, user?.id],
+  );
   const avatarOf = useCallback((id: string | null | undefined) => (id ? avatarMap.get(id) : undefined), [avatarMap]);
   const shareOf = useCallback((item: Item | undefined) => (item?.shareId ? shareMap.get(item.shareId) : undefined), [shareMap]);
   const isOwner = useCallback((shareId: string | undefined) => !!shareId && !!me && shareMap.get(shareId)?.ownerId === me, [shareMap, me]);
@@ -829,7 +860,16 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (file.shareId) {
         requireOnline();
         if (!canModify(file)) throw new Error('Nur die Person, die die Datei hinzugefügt hat, oder der Besitzer kann sie ändern.');
+        // Vorher/Nachher vergleichen, damit die anderen sehen, was sich geändert hat (stark vereinfacht).
+        const kind = fileKind(file);
+        let before: string | null = null;
+        if (comparable(kind) && file.size < 20 * 1024 * 1024) {
+          const old = await loadBlob(file.blobId).catch(() => undefined);
+          before = old ? await old.text().catch(() => null) : null;
+        }
+        const summary: ChangePart[] = before === null ? [{ unit: 'version', added: 1, removed: 0, changed: 0 }] : summarize(kind, before, await blob.text());
         await remote.replaceContent(file, blob, name);
+        await remote.recordChange(file.id, summary).catch(() => {});
         await refreshRemote();
       } else {
         await local.replaceContent(file, blob, name);
@@ -1235,6 +1275,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       avatarOf,
       commentInfo,
       markCommentsRead,
+      changesFor,
+      markChangesSeen,
       shareOf,
       isRoot,
       isOwner,
@@ -1276,7 +1318,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
-      user, online, snap, userName, avatarOf, commentInfo, markCommentsRead, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
+      user, online, snap, userName, avatarOf, commentInfo, markCommentsRead, changesFor, markChangesSeen, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
       shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, shareFileProblem, shareFile, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
       handovers, rawSnap, handoverStats, claimHandover, declineHandover, ownedRoots, deleteAccount, sync, retrySync,
     ],

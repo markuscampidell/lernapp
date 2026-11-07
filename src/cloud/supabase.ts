@@ -17,6 +17,8 @@ export const supabase: SupabaseClient | null = cloudEnabled
 export const BUCKET = 'files';
 /** Maximale Dateigröße im kostenlosen Supabase-Tarif. */
 export const MAX_UPLOAD = 50 * 1024 * 1024;
+/** Gesamter Speicher im kostenlosen Supabase-Tarif (für alle Konten zusammen, ungefähr). */
+export const SERVER_LIMIT = 1024 * 1024 * 1024;
 
 // Anmeldung nur mit Benutzername: Supabase braucht intern eine E-Mail-Adresse, wir bilden sie aus dem Namen.
 // Es werden keine E-Mails verschickt ("Confirm email" ist in Supabase ausgeschaltet).

@@ -6,7 +6,9 @@ import { downloadBlob, formatSize } from '../../lib/files';
 import { Icon } from '../../components/Icon';
 import { Sheet } from '../../components/Sheet';
 import { AccountCard } from '../account/AccountCard';
-import { cloudEnabled } from '../../cloud/supabase';
+import { cloudEnabled, SERVER_LIMIT } from '../../cloud/supabase';
+import { useAuth } from '../../cloud/auth';
+import { serverUsage } from '../../cloud/remote';
 
 export function SettingsView() {
   const lib = useLibrary();
@@ -84,6 +86,7 @@ export function SettingsView() {
           <h2 className="settings-group">Konto</h2>
           <p className="muted small">Gilt auf allen Geräten, auf denen du angemeldet bist. Ein Konto brauchst du nur, um Ordner mit anderen zu teilen.</p>
           <AccountCard />
+          <ServerStorage />
         </>
       )}
 
@@ -192,5 +195,51 @@ export function SettingsView() {
         </Sheet>
       )}
     </section>
+  );
+}
+
+/** Belegter Server-Speicher (kostenloser Tarif: ca. 1 GB für alle Konten zusammen). */
+function ServerStorage() {
+  const { user } = useAuth();
+  const { online, files } = useLibrary();
+  const [used, setUsed] = useState<number | null>(null);
+  const sharedCount = files.filter((f) => f.shareId).length;
+
+  useEffect(() => {
+    if (!user || !online) return;
+    let alive = true;
+    serverUsage().then((n) => alive && setUsed(n));
+    return () => {
+      alive = false;
+    };
+  }, [user, online, sharedCount]);
+
+  if (!user || used == null) return null;
+  const pct = Math.min(100, (used / SERVER_LIMIT) * 100);
+  const level = pct >= 95 ? 'critical' : pct >= 80 ? 'warning' : 'good';
+  const free = Math.max(0, SERVER_LIMIT - used);
+
+  return (
+    <>
+      <h3 className="section-title">Server-Speicher</h3>
+      <div className="card stack">
+        <div>
+          <div className="meter wide">
+            <div className={`meter-fill ${level === 'good' ? '' : level}`} style={{ width: `${pct.toFixed(1)}%` }} />
+          </div>
+          <p className="muted small">
+            ca. {formatSize(used)} von {formatSize(SERVER_LIMIT)} belegt · noch ca. {formatSize(free)} frei
+          </p>
+        </div>
+        {level === 'warning' && <p className="notice warning">Der Server wird langsam voll. Große Uploads klappen evtl. bald nicht mehr.</p>}
+        {level === 'critical' && (
+          <p className="notice critical">Der Server ist fast voll. Lösche nicht mehr gebrauchte Dateien in geteilten Ordnern, damit wieder Platz ist.</p>
+        )}
+        <p className="muted small">
+          Gilt für alle Konten zusammen (geteilte Ordner, „Meine Ordner auf allen Geräten“ und Profilbilder). Der Wert ist ein
+          ungefährer Richtwert und kann etwas nachhinken.
+        </p>
+      </div>
+    </>
   );
 }

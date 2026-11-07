@@ -41,6 +41,8 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
 - **Karteikarten wiederholen**: „Wiederholen“ zeigt nur fällige Karten; Gewusst → immer längere Abstände (1, 3, 7, 14, 30, 60 Tage),
   Unsicher → morgen, Nochmal → gleich wieder. Lernstand pro Person, auf dem Server auf allen eigenen Geräten gleich.
 - **Kommentare** an Dateien auf dem Server (geteilt / „Auf allen Geräten“): kommentieren, antworten, löschen; Anzahl und „neu“ in der Liste.
+- **Was hat sich geändert?** Speichert jemand eine geteilte Datei, sehen die anderen beim nächsten Öffnen einmal, wer was geändert hat
+  (stark vereinfacht, z. B. „+120 Wörter, −1 Bild“) – auch in der Liste unter dem Namen. Haben es alle gesehen, wird es gelöscht.
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
 ## Entwickeln
@@ -73,7 +75,9 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
    , `supabase/006_profilbilder.sql` (Profilbilder)
    , `supabase/007_rechte_vererben.sql` (Rechte einheitlich vererben, auch vom obersten Ordner)
    , `supabase/008_oberster_ordner.sql` (obersten geteilten Ordner ändert nur der Besitzer)
-   und `supabase/009_lernstand_kommentare.sql` (Lernstand bei Karteikarten, Kommentare).
+   , `supabase/009_lernstand_kommentare.sql` (Lernstand bei Karteikarten, Kommentare)
+   , `supabase/010_aenderungen.sql` („Was hat sich geändert?“ bei geteilten Dateien)
+   und `supabase/011_speicher.sql` (belegten Server-Speicher anzeigen und vor Uploads prüfen).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

@@ -5,6 +5,7 @@ import { useLibrary } from '../../state/Library';
 import { FileThumb, FolderThumb } from '../../components/Thumbs';
 import { Icon } from '../../components/Icon';
 import { Avatar } from '../../components/Avatar';
+import { describe } from '../changes/diff';
 import { useLongPress } from '../../hooks/useLongPress';
 import { fileKind, formatSize, fullName, KIND_LABEL } from '../../lib/files';
 
@@ -116,13 +117,19 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
 
 export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file: FileItem }) {
   const kind = fileKind(file);
-  const { commentInfo } = useLibrary();
+  const { commentInfo, changesFor, userName } = useLibrary();
   const comments = commentInfo(file.id);
+  const changes = changesFor(file.id);
   return (
     <ItemCard {...rest} thumb={<FileThumb file={file} />} label={fullName(file)}>
       <strong className="wrap-text">{fullName(file)}</strong>
       {path && <span className="muted small wrap-text">{path}</span>}
       {file.description && <span className="muted small wrap-text">{file.description}</span>}
+      {changes.length > 0 && (
+        <span className="change-line small wrap-text">
+          <Icon name="edit" size={13} /> {changes.map((c) => `${userName(c.userId)}: ${describe(c.parts)}`).join(' · ')}
+        </span>
+      )}
       <span className="chips">
         {isNew && <span className="chip new-chip">Neu</span>}
         <span className={`chip kind-chip kind-${kind}`}>{KIND_LABEL[kind]}</span>

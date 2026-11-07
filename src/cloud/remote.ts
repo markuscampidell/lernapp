@@ -3,12 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Access, FileItem, Folder } from '../domain/types';
 import { subtreeIds } from '../domain/tree';
 import { newId } from '../lib/id';
-import { fullName, kindOf, makeThumbnail, splitName } from '../lib/files';
+import { formatSize, fullName, kindOf, makeThumbnail, splitName } from '../lib/files';
 import { db } from '../storage/db';
 import { isRemoteBlob, REMOTE, remotePath } from '../storage/blobs';
 import type { Bundle, FolderInput, NewFileInput } from '../state/bundle';
 import { clean } from '../state/local';
-import { BUCKET, check, friendly, MAX_UPLOAD, supabase } from './supabase';
+import { BUCKET, check, friendly, MAX_UPLOAD, SERVER_LIMIT, supabase } from './supabase';
 
 export interface Profile {
   id: string;
@@ -53,6 +53,17 @@ export interface Snapshot {
   handoversReady?: boolean;
   /** Kommentare (nur wer/wann, für Anzahl und „neu“) – fehlt, solange 009 nicht ausgeführt ist. */
   comments?: CommentMeta[];
+  /** Änderungen an geteilten Dateien, die noch nicht alle gesehen haben (fehlt ohne 010). */
+  changes?: FileChange[];
+  /** IDs der Änderungen, die ich schon gesehen habe. */
+  changesSeen?: string[];
+}
+export interface FileChange {
+  id: string;
+  fileId: string;
+  userId: string | null;
+  summary: { unit: string; added: number; removed: number; changed: number }[];
+  createdAt: string;
 }
 export interface CommentMeta {
   fileId: string;
@@ -149,7 +160,7 @@ export async function fetchSnapshot(userId: string): Promise<Snapshot> {
     selectAll('seen', ['folder_id']),
     fetchHandovers(),
   ]);
-  const comments = await fetchCommentMeta();
+  const [comments, changes] = await Promise.all([fetchCommentMeta(), fetchChanges(userId)]);
   return {
     handovers: handovers ?? [],
     handoversReady: handovers !== null,
@@ -161,7 +172,38 @@ export async function fetchSnapshot(userId: string): Promise<Snapshot> {
     files: files.map(toFile),
     seen: Object.fromEntries(seen.map((r) => [String(r.folder_id), String(r.seen_at)])),
     comments,
+    changes: changes.list,
+    changesSeen: changes.seen,
   };
+}
+
+/** Änderungen und welche davon ich gesehen habe – leer, wenn 010 noch nicht ausgeführt ist. */
+async function fetchChanges(userId: string): Promise<{ list: FileChange[]; seen: string[] }> {
+  const [c, s] = await Promise.all([
+    sb().from('file_changes').select('id, file_id, user_id, summary, created_at').order('created_at').limit(2000),
+    sb().from('file_change_seen').select('change_id').eq('user_id', userId).limit(5000),
+  ]);
+  if (c.error || s.error) return { list: [], seen: [] };
+  return {
+    list: ((c.data ?? []) as Row[]).map((r) => ({
+      id: String(r.id),
+      fileId: String(r.file_id),
+      userId: (r.user_id as string | null) ?? null,
+      summary: Array.isArray(r.summary) ? (r.summary as FileChange['summary']) : [],
+      createdAt: String(r.created_at),
+    })),
+    seen: ((s.data ?? []) as Row[]).map((r) => String(r.change_id)),
+  };
+}
+
+/** Zusammenfassung einer Änderung speichern (Fehler, z. B. 010 fehlt, werden ignoriert). */
+export async function recordChange(fileId: string, summary: FileChange['summary']): Promise<void> {
+  if (!summary.length) return;
+  await sb().from('file_changes').insert({ file_id: fileId, summary });
+}
+/** Änderungen dieser Datei als gesehen markieren (und aufräumen, was alle gesehen haben). */
+export async function markChangesSeen(fileId: string): Promise<void> {
+  await sb().rpc('mark_changes_seen', { fid: fileId });
 }
 
 /** Wer wann wo kommentiert hat (ohne Text) – leer, wenn 009 noch nicht ausgeführt ist. */
@@ -203,6 +245,29 @@ export async function deleteComment(id: string): Promise<void> {
 }
 
 // ---------- Dateispeicher ----------
+
+/** Ungefähr belegter Server-Speicher aller Konten in Bytes – null, wenn unbekannt (offline, SQL 010 fehlt …). */
+export async function serverUsage(): Promise<number | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('storage_usage');
+  if (error || data == null) return null;
+  const n = Number(data);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Bricht vor dem Hochladen ab, wenn der Server dafür (ungefähr) zu voll ist. Ohne Messwert wird nicht blockiert. */
+async function ensureSpace(bytes: number): Promise<void> {
+  if (bytes <= 0) return;
+  const used = await serverUsage();
+  if (used == null) return;
+  const free = Math.max(0, SERVER_LIMIT - used);
+  if (bytes > free) {
+    throw new Error(
+      `Nicht genug Platz auf dem Server: Dafür werden ${formatSize(bytes)} gebraucht, frei sind nur noch ca. ${formatSize(free)} ` +
+        `(von ${formatSize(SERVER_LIMIT)} für alle Konten zusammen).`,
+    );
+  }
+}
 
 async function upload(shareId: string, blob: Blob, contentType: string): Promise<string> {
   if (blob.size > MAX_UPLOAD) throw new Error('Datei zu groß – in geteilten Ordnern sind höchstens 50 MB pro Datei möglich.');
@@ -301,6 +366,7 @@ export async function updateFolder(folder: Folder, input: FolderInput): Promise<
 }
 
 export async function addFiles(shareId: string, folderId: string, items: NewFileInput[], onProgress?: (done: number) => void): Promise<void> {
+  await ensureSpace(items.reduce((n, it) => n + it.file.size, 0));
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const split = splitName(it.filename);
@@ -346,6 +412,7 @@ export async function contentInfo(fileId: string): Promise<{ blobPath: string; u
 
 /** Inhalt einer geteilten Datei ersetzen: neue Datei hochladen, Eintrag umstellen, alte Datei entfernen. */
 export async function replaceContent(file: FileItem, blob: Blob, name?: string): Promise<void> {
+  await ensureSpace(blob.size - (file.size || 0));
   const blob_path = await upload(file.shareId!, blob, file.mime);
   const res = await sb().from('files').update({ blob_path, size: blob.size, name: name?.trim() || file.name }).eq('id', file.id).select('id');
   if (res.error || !res.data?.length) {
@@ -381,6 +448,10 @@ export async function deleteMany(folders: Folder[], files: FileItem[], folderIds
 
 /** Lädt ein Bündel in einen geteilten Ordner hoch (IDs bleiben erhalten). targetId null = neuer oberster Ordner. */
 export async function importBundle(shareId: string, targetId: string | null, bundle: Bundle, onProgress?: (done: number) => void): Promise<void> {
+  await ensureSpace(
+    bundle.folders.reduce((n, f) => n + (f.image?.size ?? 0), 0) +
+      bundle.files.reduce((n, f) => n + f.blob.size + (f.thumb?.size ?? 0), 0),
+  );
   const uploaded: string[] = [];
   const put = async (blob: Blob, type: string) => {
     const p = await upload(shareId, blob, type);

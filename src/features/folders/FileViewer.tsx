@@ -12,6 +12,7 @@ import { CardsPanel, QuizPanel } from '../study/StudyPanels';
 import { DocPanel } from '../docs/DocPanel';
 import { ShareSheet } from '../share/ShareSheet';
 import { Comments } from '../comments/Comments';
+import { ChangesBanner } from '../changes/ChangesBanner';
 import { cloudEnabled } from '../../cloud/supabase';
 import { ChartPanel } from '../charts/ChartPanel';
 import { WheelPanel } from '../wheel/WheelPanel';
@@ -189,6 +190,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
             </p>
           </div>
         )}
+        {file.shareId && <ChangesBanner file={file} />}
         {body}
         {canComment && (
           <div id="kommentare">

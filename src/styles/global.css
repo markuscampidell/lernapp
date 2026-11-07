@@ -1423,6 +1423,12 @@ button.person {
   background: var(--good);
   transition: width 0.3s ease;
 }
+.meter-fill.warning {
+  background: var(--warning);
+}
+.meter-fill.critical {
+  background: var(--critical);
+}
 
 /* ---------- Karteikarten & Quiz ---------- */
 .pre-wrap {
@@ -2712,4 +2718,35 @@ textarea.text-line.doc-desc {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+/* ---------- Änderungen anderer ---------- */
+.change-line {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  color: var(--info);
+}
+.change-line svg {
+  flex: none;
+  margin-top: 2px;
+}
+.changes-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  border: 1px solid color-mix(in srgb, var(--info) 40%, transparent);
+  background: var(--info-bg);
+}
+.changes-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--info);
+}
+.changes-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
