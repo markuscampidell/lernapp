@@ -8,6 +8,7 @@ import { loadBlob } from '../../storage/blobs';
 import { parseCards, parseQuiz } from '../study/format';
 import { parseChart } from '../charts/chart';
 import { parseWheel } from '../wheel/wheel';
+import { parseGapsDoc, solvedText } from '../gaps/gaps';
 
 /** text = steht im Prompt · file = Datei direkt an die KI geben · skip = geht nicht (Video, Audio …) */
 export type MaterialRoute = 'text' | 'file' | 'skip';
@@ -55,6 +56,7 @@ export function routeGuess(f: FileItem): { route: MaterialRoute; label: string }
     case 'quiz':
     case 'chart':
     case 'wheel':
+    case 'gaps':
       return { route: 'text', label: 'Text' };
     case 'pdf':
       return { route: 'text', label: 'PDF' };
@@ -364,6 +366,9 @@ export async function prepareMaterial(f: FileItem): Promise<Material> {
     } else if (k === 'wheel') {
       const w = parseWheel(await blob.text());
       text = `Glücksrad „${w.title}“:\n${w.entries.map((x) => `- ${x.label}`).join('\n')}`;
+    } else if (k === 'gaps') {
+      const g = parseGapsDoc(await blob.text());
+      text = `Lückentext (Lösungen eingesetzt):\n${solvedText(g.text)}`;
     } else if (k === 'document') text = await documentText(blob, e === 'odt', imgs);
     else if (k === 'presentation') text = await slidesText(blob, e === 'odp', imgs);
     else text = tidy(await blob.text());

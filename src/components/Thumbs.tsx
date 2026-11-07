@@ -18,6 +18,7 @@ const KIND_ICON: Record<FileKind, IconName> = {
   richtext: 'richdoc',
   chart: 'chart',
   wheel: 'wheel',
+  gaps: 'gaps',
   other: 'file',
 };
 

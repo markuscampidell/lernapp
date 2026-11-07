@@ -16,6 +16,7 @@ import { ChangesBanner } from '../changes/ChangesBanner';
 import { cloudEnabled } from '../../cloud/supabase';
 import { ChartPanel } from '../charts/ChartPanel';
 import { WheelPanel } from '../wheel/WheelPanel';
+import { GapsPanel } from '../gaps/GapsPanel';
 
 const MAX_TEXT = 2 * 1024 * 1024;
 
@@ -33,7 +34,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const [sharing, setSharing] = useState(false);
 
   const kind = fileKind(initial);
-  const readsText = kind === 'text' || kind === 'flashcards' || kind === 'quiz' || kind === 'richtext' || kind === 'chart' || kind === 'wheel';
+  const readsText = kind === 'text' || kind === 'flashcards' || kind === 'quiz' || kind === 'richtext' || kind === 'chart' || kind === 'wheel' || kind === 'gaps';
   useBackToClose(onClose);
 
   // Neu laden, wenn sich der Inhalt ändert (z. B. Karteikarten bearbeitet).
@@ -115,6 +116,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   else if (kind === 'richtext' && text !== null) body = <DocPanel file={file} text={text} />;
   else if (kind === 'chart' && text !== null) body = <ChartPanel file={file} text={text} />;
   else if (kind === 'wheel' && text !== null) body = <WheelPanel file={file} text={text} />;
+  else if (kind === 'gaps' && text !== null) body = <GapsPanel file={file} text={text} />;
   else
     body = (
       <div className="empty viewer-fallback">

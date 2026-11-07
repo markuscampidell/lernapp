@@ -4,10 +4,11 @@ import { fullName } from '../../lib/files';
 import { parseCards, parseQuiz, type Card, type Question } from '../study/format';
 import { CHART_TYPES, MAX_POINTS, parseChart, type Chart, type ChartType } from '../charts/chart';
 import { MAX_ENTRIES, parseWheel, type Wheel } from '../wheel/wheel';
+import { gapsOf, parseGapsDoc, type GapsDoc } from '../gaps/gaps';
 import { extractJson, markdownToHtml, splitTitle, unfence } from './answer';
 import { attachmentsOf, type Material } from './materials';
 
-export type AiKind = 'cards' | 'quiz' | 'doc' | 'note' | 'chart' | 'wheel';
+export type AiKind = 'cards' | 'quiz' | 'gaps' | 'doc' | 'note' | 'chart' | 'wheel';
 
 export interface AiSettings {
   kind: AiKind;
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: AiSettings = {
 export type AiResult = (
   | { kind: 'cards'; title: string; cards: Card[] }
   | { kind: 'quiz'; title: string; questions: Question[] }
+  | { kind: 'gaps'; title: string; doc: GapsDoc }
   | { kind: 'chart'; title: string; chart: Chart }
   | { kind: 'wheel'; title: string; wheel: Wheel }
   | { kind: 'doc'; title: string; html: string }
@@ -74,6 +76,7 @@ export const KINDS: {
 }[] = [
   { id: 'cards', icon: 'cards', label: 'Karteikarten', count: { label: 'Anzahl Karten', min: 3, max: 150, def: 20 }, text: 'Vorder- und Rückseite zum Lernen' },
   { id: 'quiz', icon: 'quiz', label: 'Quiz', count: { label: 'Anzahl Fragen', min: 3, max: 60, def: 10 }, text: 'Multiple Choice mit Erklärungen' },
+  { id: 'gaps', icon: 'gaps', label: 'Lückentext', count: { label: 'Anzahl Lücken', min: 3, max: 60, def: 12 }, text: 'Wörter einsetzen oder selbst schreiben' },
   { id: 'doc', icon: 'richdoc', label: 'Text-Dokument', count: null, text: 'Zusammenfassung, Lernzettel, Erklärung …' },
   { id: 'note', icon: 'text', label: 'Notiz', count: null, text: 'Kurzer reiner Text' },
   { id: 'chart', icon: 'chart', label: 'Diagramm', count: { label: 'Höchstens Datenpunkte', min: 2, max: MAX_POINTS, def: 8 }, text: 'Zahlen als Säulen, Linie, Kreis …' },
@@ -470,6 +473,71 @@ function wheelPrompt(s: AiSettings, mats: Material[]): string {
   ]);
 }
 
+function gapsPrompt(s: AiSettings, mats: Material[]): string {
+  const hasMats = usable(mats).length > 0;
+  return join([
+    INTRO('einen Lückentext'),
+    settingsBlock(s, mats, [
+      `- Schreibe einen zusammenhängenden Lerntext mit ${hasMats ? `bis zu ${s.count}` : `genau ${s.count}`} Lücken.`,
+      '- Der Text erklärt das Thema in ganzen Sätzen und logischer Reihenfolge – keine Liste unverbundener Einzelsätze.',
+      '- Dazu kommen 4–8 Ablenkwörter (falsche Wörter für den Modus „Wörter einsetzen“).',
+    ]),
+    sources(s, mats),
+    `## Regeln für gute Lücken
+- Lücken nur bei Wörtern, die man wirklich lernen muss: Fachbegriffe, Namen, Fachverben, wichtige Zahlen und Jahreszahlen. NIE bei Füllwörtern, Artikeln, Präpositionen oder Wörtern, die sich aus dem Satz von selbst ergeben.
+- Eine Lücke umfasst 1 Wort (höchstens 3 Wörter, z. B. ein feststehender Begriff).
+- Höchstens eine Lücke pro Satz (bei langen Sätzen zwei) und gleichmäßig über den Text verteilt.
+- Jede Lücke muss aus dem Zusammenhang eindeutig sein – man soll sie auch selbst hinschreiben können. Passen mehrere Wörter, formuliere den Satz um oder gib die gleichwertigen Antworten mit | an: [[Prophase|Vorphase]].
+- Die Grammatik darf die Lösung nicht verraten (z. B. kein „ein“/„eine“ direkt davor, das nur zu einem einzigen Wort passt).
+- Keine Lücken innerhalb von Formeln ($…$).
+- Schreibweise der Lücken: doppelte eckige Klammern direkt im Text, z. B. „Die [[Mitose]] besteht aus vier Phasen.“
+
+## Regeln für die Ablenkwörter
+- Erfinde sie frei – sie müssen nicht aus den Materialien stammen.
+- Sie stammen aus demselben Themengebiet und haben dieselbe Wortart und grammatische Form wie die Lösungen (z. B. Nomen im selben Fall, Verben in derselben Form), damit sie grammatisch in mehrere Lücken passen würden.
+- Typisch: verwandte, leicht verwechselbare Begriffe (z. B. „Meiose“ zu „Mitose“, „Interphase“ zu „Prophase“) oder knapp danebenliegende Zahlen.
+- Kein Ablenkwort darf in irgendeine Lücke richtig passen – auch kein Synonym einer Lösung.`,
+    MATH_JSON,
+    jsonAnswerRules([
+      `"text" ist der ganze Lückentext als ein String; Absätze mit \\n\\n trennen.`,
+      `"distractors" ist eine Liste mit 4–8 Ablenkwörtern.`,
+      `"title" ist ein kurzer, passender Name (höchstens 60 Zeichen).`,
+      '`"description" ist eine kurze Beschreibung (ein Satz, höchstens 150 Zeichen), worum es geht. Lass sie nur dann leer (""), wenn ich in meinen Wünschen ausdrücklich keine Beschreibung möchte.`',
+    ]),
+    `## Vorlage
+\`\`\`json
+{
+  "title": "Kurzer Name",
+  "description": "Ein Satz, worum es geht",
+  "text": "Text mit [[Lücke]] und noch einer [[Lücke|Alternative]].",
+  "distractors": ["Ablenkwort", "Ablenkwort"]
+}
+\`\`\`
+
+## Beispiel (nur zur Veranschaulichung von Format und Schwierigkeit – nicht übernehmen)
+\`\`\`json
+{
+  "title": "Zellteilung",
+  "description": "Ablauf der Mitose und ihre Phasen",
+  "text": "Bei der [[Mitose]] entstehen aus einer Zelle zwei genetisch identische Tochterzellen. Zuerst verdichten sich in der [[Prophase|Vorphase]] die Chromosomen. In der Metaphase ordnen sie sich in der [[Äquatorialebene]] an.\\n\\nAnschließend trennt der [[Spindelapparat]] die Schwesterchromatiden, bevor sich in der Telophase neue [[Kernhüllen]] bilden.",
+  "distractors": ["Meiose", "Interphase", "Zellmembran", "Zentromer", "Polebene"]
+}
+\`\`\``,
+    SELF_CHECK([
+      `Sind es ${hasMats ? `höchstens ${s.count}` : `genau ${s.count}`} Lücken, jede mit [[…]] markiert und gleichmäßig verteilt?`,
+      'Ist jede Lücke aus dem Zusammenhang eindeutig, und verrät die Grammatik nichts?',
+      'Liegt keine Lücke auf einem Füllwort oder Artikel?',
+      'Passt kein Ablenkwort richtig in eine Lücke, und haben alle dieselbe Wortart/Form wie die Lösungen?',
+      'Ist das JSON gültig (Zeilenumbrüche als \\n, Backslashes in Formeln verdoppelt)?',
+    ]),
+    materialsBlock(mats),
+    finalReminder([
+      ...JSON_REMINDER,
+      `${hasMats ? `Bis zu ${s.count}` : `Genau ${s.count}`} Lücken als [[…]] im Text, 4–8 Ablenkwörter, Sprache: ${LANGUAGE[s.language]}.`,
+    ]),
+  ]);
+}
+
 const DOC_STYLE_NAME: Record<AiSettings['docStyle'], string> = { summary: 'Zusammenfassung', sheet: 'Lernzettel', explain: 'Erklärung', outline: 'Lern-Checkliste' };
 
 function docPrompt(s: AiSettings, mats: Material[]): string {
@@ -559,6 +627,8 @@ export function buildPrompt(s: AiSettings, mats: Material[]): string {
       return chartPrompt(s, ready);
     case 'wheel':
       return wheelPrompt(s, ready);
+    case 'gaps':
+      return gapsPrompt(s, ready);
     case 'doc':
       return docPrompt(s, ready);
     case 'note':
@@ -592,6 +662,7 @@ function wrongKind(o: Obj, kind: AiKind): string | null {
     ['quiz', has('questions')],
     ['chart', has('points')],
     ['wheel', has('entries')],
+    ['gaps', typeof o.text === 'string' && o.text.includes('[[')],
   ];
   const other = found.find(([k, h]) => h && k !== kind);
   if (other && !found.some(([k, h]) => h && k === kind)) return `Das sieht nach „${kindInfo(other[0]).label}“ aus, nicht nach „${kindInfo(kind).label}“. Hast du oben die richtige Art gewählt?`;
@@ -729,6 +800,30 @@ function parseRaw(answer: string, s: AiSettings): Parsed {
     if (s.chartType !== 'auto' && chart.chart !== s.chartType) warnings.push('Die KI hat einen anderen Diagrammtyp gewählt – du kannst ihn im Editor ändern.');
     if (/beispiel/i.test(chart.title)) warnings.push('Die KI hat Beispielwerte verwendet (keine echten Daten).');
     return { result: { kind, title: chart.title, chart, description }, summary: `Diagramm mit ${chart.points.length} ${chart.points.length === 1 ? 'Wert' : 'Werten'} erkannt`, warnings };
+  }
+
+  if (kind === 'gaps') {
+    const rawText = str(pick(o, 'text', 'lückentext', 'lueckentext'));
+    const distractorsRaw = listOf(o, 'distractors', 'ablenkwörter', 'ablenkwoerter').map((d) => str(d).trim()).filter(Boolean);
+    const doc = parseGapsDoc({ text: rawText, distractors: distractorsRaw, mode: 'drag', typos: true });
+    const gaps = gapsOf(doc.text);
+    if (!doc.text.trim()) throw new Error('Kein Text gefunden. Steht in der Antwort ein Feld "text" mit dem Lückentext?');
+    if (!gaps.length) throw new Error('Im Text sind keine Lücken markiert. Die Lücken müssen in doppelten eckigen Klammern stehen, z. B. [[Mitose]].');
+    // Ablenkwörter, die eigentlich eine richtige Lösung sind, wären unfair
+    const answers = new Set(gaps.flatMap((g) => g.answers.map((a) => a.toLowerCase())));
+    const clash = doc.distractors.filter((d) => answers.has(d.toLowerCase()));
+    if (clash.length) {
+      doc.distractors = doc.distractors.filter((d) => !answers.has(d.toLowerCase()));
+      warnings.push(`${clash.length} Ablenkwort${clash.length === 1 ? ' war' : 'wörter waren'} eine richtige Lösung und wurde${clash.length === 1 ? '' : 'n'} entfernt.`);
+    }
+    if (!doc.distractors.length) warnings.push('Die KI hat keine Ablenkwörter geliefert – du kannst im Editor welche ergänzen.');
+    const cw = countWarning(gaps.length, s.count, 'Lücke', 'Lücken', false);
+    if (cw) warnings.push(cw);
+    return {
+      result: { kind, title: titleOf(o), doc, description },
+      summary: `Lückentext mit ${gaps.length} ${gaps.length === 1 ? 'Lücke' : 'Lücken'} und ${doc.distractors.length} Ablenkwörtern erkannt`,
+      warnings,
+    };
   }
 
   // Glücksrad

@@ -26,6 +26,8 @@ import { ChartEditor } from '../charts/ChartEditor';
 import { parseChart } from '../charts/chart';
 import { WheelEditor } from '../wheel/WheelEditor';
 import { parseWheel } from '../wheel/wheel';
+import { GapsEditor } from '../gaps/GapsEditor';
+import { parseGapsDoc } from '../gaps/gaps';
 import { FileEditorSheet } from './FileEditorSheet';
 import { parseCards, parseQuiz } from '../study/format';
 import { loadBlob } from '../../storage/blobs';
@@ -67,14 +69,14 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
-  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'ai' | null>(null);
+  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps' | 'ai' | null>(null);
   // Ergebnis von „Mit KI erstellen“ – öffnet den passenden Editor mit dem Inhalt.
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
   // Bearbeiten direkt aus der Liste (ohne die Datei zu öffnen).
   const [editing, setEditing] = useState<
-    { kind: 'folder'; folder: Folder } | { kind: 'file'; file: FileItem } | { kind: 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel'; file: FileItem; text: string } | null
+    { kind: 'folder'; folder: Folder } | { kind: 'file'; file: FileItem } | { kind: 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps'; file: FileItem; text: string } | null
   >(null);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -193,7 +195,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   const startEdit = async (item: Folder | FileItem) => {
     if (!('folderId' in item)) return setEditing({ kind: 'folder', folder: item });
     const k = fileKind(item);
-    const editor = k === 'flashcards' ? 'cards' : k === 'quiz' ? 'quiz' : k === 'richtext' ? 'doc' : k === 'chart' ? 'chart' : k === 'wheel' ? 'wheel' : null;
+    const editor = k === 'flashcards' ? 'cards' : k === 'quiz' ? 'quiz' : k === 'richtext' ? 'doc' : k === 'chart' ? 'chart' : k === 'wheel' ? 'wheel' : k === 'gaps' ? 'gaps' : null;
     if (!editor) return setEditing({ kind: 'file', file: item });
     const blob = await loadBlob(item.blobId);
     if (!blob) return alert('Die Datei konnte nicht geladen werden – bist du online?');
@@ -202,7 +204,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   // ✏️ nur für Dateien mit bearbeitbarem Inhalt (Karteikarten, Quiz, Text-Dokumente, Diagramme).
   const editProp = (item: Folder | FileItem) => ({
     onEdit:
-      'folderId' in item && ['flashcards', 'quiz', 'richtext', 'chart', 'wheel'].includes(fileKind(item)) && canModify(item) && (!item.shareId || lib.online)
+      'folderId' in item && ['flashcards', 'quiz', 'richtext', 'chart', 'wheel', 'gaps'].includes(fileKind(item)) && canModify(item) && (!item.shareId || lib.online)
         ? () => startEdit(item)
         : undefined,
   });
@@ -437,6 +439,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
       {sheet === 'quiz' && folder && <QuizEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'chart' && folder && <ChartEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'wheel' && folder && <WheelEditor folderId={folder.id} onClose={() => setSheet(null)} />}
+      {sheet === 'gaps' && folder && <GapsEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'ai' && folder && (
         <AiSheet
           folderId={folder.id}
@@ -462,6 +465,8 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
             return <WheelEditor folderId={folder.id} initial={aiResult.wheel} initialName={name} initialDescription={desc} onClose={close} />;
           case 'doc':
             return <DocEditor folderId={folder.id} initial={aiResult.html} initialName={name} initialDescription={desc} onClose={close} />;
+          case 'gaps':
+            return <GapsEditor folderId={folder.id} initial={aiResult.doc} initialName={name} initialDescription={desc} onClose={close} />;
           case 'note':
             return <NoteSheet folderId={folder.id} initialName={name} initialDescription={desc} initialText={aiResult.text} onClose={close} />;
         }
@@ -497,6 +502,7 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
       {editing?.kind === 'doc' && <DocEditor file={editing.file} initial={editing.text} onClose={() => setEditing(null)} />}
       {editing?.kind === 'chart' && <ChartEditor file={editing.file} initial={parseChart(editing.text)} onClose={() => setEditing(null)} />}
       {editing?.kind === 'wheel' && <WheelEditor file={editing.file} initial={parseWheel(editing.text)} onClose={() => setEditing(null)} />}
+      {editing?.kind === 'gaps' && <GapsEditor file={editing.file} initial={parseGapsDoc(editing.text)} onClose={() => setEditing(null)} />}
     </section>
   );
 }
@@ -660,7 +666,7 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
   );
 }
 
-type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz' | 'chart' | 'wheel' | 'ai';
+type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz' | 'gaps' | 'chart' | 'wheel' | 'ai';
 const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; text: string; touchOnly?: boolean }[] = [
   { id: 'files', icon: 'upload', title: 'Dateien durchsuchen', text: 'PDFs, Bilder, Präsentationen, Videos … von deinem Gerät' },
   { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', text: 'Direkt mit der Kamera', touchOnly: true },
@@ -668,6 +674,7 @@ const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; text: string;
   { id: 'note', icon: 'text', title: 'Notiz', text: 'Schnell ein paar Zeilen reiner Text' },
   { id: 'cards', icon: 'cards', title: 'Karteikarten', text: 'Vorder- und Rückseite, mit Lernmodus' },
   { id: 'quiz', icon: 'quiz', title: 'Quiz', text: 'Multiple Choice mit Auswertung' },
+  { id: 'gaps', icon: 'gaps', title: 'Lückentext', text: 'Wörter einsetzen oder selbst schreiben' },
   { id: 'chart', icon: 'chart', title: 'Diagramm', text: 'Säulen, Balken, Linie, Kreis – auch in Text-Dokumente einfügbar' },
   { id: 'wheel', icon: 'wheel', title: 'Glücksrad', text: 'Zufällig auswählen – auch in Text-Dokumente einfügbar' },
   { id: 'ai', icon: 'sparkle', title: 'Mit KI erstellen', text: 'Prompt für ChatGPT, Claude & Co. – Antwort einfügen, fertig' },

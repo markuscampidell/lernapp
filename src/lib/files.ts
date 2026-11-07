@@ -15,6 +15,7 @@ export type FileKind =
   | 'richtext'
   | 'chart'
   | 'wheel'
+  | 'gaps'
   | 'other';
 
 const EXT: Record<string, FileKind> = {
@@ -24,6 +25,7 @@ const EXT: Record<string, FileKind> = {
   dokument: 'richtext',
   diagramm: 'chart',
   gluecksrad: 'wheel',
+  lueckentext: 'gaps',
   pdf: 'pdf',
   ppt: 'presentation', pptx: 'presentation', odp: 'presentation', key: 'presentation', pps: 'presentation', ppsx: 'presentation',
   doc: 'document', docx: 'document', odt: 'document', rtf: 'document', pages: 'document',
@@ -67,6 +69,7 @@ export const KIND_LABEL: Record<FileKind, string> = {
   richtext: 'Text-Dokument',
   chart: 'Diagramm',
   wheel: 'Glücksrad',
+  gaps: 'Lückentext',
   other: 'Datei',
 };
 
