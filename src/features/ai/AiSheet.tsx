@@ -8,7 +8,7 @@ import { Icon } from '../../components/Icon';
 import { TextLine } from '../../components/TextLine';
 import { FileThumb, FolderThumb } from '../../components/Thumbs';
 import { EmptyState } from '../../components/EmptyState';
-import { downloadBlob, fullName } from '../../lib/files';
+import { downloadBlob, fullName, isTouchDevice } from '../../lib/files';
 import { CHART_TYPES } from '../charts/chart';
 import { attachmentsOf, prepareMaterial, routeGuess, type Material } from './materials';
 import { buildPrompt, DEFAULT_SETTINGS, kindInfo, KINDS, parseAnswer, type AiKind, type AiResult, type AiSettings, type Parsed } from './recipes';
@@ -173,7 +173,8 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
   };
 
   const fileList = attachments;
-  const canShareFiles = typeof navigator.canShare === 'function' && fileList.length > 0 && (() => {
+  // Teilen nur auf Handys/Tablets – am PC führt das Teilen-Menü kaum zu einer KI, dort sind Herunterladen/Kopieren besser.
+  const canShareFiles = isTouchDevice && typeof navigator.canShare === 'function' && fileList.length > 0 && (() => {
     try {
       return navigator.canShare({ files: fileList });
     } catch {
@@ -188,6 +189,33 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
       setActionErr('Teilen hat nicht geklappt – lade die Dateien stattdessen herunter.');
     }
   };
+  // Handy: Prompt und Dateien in einem Rutsch teilen. Nicht jede KI-App übernimmt dabei den Text –
+  // deshalb liegt der Prompt vorher zusätzlich in der Zwischenablage.
+  const SHARE_TEXT_MAX = 50_000;
+  const shareAll = async () => {
+    let onClipboard = false;
+    try {
+      await navigator.clipboard.writeText(prompt);
+      onClipboard = true;
+    } catch {
+      /* dann eben nur teilen */
+    }
+    const withText = prompt.length <= SHARE_TEXT_MAX;
+    try {
+      const data: ShareData = { files: fileList, ...(withText ? { text: prompt } : {}) };
+      await navigator.share(navigator.canShare?.(data) ? data : { files: fileList });
+      flash(
+        onClipboard
+          ? withText
+            ? 'Geteilt. Steht der Prompt in der KI nicht im Eingabefeld? Er ist schon kopiert – lange tippen → „Einfügen“.'
+            : 'Dateien geteilt. Der Prompt ist zu lang zum Mitschicken und liegt in der Zwischenablage – in der KI lange tippen → „Einfügen“.'
+          : 'Geteilt. Falls der Prompt fehlt: „Prompt kopieren“ und in der KI einfügen.',
+      );
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      setActionErr('Teilen hat nicht geklappt – nimm „Prompt kopieren“ und „Dateien herunterladen“.');
+    }
+  };
   const downloadFiles = async () => {
     for (const f of fileList) {
       downloadBlob(f, f.name);
@@ -195,7 +223,31 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
     }
     flash(fileList.length === 1 ? 'Datei heruntergeladen.' : `${fileList.length} Dateien heruntergeladen.`);
   };
-  const canSharePrompt = typeof navigator.share === 'function' && prompt.length < 60_000;
+  const canSharePrompt = isTouchDevice && typeof navigator.share === 'function' && prompt.length < 60_000;
+
+  // Am PC: Bilder einzeln in die Zwischenablage kopieren und in der KI mit Strg+V einfügen.
+  const canCopyImages = !isTouchDevice && typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';
+  const [copiedFile, setCopiedFile] = useState<string | null>(null);
+  const copyImage = async (f: File) => {
+    try {
+      // Browser erlauben in der Zwischenablage nur PNG.
+      let png: Blob = f;
+      if (f.type !== 'image/png') {
+        const bmp = await createImageBitmap(f);
+        const c = document.createElement('canvas');
+        c.width = bmp.width;
+        c.height = bmp.height;
+        c.getContext('2d')!.drawImage(bmp, 0, 0);
+        bmp.close();
+        png = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('png'))), 'image/png'));
+      }
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+      setCopiedFile(f.name);
+      setActionErr(null);
+    } catch {
+      setActionErr('Das Bild konnte nicht kopiert werden – lade es stattdessen herunter.');
+    }
+  };
   const sharePrompt = async () => {
     try {
       await navigator.share({ text: prompt });
@@ -560,7 +612,22 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
         </Step>
 
         <Step n={++stepNo} title="Prompt an die KI geben">
-          <ol className="ai-howto">
+          {canShareFiles ? (
+            <>
+              <ol className="ai-howto">
+                <li>
+                  Tippe auf „Alles an die KI schicken“ und wähle im Teilen-Menü deine KI-App (z. B. ChatGPT, Claude oder Gemini). Der Prompt und{' '}
+                  {attachments.length === 1 ? 'die Datei' : `die ${attachments.length} Dateien`} gehen zusammen hinüber.
+                </li>
+                <li>Steht der Prompt dort nicht im Eingabefeld? Er ist schon kopiert: lange ins Feld tippen → „Einfügen“. Dann abschicken.</li>
+              </ol>
+              <p className="muted small">
+                Keine KI-App installiert, sondern die KI im Browser? Dann einzeln: „Prompt kopieren“ und „Dateien herunterladen“ (iPhone: im
+                Teilen-Menü „Bilder sichern“ bzw. „In Dateien sichern“) – und in der KI über das „+“ anhängen.
+              </p>
+            </>
+          ) : (
+            <ol className="ai-howto">
             <li>Tippe auf „Prompt kopieren“.</li>
             <li>Öffne deine KI (z. B. ChatGPT, Claude oder Gemini) und starte ein neues Gespräch.</li>
             {attachments.length > 0 && (
@@ -568,11 +635,14 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
                 Hänge {attachments.length === 1 ? 'die Datei' : `die ${attachments.length} Dateien`} an, die „Direkt an die KI“ gehen (Fotos, Scans und Bilder aus deinen Dokumenten):{' '}
                 {canShareFiles
                   ? 'Tippe auf „Dateien teilen“ und wähle deine KI-App – oder lade sie herunter und hänge sie in der KI über die Büroklammer bzw. das „+“ an.'
-                  : 'Tippe auf „Dateien herunterladen“ und hänge sie in der KI über die Büroklammer bzw. das „+“ an.'}
+                  : canCopyImages
+                    ? 'Kopiere die Bilder einzeln mit „Kopieren“ (unten) und füge sie in der KI mit Strg+V ein – oder klicke auf „Dateien herunterladen“ und ziehe sie aus dem Download-Ordner ins KI-Fenster (bzw. Büroklammer/„+“).'
+                    : 'Klicke auf „Dateien herunterladen“ und hänge sie in der KI über die Büroklammer bzw. das „+“ an (oder ziehe sie ins KI-Fenster).'}
               </li>
             )}
             <li>Füge den Prompt ins Eingabefeld der KI ein (lange tippen → „Einfügen“ bzw. Strg+V) und schick ihn ab.</li>
-          </ol>
+            </ol>
+          )}
           {!hasSource && (
             <p className="notice warning">Gib zuerst ein Thema ein (Schritt 2) oder wähle Materialien aus (Schritt 3) – sonst weiß die KI nicht, worum es gehen soll.</p>
           )}
@@ -594,12 +664,17 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
             </p>
           )}
           <div className="input-row wrap">
-            <button className="btn primary" onClick={copyPrompt} disabled={loading || !hasSource}>
+            {attachments.length > 0 && canShareFiles && (
+              <button className="btn primary" onClick={shareAll} disabled={loading || !hasSource}>
+                <Icon name="share" size={18} /> Alles an die KI schicken
+              </button>
+            )}
+            <button className={`btn ${attachments.length > 0 && canShareFiles ? 'ghost' : 'primary'}`} onClick={copyPrompt} disabled={loading || !hasSource}>
               <Icon name="copy" size={18} /> Prompt kopieren
             </button>
             {attachments.length > 0 && canShareFiles && (
               <button className="btn ghost" onClick={shareFiles}>
-                <Icon name="share" size={18} /> Dateien teilen
+                <Icon name="share" size={18} /> Nur Dateien teilen
               </button>
             )}
             {attachments.length > 0 && (
@@ -607,12 +682,32 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
                 <Icon name="download" size={18} /> Dateien herunterladen
               </button>
             )}
-            {canSharePrompt && !loading && hasSource && (
+            {canSharePrompt && !loading && hasSource && attachments.length === 0 && (
               <button className="btn ghost" onClick={sharePrompt}>
                 <Icon name="share" size={18} /> Prompt teilen
               </button>
             )}
           </div>
+          {canCopyImages && attachments.length > 0 && (
+            <ul className="list ai-attachments">
+              {attachments.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="card row-card">
+                  <Icon name={f.type.startsWith('image/') ? 'image' : 'file'} size={20} />
+                  <span className="grow ellipsis small">{f.name}</span>
+                  {f.type.startsWith('image/') ? (
+                    <button className="btn ghost small" onClick={() => copyImage(f)}>
+                      <Icon name={copiedFile === f.name ? 'check' : 'copy'} size={16} /> {copiedFile === f.name ? 'Kopiert' : 'Kopieren'}
+                    </button>
+                  ) : (
+                    <button className="btn ghost small" onClick={() => downloadBlob(f, f.name)}>
+                      <Icon name="download" size={16} /> Laden
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canCopyImages && copiedFile && <p className="muted small">„{copiedFile}“ ist kopiert – jetzt in der KI ins Eingabefeld klicken und Strg+V drücken.</p>}
           {attachments.length > 10 && (
             <p className="notice warning">
               {attachments.length} Dateien zum Anhängen – viele KIs nehmen nur etwa 10 Dateien pro Nachricht. Schick sie notfalls in zwei Nachrichten

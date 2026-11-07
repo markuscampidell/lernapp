@@ -2831,3 +2831,5 @@ textarea.ai-answer { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas,
 .img-tools button:active { transform: scale(0.94); }
 .ai-attach { display: flex; align-items: flex-start; gap: 8px; margin-top: 2px; cursor: pointer; color: var(--text-2); }
 .ai-attach input { flex: none; width: 18px; height: 18px; margin-top: 1px; accent-color: var(--accent); }
+.ai-attachments { gap: 6px; }
+.ai-attachments > li { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; }
