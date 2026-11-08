@@ -2936,7 +2936,13 @@ input.gap-input:disabled { opacity: 1; }
 .doc-content .col > :last-child {
   margin-bottom: 0;
 }
-/* Lesen: dünne Linien zwischen Spalten und Zeilen */
+/* Lesen: dünne, durchgehende Linien zwischen Spalten und Zeilen (Abstand als Innenabstand der Zellen, nicht als Lücke) */
+.doc-content:not(.doc-editable) .row {
+  gap: 0;
+}
+.doc-content:not(.doc-editable) .col:not(:last-child) {
+  padding-right: 16px;
+}
 .doc-content:not(.doc-editable) .col + .col {
   padding-left: 16px;
   border-left: 1px solid var(--border);
