@@ -102,6 +102,22 @@ $$;
 
 -- ---------- Auslöser ----------
 
+-- Alle Personen, die einen geteilten Ordner sehen (auch über äußere Ordner). Gleich wie in 010_aenderungen.sql –
+-- hier noch einmal, damit diese Datei auch ohne 010 funktioniert.
+create or replace function public.share_people(s uuid) returns setof uuid
+language sql stable security definer set search_path = '' as $$
+  with recursive up(id) as (
+    select s
+    union
+    select f.share_id from up
+      join public.shares sh on sh.id = up.id
+      join public.folders f on f.id = sh.inside
+  )
+  select x.owner_id from up join public.shares x on x.id = up.id
+  union
+  select m.user_id from up join public.share_members m on m.share_id = up.id;
+$$;
+
 -- Kommentar: an die Person, die die Datei erstellt hat. Antwort: zusätzlich an alle im selben Gespräch.
 -- Nur an Personen, die die Datei noch sehen.
 create or replace function public.comments_notify() returns trigger

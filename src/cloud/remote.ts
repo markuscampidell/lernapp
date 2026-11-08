@@ -219,7 +219,9 @@ async function fetchCommentMeta(): Promise<CommentMeta[]> {
 
 // ---------- Kommentare ----------
 export const COMMENTS_NOT_READY = 'Kommentare sind auf dem Server noch nicht eingerichtet: Bitte supabase/009_lernstand_kommentare.sql im Supabase „SQL Editor“ ausführen.';
-const commentError = (msg: string) => (/comments|relation|schema cache|does not exist/i.test(msg) ? new Error(COMMENTS_NOT_READY) : new Error(friendly(msg)));
+// Nur wenn die Tabelle selbst fehlt, auf SQL 009 verweisen – andere Fehler (z. B. aus Triggern) im Klartext zeigen.
+const commentError = (msg: string) =>
+  /relation "(public\.)?comments" does not exist|table 'public\.comments' in the schema cache/i.test(msg) ? new Error(COMMENTS_NOT_READY) : new Error(friendly(msg));
 
 export async function fetchComments(fileId: string): Promise<Comment[]> {
   const res = await sb().from('comments').select('id, file_id, user_id, parent_id, body, created_at').eq('file_id', fileId).order('created_at');
