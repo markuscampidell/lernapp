@@ -43,6 +43,9 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
 - **Kommentare** an Dateien auf dem Server (geteilt / „Auf allen Geräten“): kommentieren, antworten, löschen; Anzahl und „neu“ in der Liste.
 - **Was hat sich geändert?** Speichert jemand eine geteilte Datei, sehen die anderen beim nächsten Öffnen einmal, wer was geändert hat
   (stark vereinfacht, z. B. „+120 Wörter, −1 Bild“) – auch in der Liste unter dem Namen. Haben es alle gesehen, wird es gelöscht.
+- **Benachrichtigungen** (Einstellungen → Auf diesem Gerät): Mitteilung aufs Handy/den PC, auch bei geschlossener App, wenn jemand
+  eine eigene Datei kommentiert oder auf einen Kommentar antwortet, einen Ordner mit einem teilt oder einem Ordner übergibt.
+  Antippen öffnet die Datei bzw. den Ordner. Auf iPhone/iPad nur in der zum Home-Bildschirm hinzugefügten App (ab iOS 16.4).
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
 ## Entwickeln
@@ -77,7 +80,23 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
    , `supabase/008_oberster_ordner.sql` (obersten geteilten Ordner ändert nur der Besitzer)
    , `supabase/009_lernstand_kommentare.sql` (Lernstand bei Karteikarten, Kommentare)
    , `supabase/010_aenderungen.sql` („Was hat sich geändert?“ bei geteilten Dateien)
-   und `supabase/011_speicher.sql` (belegten Server-Speicher anzeigen und vor Uploads prüfen).
+   , `supabase/011_speicher.sql` (belegten Server-Speicher anzeigen und vor Uploads prüfen)
+   und `supabase/012_benachrichtigungen.sql` (Push-Benachrichtigungen, siehe unten).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.
+
+## Benachrichtigungen einrichten (kostenlos)
+
+Push-Benachrichtigungen laufen über die Push-Dienste der Browser (kostenlos) und eine Supabase Edge Function
+(`supabase/functions/push/index.ts`, im kostenlosen Tarif ca. 500 000 Aufrufe pro Monat). Einmalig:
+
+1. *Edge Functions → Deploy a new function → Via Editor*: Name **`push`**, Inhalt von `supabase/functions/push/index.ts` einfügen, deployen.
+2. In den Einstellungen der Funktion **„Verify JWT“ (bzw. „Enforce JWT verification“) ausschalten** (die Datenbank ruft sie ohne Schlüssel auf; die Funktion verschickt
+   nur, was in `notifications` noch unversendet wartet).
+3. *Edge Functions → Secrets*: `VAPID_PUBLIC_KEY` (steht in `src/cloud/push.ts`) und `VAPID_PRIVATE_KEY` (nicht ins Repo!) eintragen.
+   Neues Schlüsselpaar: `npx web-push generate-vapid-keys` – dann auch `VAPID_PUBLIC_KEY` in `src/cloud/push.ts` ändern.
+4. *SQL Editor*: `supabase/012_benachrichtigungen.sql` ausführen (aktiviert `pg_net`, legt Tabellen und Trigger an).
+5. In der App: Einstellungen → Benachrichtigungen einschalten → „Test-Benachrichtigung senden“.
+
+Klappt der Test nicht: *Edge Functions → push → Logs* bzw. im SQL Editor `select * from net._http_response order by created desc limit 5;`.

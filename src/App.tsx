@@ -81,7 +81,7 @@ export function App() {
         ) : (
           <ErrorBoundary>
             <HandoverBanner />
-            {tab === 'ordner' && <FoldersView folderId={route.folderId} />}
+            {tab === 'ordner' && <FoldersView folderId={route.folderId} fileId={route.fileId} />}
             {tab === 'hochladen' && <UploadView />}
             {tab === 'einstellungen' && <SettingsView />}
           </ErrorBoundary>

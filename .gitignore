@@ -3,3 +3,4 @@ dist
 *.local
 *.tsbuildinfo
 .claude
+vite.config.ts.timestamp-*

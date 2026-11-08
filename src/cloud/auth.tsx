@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { cloudEnabled, friendly, MIN_PASSWORD, supabase, usernameToEmail, USERNAME_RE } from './supabase';
+import { forgetPushDevice, syncPush } from './push';
 
 export interface User {
   id: string;
@@ -94,9 +95,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Dieses Gerät bekommt danach keine Benachrichtigungen mehr für das Konto.
+    await forgetPushDevice();
     await supabase?.auth.signOut().catch(() => {});
     setUser(null);
   }, []);
+
+  // Benachrichtigungen: Gerät (falls eingeschaltet) dem angemeldeten Konto zuordnen.
+  const userId = user?.id;
+  useEffect(() => {
+    if (userId) syncPush();
+  }, [userId]);
 
   const changePassword = useCallback(async (password: string) => {
     if (!supabase) return;

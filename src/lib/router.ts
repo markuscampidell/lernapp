@@ -1,21 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { SHARED_ROOT } from '../domain/types';
 
-// Hash-Routen: #ordner (Meine Ordner), #geteilt (Geteilte Ordner), #ordner/<id>, #hochladen, #einstellungen
+// Hash-Routen: #ordner (Meine Ordner), #geteilt (Geteilte Ordner), #ordner/<id>, #ordner/<id>/<datei-id> (Datei öffnen),
+// #hochladen, #einstellungen
 export type Tab = 'ordner' | 'hochladen' | 'einstellungen';
 export interface Route {
   tab: Tab;
   folderId: string | null;
+  /** Datei, die beim Öffnen des Ordners gleich angezeigt wird (z. B. aus einer Benachrichtigung). */
+  fileId?: string;
 }
 
 const TABS: Tab[] = ['ordner', 'hochladen', 'einstellungen'];
 
 export function parseHash(hash = window.location.hash): Route {
-  const [tab, id] = hash.replace(/^#/, '').split('/');
+  const [tab, id, file] = hash.replace(/^#/, '').split('/');
   if (tab === 'geteilt') return { tab: 'ordner', folderId: SHARED_ROOT };
   if (!TABS.includes(tab as Tab)) return { tab: 'ordner', folderId: null };
   // #ordner/<id> = geöffneter Ordner
-  return { tab: tab as Tab, folderId: tab === 'ordner' && id ? decodeURIComponent(id) : null };
+  const folderId = tab === 'ordner' && id ? decodeURIComponent(id) : null;
+  return { tab: tab as Tab, folderId, ...(folderId && file ? { fileId: decodeURIComponent(file) } : {}) };
 }
 
 export const folderHash = (id: string | null) =>

@@ -1,6 +1,6 @@
 // Offline-Unterstützung: Die App-Hülle wird zwischengespeichert, damit die installierte App ohne Netz startet.
 // VERSION erhöhen, damit Clients nach einem Deploy alte Caches verwerfen.
-const VERSION = 'v24';
+const VERSION = 'v25';
 const CACHE = `lernapp-${VERSION}`;
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
@@ -103,5 +103,42 @@ self.addEventListener('fetch', (event) => {
           return res;
         }),
     ),
+  );
+});
+
+// ---------- Push-Benachrichtigungen ----------
+// Kommen von der Supabase Edge Function "push" (supabase/functions/push). Inhalt: { title, body, url, tag }.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Lernapp', {
+      body: data.body || '',
+      icon: './icons/icon-192.png',
+      tag: data.tag,
+      data: { url: data.url || '#ordner' },
+    }),
+  );
+});
+
+// Antippen: offene App nach vorne holen und dorthin wechseln – sonst die App neu öffnen.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const hash = (event.notification.data && event.notification.data.url) || '#ordner';
+  const target = new URL('./' + hash, self.registration.scope).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (list) => {
+      const client = list.find((c) => c.url.startsWith(self.registration.scope));
+      if (client) {
+        await client.focus().catch(() => {});
+        client.postMessage({ type: 'lernapp:open', hash });
+        return;
+      }
+      return self.clients.openWindow(target);
+    }),
   );
 });

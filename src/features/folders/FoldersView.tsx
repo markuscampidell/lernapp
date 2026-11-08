@@ -37,7 +37,7 @@ import { cloudEnabled } from '../../cloud/supabase';
 
 const norm = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-export function FoldersView({ folderId }: { folderId: string | null }) {
+export function FoldersView({ folderId, fileId }: { folderId: string | null; fileId?: string }) {
   const { folders, files } = useLibrary();
   const sharedRoot = folderId === SHARED_ROOT;
   const folder = folderId && !sharedRoot ? folders.find((f) => f.id === folderId) : undefined;
@@ -53,7 +53,9 @@ export function FoldersView({ folderId }: { folderId: string | null }) {
   }, [folderId]);
 
   if (folderId && !sharedRoot && !folder) return null;
-  return <FolderPage key={folderId ?? 'root'} folder={folder ?? null} scope={sharedRoot ? 'shared' : 'mine'} folders={folders} files={files} />;
+  return (
+    <FolderPage key={folderId ?? 'root'} folder={folder ?? null} scope={sharedRoot ? 'shared' : 'mine'} folders={folders} files={files} openFileId={fileId} />
+  );
 }
 
 interface Selection {
@@ -61,7 +63,19 @@ interface Selection {
   files: Set<string>;
 }
 
-function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Folder | null; scope: 'mine' | 'shared'; folders: Folder[]; files: FileItem[] }) {
+function FolderPage({
+  folder,
+  scope: rootScope,
+  folders,
+  files,
+  openFileId,
+}: {
+  folder: Folder | null;
+  scope: 'mine' | 'shared';
+  folders: Folder[];
+  files: FileItem[];
+  openFileId?: string;
+}) {
   const lib = useLibrary();
   const { deleteMany, moveMany, deleteProblem, moveProblem, canModify, canAddIn, isRoot, isOrphan, isNewSince, me } = lib;
   // Was gerade verschoben wird (öffnet die Ordnerauswahl).
@@ -80,6 +94,14 @@ function FolderPage({ folder, scope: rootScope, folders, files }: { folder: Fold
   >(null);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // #ordner/<ordner>/<datei> (z. B. aus einer Benachrichtigung): Datei gleich öffnen, Adresse auf den Ordner zurücksetzen.
+  useEffect(() => {
+    if (!openFileId || !folder) return;
+    replace(folderHash(folder.id));
+    const target = files.find((f) => f.id === openFileId && f.folderId === folder.id);
+    if (target) setViewing(target);
+  }, [openFileId]);
 
   const id = folder?.id ?? (rootScope === 'shared' ? SHARED_ROOT : null);
   const scope = folder ? scopeOf(folders, folder.id) : rootScope;
