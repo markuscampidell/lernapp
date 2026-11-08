@@ -5,6 +5,7 @@ export const MAX_COLS = 4;
 export const COLS_SELECTOR = 'div.cols';
 
 const BLOCKS = 'p, h2, h3, ul, ol, blockquote, pre, figure, div';
+const LINES = 'p, li, h2, h3, blockquote, pre';
 const emptyBlock = (doc: Document) => {
   const p = doc.createElement('p');
   p.appendChild(doc.createElement('br'));
@@ -202,19 +203,29 @@ export function blockColumnMerge(root: HTMLElement, key: 'Backspace' | 'Delete')
   const sel = root.ownerDocument.getSelection();
   if (!sel?.isCollapsed || !sel.anchorNode || !root.contains(sel.anchorNode)) return false;
   const start = sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode.parentElement;
+  // Zeile (Absatz, Listenpunkt …), in der der Cursor steht.
+  const line = start?.closest(LINES);
+  const back = key === 'Backspace';
+  /** Steht der Cursor am Anfang der ersten bzw. am Ende der letzten Zeile von el? (Leere Zeilen davor zählen mit.) */
+  const atOuterEdge = (el: Element) => {
+    const lines = el.querySelectorAll(LINES);
+    const edgeLine = back ? lines[0] : lines[lines.length - 1];
+    return !!line && line === edgeLine && caretAtEdge(line, back ? 'start' : 'end');
+  };
   const col = start?.closest('div.col');
-  if (col && root.contains(col)) return caretAtEdge(col, key === 'Backspace' ? 'start' : 'end');
+  if (col && root.contains(col)) return atOuterEdge(col);
   const block = topBlockAtCursor(root);
   if (!block) return false;
-  if (key === 'Backspace') {
-    if (!block.previousElementSibling?.matches(COLS_SELECTOR) || !caretAtEdge(block, 'start')) return false;
-    // Leerer Absatz direkt unter dem Block (nicht der letzte): einfach entfernen.
-    const next = block.nextElementSibling;
-    if (next && !colHasContent(block)) {
+  if (back) {
+    const box = block.previousElementSibling;
+    if (!box?.matches(COLS_SELECTOR) || !atOuterEdge(block)) return false;
+    // Leerer Absatz direkt unter dem Block (nicht der letzte): entfernen, Cursor ans Ende der letzten Spalte.
+    if (block.nextElementSibling && !colHasContent(block)) {
       block.remove();
-      placeCaret(next);
+      const lastCol = box.querySelector(':scope > div.col:last-child');
+      if (lastCol) placeCaret(lastCol, true);
     }
     return true;
   }
-  return !!block.nextElementSibling?.matches(COLS_SELECTOR) && caretAtEdge(block, 'end');
+  return !!block.nextElementSibling?.matches(COLS_SELECTOR) && atOuterEdge(block);
 }
