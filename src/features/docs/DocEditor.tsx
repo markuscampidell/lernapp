@@ -17,6 +17,27 @@ import { WheelEditor } from '../wheel/WheelEditor';
 import { EmbedInsertSheet } from './EmbedInsertSheet';
 import { EMBED_SELECTOR, embedFigure, embedFromPaste, embedJson, embedOf, embedTitle, renderEmbedsIn, useEmbedCopy, type EmbedData, type EmbedKind } from './embeds';
 import { afterBack } from '../../lib/router';
+import { addColumn, blockColumnMerge, colHasContent, fixColumns, insertColumns, MAX_COLS, removeColumn } from './columns';
+
+/** Lage eines Spalten-Blocks und seiner Spalten (für die Knöpfe über jeder Spalte). */
+interface ColBox {
+  box: HTMLElement;
+  left: number;
+  top: number;
+  width: number;
+  cols: { el: HTMLElement; left: number; width: number }[];
+}
+const sameBoxes = (a: ColBox[], b: ColBox[]) =>
+  a.length === b.length &&
+  a.every(
+    (x, i) =>
+      x.box === b[i].box &&
+      x.left === b[i].left &&
+      x.top === b[i].top &&
+      x.width === b[i].width &&
+      x.cols.length === b[i].cols.length &&
+      x.cols.every((c, j) => c.el === b[i].cols[j].el && c.left === b[i].cols[j].left && c.width === b[i].cols[j].width),
+  );
 
 const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const blank = (c: string | undefined) => c === undefined || /\s/.test(c);
@@ -73,6 +94,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     if (!el) return;
     el.innerHTML = sanitizeHtml(initial) || '<p><br></p>';
     normalizeBlocks(el);
+    fixColumns(el);
     renderMathIn(el, true);
     renderEmbedsIn(el, { editable: true });
     document.execCommand('defaultParagraphSeparator', false, 'p');
@@ -103,6 +125,69 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
       scroller?.removeEventListener('scroll', measure);
     };
   }, [image, measure]);
+
+  // ---------- Spalten ----------
+  const [colBoxes, setColBoxes] = useState<ColBox[]>([]);
+  const measureCols = useCallback(() => {
+    const root = editor.current;
+    const w = wrap.current;
+    if (!root || !w) return;
+    const wr = w.getBoundingClientRect();
+    const next: ColBox[] = Array.from(root.querySelectorAll<HTMLElement>(':scope > div.cols')).map((box) => {
+      const br = box.getBoundingClientRect();
+      return {
+        box,
+        left: Math.round(br.left - wr.left),
+        top: Math.round(br.top - wr.top),
+        width: Math.round(br.width),
+        cols: Array.from(box.querySelectorAll<HTMLElement>(':scope > div.col')).map((col) => {
+          const cr = col.getBoundingClientRect();
+          return { el: col, left: Math.round(cr.left - br.left), width: Math.round(cr.width) };
+        }),
+      };
+    });
+    setColBoxes((prev) => (sameBoxes(prev, next) ? prev : next));
+  }, []);
+  useEffect(() => {
+    const root = editor.current;
+    if (!root) return;
+    measureCols();
+    const ro = new ResizeObserver(() => measureCols());
+    ro.observe(root);
+    // Seitlich gescrollte Spalten (schmaler Bildschirm) -> Knöpfe mitschieben.
+    root.addEventListener('scroll', measureCols, true);
+    window.addEventListener('resize', measureCols);
+    return () => {
+      ro.disconnect();
+      root.removeEventListener('scroll', measureCols, true);
+      window.removeEventListener('resize', measureCols);
+    };
+  }, [measureCols]);
+  const afterColChange = () => {
+    setDirty(true);
+    measureCols();
+    requestAnimationFrame(measureCols);
+  };
+  const addColumnsBlock = () => {
+    const root = editor.current;
+    if (!root) return;
+    if (formula) finishFormula();
+    setImage(null);
+    selectEmbed(null);
+    root.focus();
+    insertColumns(root);
+    afterColChange();
+  };
+  const addCol = (col: HTMLElement, side: 'left' | 'right') => {
+    editor.current?.focus();
+    if (addColumn(col, side)) afterColChange();
+  };
+  const deleteCol = (col: HTMLElement) => {
+    if (colHasContent(col) && !confirm('In dieser Spalte steht etwas. Spalte mit Inhalt löschen?')) return;
+    editor.current?.focus();
+    removeColumn(col);
+    afterColChange();
+  };
 
   /** Größe per Ecke/Kante ziehen – das Seitenverhältnis bleibt immer gleich. */
   const startResize = (handle: Handle) => (e: React.PointerEvent) => {
@@ -222,6 +307,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     const sel = document.getSelection();
     const node = sel?.anchorNode ?? null;
     const off = sel?.anchorOffset ?? 0;
+    fixColumns(el);
     if (normalizeBlocks(el) && sel && node && el.contains(node)) {
       try {
         sel.collapse(node, off);
@@ -569,6 +655,12 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
       cmd('insertParagraph');
       return;
     }
+    // ⌫/Entf am Rand einer Spalte bzw. direkt unter/über Spalten: nichts zusammenlegen.
+    if ((e.key === 'Backspace' || e.key === 'Delete') && !image && !embedEl && editor.current && blockColumnMerge(editor.current, e.key)) {
+      e.preventDefault();
+      afterColChange();
+      return;
+    }
     if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && !image && !embedEl) {
       e.preventDefault();
       indent(e.shiftKey);
@@ -639,6 +731,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
       },
     },
     { icon: 'sigma', label: 'Formel einfügen', on: !!formula, run: () => (formula ? finishFormula() : insertFormula()) },
+    { icon: 'columns', label: 'Spalten einfügen', run: addColumnsBlock },
   ];
 
   return (
@@ -770,6 +863,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
               setDirty(true);
               measure();
               normalize();
+              measureCols();
               if (editor.current?.querySelector('ul.checklist')) refreshChecks();
               const ev = e.nativeEvent as InputEvent;
               if (ev.inputType === 'insertText' && ev.data?.endsWith('$')) autoFormula();
@@ -784,6 +878,31 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
               }
             }}
           />
+          {colBoxes.map((b, bi) => (
+            <div key={bi} className="cols-overlay" style={{ left: b.left, top: b.top, width: b.width }} data-no-swipe>
+              {b.cols.map((c, ci) => (
+                <div key={ci} className="col-bar" style={{ left: c.left, width: c.width }} onMouseDown={(e) => e.preventDefault()}>
+                  {ci === 0 && b.cols.length < MAX_COLS ? (
+                    <button type="button" className="icon-btn small" aria-label="Spalte links einfügen" title="Spalte links einfügen" onClick={() => addCol(c.el, 'left')}>
+                      <Icon name="colAddLeft" size={17} />
+                    </button>
+                  ) : (
+                    <span className="col-bar-gap" />
+                  )}
+                  <button type="button" className="icon-btn small danger" aria-label="Spalte löschen" title="Spalte löschen" onClick={() => deleteCol(c.el)}>
+                    <Icon name="trash" size={16} />
+                  </button>
+                  {b.cols.length < MAX_COLS ? (
+                    <button type="button" className="icon-btn small" aria-label="Spalte rechts einfügen" title="Spalte rechts einfügen" onClick={() => addCol(c.el, 'right')}>
+                      <Icon name="colAddRight" size={17} />
+                    </button>
+                  ) : (
+                    <span className="col-bar-gap" />
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
           {image && box && (
             <div className="img-frame" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} data-no-swipe>
               {HANDLES.map((h) => (

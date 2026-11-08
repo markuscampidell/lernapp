@@ -2913,3 +2913,62 @@ input.gap-input:disabled { opacity: 1; }
 }
 .gap-token.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--surface-2)); }
 .study-hero .block { display: block; }
+
+/* ---------- Spalten in Text-Dokumenten ---------- */
+.doc-content .cols {
+  display: flex;
+  gap: 16px;
+  margin: 0.4em 0;
+  /* Schmaler Bildschirm: Spalten bleiben nebeneinander, der Block scrollt seitlich. */
+  overflow-x: auto;
+}
+.doc-content .col {
+  flex: 1 1 0;
+  min-width: 130px;
+}
+.doc-content .col > :first-child {
+  margin-top: 0;
+}
+.doc-content .col > :last-child {
+  margin-bottom: 0;
+}
+.doc-content:not(.doc-editable) .col + .col {
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+.doc-editable .cols {
+  gap: 8px;
+}
+.doc-editable .col {
+  padding: 36px 10px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+/* Knöpfe über jeder Spalte (liegen über dem Editor, nicht im Text) */
+.cols-overlay {
+  position: absolute;
+  z-index: 2;
+  height: 34px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.col-bar {
+  position: absolute;
+  top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  pointer-events: auto;
+}
+.col-bar .icon-btn.small {
+  width: 30px;
+  height: 30px;
+  color: var(--text-2);
+}
+.col-bar .icon-btn.small.danger:hover {
+  color: var(--critical, #e5484d);
+}
+.col-bar-gap {
+  width: 30px;
+}

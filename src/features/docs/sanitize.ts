@@ -1,6 +1,7 @@
 // Text-Dokumente sind HTML. Weil sie auch von anderen Personen stammen können (geteilte Ordner),
 // wird vor dem Anzeigen/Einfügen alles entfernt, was nicht ausdrücklich erlaubt ist.
 import { EMBED_KINDS, embedJson, parseEmbed } from './embeds';
+import { MAX_COLS } from './columns';
 
 export const DOC_EXT = 'dokument';
 export const DOC_MIME = 'application/vnd.lernapp.dokument+html';
@@ -19,7 +20,7 @@ const safeId = (id: string | null) => (id && /^[A-Za-z0-9_-]{1,40}$/.test(id) ? 
 
 const safeLink = (href: string) => /^(https?:|mailto:)/i.test(href.trim());
 
-function clean(node: Node, out: Node, doc: Document) {
+function clean(node: Node, out: Node, doc: Document, inCol = false) {
   node.childNodes.forEach((child) => {
     if (child.nodeType === Node.TEXT_NODE) {
       // Unsichtbare Hilfszeichen hinter Formeln nicht mitspeichern.
@@ -29,6 +30,31 @@ function clean(node: Node, out: Node, doc: Document) {
     if (child.nodeType !== Node.ELEMENT_NODE) return;
     const el = child as HTMLElement;
     const tag = el.tagName.toLowerCase();
+    // Spalten: <div class="cols"> mit 1–4 <div class="col">. Spalten in Spalten werden aufgelöst (Inhalt untereinander).
+    if (tag === 'div' && el.classList.contains('cols')) {
+      const cols = Array.from(el.children).filter((c) => c.tagName === 'DIV' && c.classList.contains('col'));
+      if (inCol || !cols.length) {
+        (cols.length ? cols : [el]).forEach((c) => clean(c, out, doc, inCol));
+        return;
+      }
+      const box = doc.createElement('div');
+      box.className = 'cols';
+      cols.forEach((c, i) => {
+        // Mehr als erlaubt: der Rest landet in der letzten Spalte.
+        if (i >= MAX_COLS) return clean(c, box.lastChild!, doc, true);
+        const col = doc.createElement('div');
+        col.className = 'col';
+        clean(c, col, doc, true);
+        if (!col.childNodes.length) col.appendChild(doc.createElement('p')).appendChild(doc.createElement('br'));
+        box.appendChild(col);
+      });
+      out.appendChild(box);
+      return;
+    }
+    if (tag === 'div' && el.classList.contains('col')) {
+      clean(el, out, doc, inCol);
+      return;
+    }
     if (tag === 'br' || tag === 'hr') {
       out.appendChild(doc.createElement(tag));
       return;
@@ -76,7 +102,7 @@ function clean(node: Node, out: Node, doc: Document) {
         target.setAttribute('target', '_blank');
         target.setAttribute('rel', 'noopener noreferrer');
       }
-      clean(el, target, doc);
+      clean(el, target, doc, inCol);
       out.appendChild(target);
       return;
     }
@@ -101,7 +127,7 @@ function clean(node: Node, out: Node, doc: Document) {
       const id = safeId(el.getAttribute('data-id'));
       if (id) target.setAttribute('data-id', id);
     }
-    clean(el, target, doc);
+    clean(el, target, doc, inCol);
     out.appendChild(target);
   });
 }
