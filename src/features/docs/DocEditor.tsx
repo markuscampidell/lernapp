@@ -17,7 +17,7 @@ import { WheelEditor } from '../wheel/WheelEditor';
 import { EmbedInsertSheet } from './EmbedInsertSheet';
 import { EMBED_SELECTOR, embedFigure, embedFromPaste, embedJson, embedOf, embedTitle, renderEmbedsIn, useEmbedCopy, type EmbedData, type EmbedKind } from './embeds';
 import { afterBack } from '../../lib/router';
-import { addColumn, addRow, blockColumnMerge, columnCells, fixColumns, hasContent, insertColumns, MAX_COLS, removeColumn, removeRow } from './columns';
+import { addColumn, addRow, blockColumnMerge, columnCells, deleteAcrossCells, fixColumns, hasContent, insertColumns, MAX_COLS, perCell, removeColumn, removeRow } from './columns';
 
 /** Lage eines Spalten-Blocks, seiner Spalten und Zeilen (für die Knöpfe oben und links). */
 interface ColBox {
@@ -170,6 +170,27 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     measureCols();
     requestAnimationFrame(measureCols);
   };
+  /** Befehl bei einer Auswahl über mehrere Zellen je Zelle einzeln ausführen. */
+  const inCells = (fn: () => void) => () => (editor.current ? perCell(editor.current, fn) : fn());
+  // Tippen, Löschen, Enter, Ausschneiden … bei einer Auswahl über Zellgrenzen: nur den markierten Text je Zelle
+  // löschen (der Browser würde sonst Zellen zusammenziehen oder ganze Zellen entfernen).
+  useEffect(() => {
+    const root = editor.current;
+    if (!root) return;
+    const onBeforeInput = (e: InputEvent) => {
+      const t = e.inputType;
+      if (!(t.startsWith('delete') || t === 'insertText' || t === 'insertParagraph' || t === 'insertLineBreak' || t === 'insertReplacementText')) return;
+      if (!deleteAcrossCells(root)) return;
+      e.preventDefault();
+      if ((t === 'insertText' || t === 'insertReplacementText') && e.data) document.execCommand('insertText', false, e.data);
+      else if (t === 'insertParagraph' || t === 'insertLineBreak') document.execCommand('insertParagraph');
+      setDirty(true);
+      measureCols();
+      requestAnimationFrame(measureCols);
+    };
+    root.addEventListener('beforeinput', onBeforeInput);
+    return () => root.removeEventListener('beforeinput', onBeforeInput);
+  }, [measureCols]);
   const addColumnsBlock = () => {
     const root = editor.current;
     if (!root) return;
@@ -308,6 +329,8 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
 
   const cmd = (command: string, value?: string) => {
     editor.current?.focus();
+    // Einfügen ersetzt die Auswahl – geht sie über Zellgrenzen, zuerst nur den markierten Text je Zelle löschen.
+    if (editor.current && /^insert(?!(Un)?OrderedList)/.test(command)) deleteAcrossCells(editor.current);
     document.execCommand(command, false, value);
     normalize();
     setDirty(true);
@@ -349,13 +372,16 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
       refreshChecks();
       return;
     }
-    // Sonst: ganzen Absatz/Überschrift einrücken.
+    // Sonst: ganze Absätze/Überschriften einrücken (alle markierten, sonst den mit dem Cursor).
     const block = el?.closest('p, h2, h3') as HTMLElement | null;
-    if (!block || !editor.current?.contains(block)) return;
-    const level = Math.max(0, Math.min(MAX_INDENT, Number(block.dataset.indent || 0) + (out ? -1 : 1)));
-    if (level) block.dataset.indent = String(level);
-    else delete block.dataset.indent;
-    setDirty(true);
+    const many = document.getSelection()?.isCollapsed === false ? selectedLines() : [];
+    const blocks = many.length ? many : block && editor.current?.contains(block) ? [block] : [];
+    for (const b of blocks) {
+      const level = Math.max(0, Math.min(MAX_INDENT, Number(b.dataset.indent || 0) + (out ? -1 : 1)));
+      if (level) b.dataset.indent = String(level);
+      else delete b.dataset.indent;
+    }
+    if (blocks.length) setDirty(true);
   };
   // ---------- Checklisten ----------
   /** Liste (ul), in der der Cursor steht. */
@@ -485,8 +511,42 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
   // Aktuellen Absatztyp direkt abfragen (der gemerkte Zustand kann nach Enter veraltet sein).
   const toggleBlock = (tag: 'h2' | 'h3') => {
     editor.current?.focus();
+    const lines = selectedLines();
+    // Mehrere Zeilen markiert: jede Zeile einzeln umwandeln (der Browser würde sie sonst zu einer Überschrift
+    // mit Zeilenumbrüchen zusammenziehen).
+    if (lines.length > 1) {
+      const target = lines.every((l) => l.tagName.toLowerCase() === tag) ? 'p' : tag;
+      const sel = document.getSelection()!;
+      for (const line of lines) {
+        if (!line.isConnected) continue;
+        const r = document.createRange();
+        r.selectNodeContents(line);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        cmd('formatBlock', target);
+      }
+      return;
+    }
     const current = String(document.queryCommandValue('formatBlock')).toLowerCase();
     cmd('formatBlock', current === tag ? 'p' : tag);
+  };
+  /** Absätze/Überschriften (nicht in Listen), die die Auswahl berührt. */
+  const selectedLines = (): HTMLElement[] => {
+    const root = editor.current;
+    const sel = document.getSelection();
+    if (!root || !sel?.rangeCount) return [];
+    const r = sel.getRangeAt(0);
+    return Array.from(root.querySelectorAll<HTMLElement>('p, h2, h3')).filter((b) => {
+      if (b.closest('li') || !r.intersectsNode(b)) return false;
+      // Endet die Auswahl ganz am Anfang dieser Zeile (z. B. nach Dreifachklick), zählt sie nicht mit.
+      if (!r.collapsed && b.contains(r.endContainer)) {
+        const head = document.createRange();
+        head.setStart(b, 0);
+        head.setEnd(r.endContainer, r.endOffset);
+        if (!head.toString() && !head.cloneContents().querySelector('img, span.math')) return false;
+      }
+      return true;
+    });
   };
 
   /** Absatz eines Bildes (Bilder direkt im Dokument werden in einen Absatz gepackt). */
@@ -526,6 +586,11 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
   };
 
   const onPaste = (e: React.ClipboardEvent) => {
+    // Auswahl über mehrere Zellen: erst den markierten Text je Zelle löschen, dann normal einfügen.
+    if (editor.current && deleteAcrossCells(editor.current)) {
+      setDirty(true);
+      measureCols();
+    }
     // Diagramm/Glücksrad aus der App? (vor Bildern prüfen – Kopien bringen auch ein Bild mit)
     const embed = embedFromPaste(e.clipboardData);
     if (embed && embed !== 'html') {
@@ -676,7 +741,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     }
     if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && !image && !embedEl) {
       e.preventDefault();
-      indent(e.shiftKey);
+      inCells(() => indent(e.shiftKey))();
       return;
     }
     if (embedEl) {
@@ -712,17 +777,17 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     { icon: 'bold', label: 'Fett', on: state.bold, run: () => cmd('bold') },
     { icon: 'italic', label: 'Kursiv', on: state.italic, run: () => cmd('italic') },
     { icon: 'underline', label: 'Unterstrichen', on: state.underline, run: () => cmd('underline') },
-    { icon: 'heading', label: 'Überschrift', on: state.h2, run: () => toggleBlock('h2') },
+    { icon: 'heading', label: 'Überschrift', on: state.h2, run: inCells(() => toggleBlock('h2')) },
     'sep',
-    { icon: 'alignLeft', label: 'Linksbündig', on: !state.center && !state.right, run: () => align('left') },
-    { icon: 'alignCenter', label: 'Zentriert', on: state.center, run: () => align('center') },
-    { icon: 'alignRight', label: 'Rechtsbündig', on: state.right, run: () => align('right') },
+    { icon: 'alignLeft', label: 'Linksbündig', on: !state.center && !state.right, run: inCells(() => align('left')) },
+    { icon: 'alignCenter', label: 'Zentriert', on: state.center, run: inCells(() => align('center')) },
+    { icon: 'alignRight', label: 'Rechtsbündig', on: state.right, run: inCells(() => align('right')) },
     'sep',
-    { icon: 'listBullet', label: 'Aufzählung', on: state.ul, run: bulletList },
-    { icon: 'listNumber', label: 'Nummerierung', on: state.ol, run: () => cmd('insertOrderedList') },
-    { icon: 'checklist', label: 'Checkliste', on: state.check, run: toggleChecklist },
-    { icon: 'outdent', label: 'Ausrücken (Umschalt+Tab)', run: () => indent(true) },
-    { icon: 'indent', label: 'Einrücken (Tab)', run: () => indent(false) },
+    { icon: 'listBullet', label: 'Aufzählung', on: state.ul, run: inCells(bulletList) },
+    { icon: 'listNumber', label: 'Nummerierung', on: state.ol, run: inCells(() => cmd('insertOrderedList')) },
+    { icon: 'checklist', label: 'Checkliste', on: state.check, run: inCells(toggleChecklist) },
+    { icon: 'outdent', label: 'Ausrücken (Umschalt+Tab)', run: inCells(() => indent(true)) },
+    { icon: 'indent', label: 'Einrücken (Tab)', run: inCells(() => indent(false)) },
     'sep',
     { icon: 'image', label: 'Bild einfügen', run: () => imageInput.current?.click() },
     // Auf Handys/Tablets: direkt die Kamera öffnen – das Foto landet sofort im Dokument (nicht erst in der Galerie).

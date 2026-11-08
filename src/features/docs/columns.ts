@@ -316,3 +316,181 @@ export function blockColumnMerge(root: HTMLElement, key: 'Backspace' | 'Delete')
   }
   return !!block.nextElementSibling?.matches(COLS_SELECTOR) && atOuterEdge(block);
 }
+
+// ---------- Auswahl über mehrere Zellen ----------
+// Browser behandeln eine Auswahl über Zellgrenzen wie normalen Text: Löschen/Tippen/Listen ziehen dann Inhalt aus
+// anderen Zellen heran oder entfernen ganze Zellen. Deshalb wird so eine Auswahl in Stücke je Zelle zerlegt.
+
+const cellOf = (n: Node | null) => (n instanceof Element ? n : n?.parentElement)?.closest<HTMLElement>("div.col") ?? null;
+
+/** Erste bzw. letzte Textstelle in el (Textknoten, sonst vor einem <br>, sonst el selbst). */
+function edgePoint(el: Element, atEnd: boolean): [Node, number] {
+  const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (n) =>
+      (n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').length) || (n instanceof Element && n.matches('br, img, span.math'))
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_SKIP,
+  });
+  let hit: Node | null = null;
+  if (atEnd) while (walker.nextNode()) hit = walker.currentNode;
+  else hit = walker.nextNode();
+  if (!hit) return [el, atEnd ? el.childNodes.length : 0];
+  if (hit.nodeType === Node.TEXT_NODE) return [hit, atEnd ? (hit.textContent ?? '').length : 0];
+  // Element (br/img/Formel): Stelle davor bzw. dahinter im Elternelement.
+  const parent = hit.parentNode!;
+  const i = Array.prototype.indexOf.call(parent.childNodes, hit);
+  return [parent, atEnd && !(hit as Element).matches('br') ? i + 1 : i];
+}
+
+/** Direktes Kind von root, in dem node liegt. */
+function topLevel(root: HTMLElement, node: Node): HTMLElement | null {
+  let el: Node | null = node;
+  while (el && el.parentNode !== root) el = el.parentNode;
+  return el instanceof HTMLElement ? el : null;
+}
+
+/** Liegt node komplett innerhalb von r? */
+function rangeCovers(r: Range, node: Node): boolean {
+  const n = node.ownerDocument!.createRange();
+  n.selectNode(node);
+  return r.compareBoundaryPoints(Range.START_TO_START, n) <= 0 && r.compareBoundaryPoints(Range.END_TO_END, n) >= 0;
+}
+
+/**
+ * Die aktuelle Auswahl als Stücke je Zelle bzw. je Absatz außerhalb der Blöcke – oder null, wenn sie keine
+ * Zellgrenze berührt (dann darf der Browser selbst arbeiten).
+ */
+export function selectionPieces(root: HTMLElement, clamp = true): Range[] | null {
+  const doc = root.ownerDocument;
+  const sel = doc.getSelection();
+  if (!sel || !sel.rangeCount || sel.isCollapsed) return null;
+  const r = sel.getRangeAt(0);
+  if (!root.contains(r.commonAncestorContainer)) return null;
+  const sc = cellOf(r.startContainer);
+  const ec = cellOf(r.endContainer);
+  const boxes = Array.from(root.querySelectorAll<HTMLElement>(COLS_SELECTOR));
+  if (sc === ec && (sc || !boxes.some((b) => r.intersectsNode(b)))) return null;
+  const pieces: Range[] = [];
+  for (const child of Array.from(root.children)) {
+    if (!r.intersectsNode(child)) continue;
+    const parts = child.matches(COLS_SELECTOR) ? Array.from(child.querySelectorAll('div.col')) : [child];
+    for (const t of parts) {
+      if (!r.intersectsNode(t)) continue;
+      const pr = doc.createRange();
+      pr.selectNodeContents(t);
+      // Grenzen IN den Text legen (nicht an den Rand der Zelle) – sonst rechnet der Browser die Nachbarzelle mit.
+      if (t.contains(r.startContainer)) pr.setStart(r.startContainer, r.startOffset);
+      else if (clamp) pr.setStart(...edgePoint(t, false));
+      if (t.contains(r.endContainer)) pr.setEnd(r.endContainer, r.endOffset);
+      else if (clamp) pr.setEnd(...edgePoint(t, true));
+      if (!pr.collapsed) pieces.push(pr);
+    }
+  }
+  return pieces;
+}
+
+/**
+ * Markierten Text löschen, ohne Zellen zu verschieben oder zu entfernen: in jeder Zelle nur das Markierte.
+ * Ganz markierte Blöcke (mit allen Zellen) und ganz markierte Absätze außerhalb verschwinden.
+ * Gibt false zurück, wenn die Auswahl keine Zellgrenze berührt (dann normal löschen lassen).
+ */
+export function deleteAcrossCells(root: HTMLElement): boolean {
+  const pieces = selectionPieces(root, false);
+  if (!pieces) return false;
+  const doc = root.ownerDocument;
+  const r = doc.getSelection()!.getRangeAt(0).cloneRange();
+  const startCell = cellOf(r.startContainer);
+  // Anfang/Ende merken (die Range selbst verschiebt sich beim Löschen).
+  const s0 = r.startContainer;
+  const s0Off = r.startOffset;
+  const e0 = r.endContainer;
+  // Ganz markierte Blöcke/Absätze (nicht der, in dem die Auswahl beginnt oder endet).
+  const whole = Array.from(root.children).filter((c) => rangeCovers(r, c) && !c.contains(r.startContainer) && !c.contains(r.endContainer));
+  // Ganz markierte Zellen leeren, sonst nur das Markierte löschen.
+  const full = new Set(
+    Array.from(root.querySelectorAll<HTMLElement>('div.col')).filter((c) => r.intersectsNode(c) && rangeCovers(r, c) && !c.contains(r.startContainer) && !c.contains(r.endContainer)),
+  );
+  pieces.forEach((p) => {
+    const c = cellOf(p.startContainer);
+    if (!c || !full.has(c)) p.deleteContents();
+  });
+  full.forEach((c) => c.replaceChildren(emptyBlock(doc)));
+  whole.forEach((c) => c.remove());
+  // Beginnt und endet die Auswahl außerhalb von Blöcken (in zwei verschiedenen Absätzen), wie gewohnt zusammenfügen.
+  const sTop = s0.isConnected ? topLevel(root, s0) : null;
+  const eTop = e0.isConnected ? topLevel(root, e0) : null;
+  if (sTop && eTop && sTop !== eTop && !sTop.matches(COLS_SELECTOR) && !eTop.matches(COLS_SELECTOR) && sTop.matches('p, h2, h3') && eTop.matches('p, h2, h3')) {
+    if (eTop.textContent || eTop.querySelector('img, span.math')) {
+      sTop.querySelectorAll(':scope > br:last-child').forEach((br) => br.remove());
+      sTop.append(...Array.from(eTop.childNodes));
+    }
+    eTop.remove();
+  }
+  // Leerzeichen am Rand der Schnittstellen sichtbar halten (sonst „verschluckt“ sie der Browser beim Weitertippen).
+  if (s0 instanceof Text && s0.isConnected && s0Off === s0.data.length && s0.data.endsWith(' ')) s0.data = s0.data.slice(0, -1) + '\u00a0';
+  if (e0 !== s0 && e0 instanceof Text && e0.isConnected && e0.data.startsWith(' ')) e0.data = '\u00a0' + e0.data.slice(1);
+  // Leer gewordene Zeilen sichtbar lassen.
+  root.querySelectorAll('p, h2, h3, li').forEach((el) => {
+    if (!el.textContent && !el.querySelector('br, img, span.math, figure, ul, ol')) el.replaceChildren(doc.createElement('br'));
+  });
+  if (!root.firstChild) root.appendChild(emptyBlock(doc));
+  fixColumns(root);
+  // Cursor an den Anfang der Auswahl (bzw. in die erste Zelle, falls dort alles weg ist).
+  const sel = doc.getSelection()!;
+  const first = pieces.find((p) => p.startContainer.isConnected && root.contains(p.startContainer));
+  const max = s0.nodeType === Node.TEXT_NODE ? (s0.textContent ?? '').length : s0.childNodes.length;
+  try {
+    // Wo die Auswahl begann (der Textknoten dort bleibt beim Löschen erhalten).
+    if (s0 !== root && s0.isConnected && root.contains(s0)) sel.collapse(s0, Math.min(s0Off, max));
+    else if (first) sel.collapse(first.startContainer, first.startOffset);
+    else if (startCell?.isConnected) placeCaret(startCell);
+    else placeCaret(root);
+  } catch {
+    placeCaret(root);
+  }
+  // Steht der Cursor direkt in der Zelle (nicht in einer Zeile), in die erste Zeile setzen.
+  const a = sel.anchorNode;
+  if (a instanceof HTMLElement && a.matches('div.col, div.row, div.cols')) placeCaret(cellOf(a) ?? a);
+  return true;
+}
+
+/**
+ * Befehl (z. B. Liste, Überschrift, Ausrichtung) bei einer Auswahl über mehrere Zellen für jede Zelle einzeln
+ * ausführen – sonst würde der Browser die Zellen zu einem Absatz/einer Liste zusammenziehen.
+ */
+export function perCell(root: HTMLElement, run: () => void) {
+  const pieces = selectionPieces(root);
+  if (!pieces) return run();
+  const sel = root.ownerDocument.getSelection()!;
+  for (const p of pieces) {
+    if (!p.startContainer.isConnected) continue;
+    // Die Zelle (bzw. der Absatz) wird kurz zum einzigen bearbeitbaren Bereich – so kann der Browser den Befehl
+    // nicht auf Nachbarzellen ausdehnen (z. B. Listen mit der Liste in der Zelle davor zusammenlegen).
+    const host = cellOf(p.startContainer) ?? topLevel(root, p.startContainer);
+    if (host) {
+      root.contentEditable = 'false';
+      host.contentEditable = 'true';
+      host.focus({ preventScroll: true });
+    }
+    sel.removeAllRanges();
+    sel.addRange(p);
+    try {
+      run();
+    } finally {
+      if (host) {
+        host.removeAttribute('contenteditable');
+        root.contentEditable = 'true';
+      }
+    }
+  }
+  root.focus({ preventScroll: true });
+  // Auswahl wieder über alles legen, soweit möglich.
+  const live = pieces.filter((p) => p.startContainer.isConnected && p.endContainer.isConnected);
+  if (live.length) {
+    const all = root.ownerDocument.createRange();
+    all.setStart(live[0].startContainer, live[0].startOffset);
+    all.setEnd(live[live.length - 1].endContainer, live[live.length - 1].endOffset);
+    sel.removeAllRanges();
+    sel.addRange(all);
+  }
+}
