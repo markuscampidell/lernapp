@@ -564,7 +564,13 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
 - "> " für Definitionen, Sätze oder Merksätze, die hervorgehoben werden sollen.
 - \`Code\` und Codeblöcke nur für echten Programmcode.
 - "---" als Trennlinie, falls nötig.
-- NICHT erlaubt: Tabellen (stattdessen Aufzählungen), HTML, Bilder, Fußnoten, Links (außer sie stehen im Material), Emojis.`,
+- Tabellen (Markdown) NUR für echte Gegenüberstellungen – z. B. Vokabeln (Deutsch | Englisch), Begriff | Bedeutung, Vergleich zweier Verfahren.
+  In der App werden sie zu Spalten und Zeilen. Regeln:
+  - Höchstens 4 Spalten. Jede Zeile beginnt und endet mit "|", erste Zeile = Kopfzeile, darunter "| --- | --- |".
+  - Jede Zelle ist kurz (ein Wort bis ein Satz). Keine Listen, Überschriften oder Absätze in Zellen; Formeln in $…$ sind erlaubt.
+  - Ein senkrechter Strich im Text einer Zelle wird als "\\|" geschrieben.
+  - Fließtext, Erklärungen und Aufzählungen gehören NICHT in Tabellen.
+- NICHT erlaubt: HTML, Bilder, Fußnoten, Links (außer sie stehen im Material), Emojis.`,
     MATH_TEXT,
     `## Antwortformat (exakt einhalten)
 - Schreibe das ganze Dokument in genau einen Codeblock, der mit \`\`\`\`markdown (vier Backticks) beginnt und mit \`\`\`\` (vier Backticks) endet – so bleibt der Text beim Kopieren unverändert.
@@ -573,13 +579,13 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
     SELF_CHECK([
       'Ist alles fachlich korrekt und vollständig, ohne Erfundenes?',
       `Passen die Länge (${words}) und die Art (${DOC_STYLE_NAME[s.docStyle]})?`,
-      'Nur erlaubte Formatierung (keine Tabellen, kein HTML)?',
+      'Nur erlaubte Formatierung (kein HTML; Tabellen nur für Gegenüberstellungen und mit höchstens 4 Spalten)?',
     ]),
     materialsBlock(mats),
     finalReminder([
       'Nur ein einziger Codeblock mit vier Backticks (````markdown … ````), nichts davor und nichts danach.',
       'Erste Zeile "# Titel", zweite Zeile "Beschreibung: …", dann "##"-Abschnitte.',
-      'Keine Tabellen, kein HTML. Formeln in $…$.',
+      'Kein HTML. Tabellen nur für Gegenüberstellungen, höchstens 4 Spalten. Formeln in $…$.',
       `Sprache: ${LANGUAGE[s.language]}.`,
     ]),
   ]);
@@ -709,7 +715,7 @@ function parseRaw(answer: string, s: AiSettings): Parsed {
     const sections = (body.match(/^##\s/gm) ?? []).length;
     const warnings: string[] = [];
     if (!title) warnings.push('Die KI hat keinen Titel („# …“) mitgeschickt – gib dem Dokument im Editor einen Namen.');
-    if (/<\/?(div|table|span|p|br)\b/i.test(body)) warnings.push('Die KI hat HTML verwendet – das wird nur teilweise übernommen.');
+    if (/<\/?(div|table|span|p|br)\b/i.test(body.replace(/^\s*\|.*\|\s*$/gm, ''))) warnings.push('Die KI hat HTML verwendet – das wird nur teilweise übernommen.');
     return { result: { kind, title, html, description }, summary: `Text-Dokument${title ? ` „${title}“` : ''} mit ${sections} ${sections === 1 ? 'Abschnitt' : 'Abschnitten'} erkannt`, warnings };
   }
 

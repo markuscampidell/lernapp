@@ -308,6 +308,22 @@ async function richText(html: string, imgs: ImageCollector): Promise<string> {
     }
     img.replaceWith(ph ? `\n${ph}${alt ? ` (${alt})` : ''}\n` : alt ? `[Bild: ${alt}]` : '[Bild]');
   }
+  // Spalten & Zeilen als Markdown-Tabelle (erste Zeile als Kopfzeile).
+  doc.querySelectorAll('div.cols').forEach((box) => {
+    const rows = Array.from(box.querySelectorAll(':scope > div.row'));
+    const lines = (rows.length ? rows : [box]).map((r) => {
+      const cells = Array.from(r.querySelectorAll(':scope > div.col')).map((c) =>
+        Array.from(c.children)
+          .map((x) => (x.textContent ?? '').trim())
+          .filter(Boolean)
+          .join(' / ')
+          .replace(/\|/g, '\\|'),
+      );
+      return `| ${cells.join(' | ')} |`;
+    });
+    if (lines.length) lines.splice(1, 0, `|${' --- |'.repeat((rows[0] ?? box).querySelectorAll(':scope > div.col').length)}`);
+    box.replaceWith(`\n${lines.join('\n')}\n`);
+  });
   doc.querySelectorAll('h2').forEach((h) => h.prepend('## '));
   doc.querySelectorAll('h3').forEach((h) => h.prepend('### '));
   doc.querySelectorAll('ul.checklist > li').forEach((li) => li.prepend('[ ] '));

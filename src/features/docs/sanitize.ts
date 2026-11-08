@@ -30,28 +30,46 @@ function clean(node: Node, out: Node, doc: Document, inCol = false) {
     if (child.nodeType !== Node.ELEMENT_NODE) return;
     const el = child as HTMLElement;
     const tag = el.tagName.toLowerCase();
-    // Spalten: <div class="cols"> mit 1–4 <div class="col">. Spalten in Spalten werden aufgelöst (Inhalt untereinander).
+    // Spalten & Zeilen: <div class="cols"> mit <div class="row">s, darin je 1–4 <div class="col">.
+    // Ältere Dokumente: Zellen direkt im Block = eine Zeile. Blöcke in Zellen werden aufgelöst (Inhalt untereinander).
     if (tag === 'div' && el.classList.contains('cols')) {
-      const cols = Array.from(el.children).filter((c) => c.tagName === 'DIV' && c.classList.contains('col'));
-      if (inCol || !cols.length) {
-        (cols.length ? cols : [el]).forEach((c) => clean(c, out, doc, inCol));
+      const isCell = (c: Element) => c.tagName === 'DIV' && c.classList.contains('col');
+      const rows: Element[][] = [];
+      let loose: Element[] | null = null;
+      for (const c of Array.from(el.children)) {
+        if (c.tagName === 'DIV' && c.classList.contains('row')) {
+          loose = null;
+          const cells = Array.from(c.children).filter(isCell);
+          if (cells.length) rows.push(cells);
+        } else if (isCell(c)) {
+          if (!loose) rows.push((loose = []));
+          loose.push(c);
+        }
+      }
+      if (inCol || !rows.length) {
+        (rows.length ? rows.flat() : [el]).forEach((c) => clean(c, out, doc, inCol));
         return;
       }
+      const n = Math.min(MAX_COLS, Math.max(...rows.map((r) => r.length)));
       const box = doc.createElement('div');
       box.className = 'cols';
-      cols.forEach((c, i) => {
-        // Mehr als erlaubt: der Rest landet in der letzten Spalte.
-        if (i >= MAX_COLS) return clean(c, box.lastChild!, doc, true);
-        const col = doc.createElement('div');
-        col.className = 'col';
-        clean(c, col, doc, true);
-        if (!col.childNodes.length) col.appendChild(doc.createElement('p')).appendChild(doc.createElement('br'));
-        box.appendChild(col);
-      });
+      for (const cells of rows) {
+        const row = doc.createElement('div');
+        row.className = 'row';
+        for (let i = 0; i < n; i++) {
+          const col = doc.createElement('div');
+          col.className = 'col';
+          // Mehr Zellen als erlaubt: der Rest landet in der letzten Spalte.
+          (i === n - 1 ? cells.slice(i) : cells.slice(i, i + 1)).forEach((c) => clean(c, col, doc, true));
+          if (!col.childNodes.length) col.appendChild(doc.createElement('p')).appendChild(doc.createElement('br'));
+          row.appendChild(col);
+        }
+        box.appendChild(row);
+      }
       out.appendChild(box);
       return;
     }
-    if (tag === 'div' && el.classList.contains('col')) {
+    if (tag === 'div' && (el.classList.contains('col') || el.classList.contains('row'))) {
       clean(el, out, doc, inCol);
       return;
     }

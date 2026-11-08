@@ -17,27 +17,22 @@ import { WheelEditor } from '../wheel/WheelEditor';
 import { EmbedInsertSheet } from './EmbedInsertSheet';
 import { EMBED_SELECTOR, embedFigure, embedFromPaste, embedJson, embedOf, embedTitle, renderEmbedsIn, useEmbedCopy, type EmbedData, type EmbedKind } from './embeds';
 import { afterBack } from '../../lib/router';
-import { addColumn, blockColumnMerge, colHasContent, fixColumns, insertColumns, MAX_COLS, removeColumn } from './columns';
+import { addColumn, addRow, blockColumnMerge, columnCells, fixColumns, hasContent, insertColumns, MAX_COLS, removeColumn, removeRow } from './columns';
 
-/** Lage eines Spalten-Blocks und seiner Spalten (für die Knöpfe über jeder Spalte). */
+/** Lage eines Spalten-Blocks, seiner Spalten und Zeilen (für die Knöpfe oben und links). */
 interface ColBox {
   box: HTMLElement;
   left: number;
   top: number;
   width: number;
-  cols: { el: HTMLElement; left: number; width: number }[];
+  height: number;
+  /** Spalten: Lage innerhalb des Blocks (aus der ersten Zeile). */
+  cols: { left: number; width: number }[];
+  rows: { el: HTMLElement; top: number; height: number }[];
 }
-const sameBoxes = (a: ColBox[], b: ColBox[]) =>
-  a.length === b.length &&
-  a.every(
-    (x, i) =>
-      x.box === b[i].box &&
-      x.left === b[i].left &&
-      x.top === b[i].top &&
-      x.width === b[i].width &&
-      x.cols.length === b[i].cols.length &&
-      x.cols.every((c, j) => c.el === b[i].cols[j].el && c.left === b[i].cols[j].left && c.width === b[i].cols[j].width),
-  );
+const sameBoxes = (a: ColBox[], b: ColBox[]) => JSON.stringify(a.map(({ box: _b, rows, ...r }) => ({ ...r, rows: rows.map(({ el: _e, ...x }) => x) }))) ===
+  JSON.stringify(b.map(({ box: _b, rows, ...r }) => ({ ...r, rows: rows.map(({ el: _e, ...x }) => x) }))) &&
+  a.every((x, i) => x.box === b[i].box && x.rows.every((r, j) => r.el === b[i].rows[j].el));
 
 const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const blank = (c: string | undefined) => c === undefined || /\s/.test(c);
@@ -135,14 +130,21 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     const wr = w.getBoundingClientRect();
     const next: ColBox[] = Array.from(root.querySelectorAll<HTMLElement>(':scope > div.cols')).map((box) => {
       const br = box.getBoundingClientRect();
+      const rows = Array.from(box.querySelectorAll<HTMLElement>(':scope > div.row'));
+      const first = rows[0] ? Array.from(rows[0].querySelectorAll<HTMLElement>(':scope > div.col')) : [];
       return {
         box,
         left: Math.round(br.left - wr.left),
         top: Math.round(br.top - wr.top),
         width: Math.round(br.width),
-        cols: Array.from(box.querySelectorAll<HTMLElement>(':scope > div.col')).map((col) => {
+        height: Math.round(br.height),
+        cols: first.map((col) => {
           const cr = col.getBoundingClientRect();
-          return { el: col, left: Math.round(cr.left - br.left), width: Math.round(cr.width) };
+          return { left: Math.round(cr.left - br.left), width: Math.round(cr.width) };
+        }),
+        rows: rows.map((row) => {
+          const rr = row.getBoundingClientRect();
+          return { el: row, top: Math.round(rr.top - br.top), height: Math.round(rr.height) };
         }),
       };
     });
@@ -178,14 +180,25 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     insertColumns(root);
     afterColChange();
   };
-  const addCol = (col: HTMLElement, side: 'left' | 'right') => {
+  const addCol = (box: HTMLElement, i: number, side: 'left' | 'right') => {
     editor.current?.focus();
-    if (addColumn(col, side)) afterColChange();
+    if (addColumn(box, i, side)) afterColChange();
   };
-  const deleteCol = (col: HTMLElement) => {
-    if (colHasContent(col) && !confirm('In dieser Spalte steht etwas. Spalte mit Inhalt löschen?')) return;
+  const deleteCol = (box: HTMLElement, i: number) => {
+    if (columnCells(box, i).some(hasContent) && !confirm('In dieser Spalte steht etwas. Spalte mit Inhalt löschen (in allen Zeilen)?')) return;
     editor.current?.focus();
-    removeColumn(col);
+    removeColumn(box, i);
+    afterColChange();
+  };
+  const addRowAt = (row: HTMLElement, side: 'above' | 'below') => {
+    editor.current?.focus();
+    addRow(row, side);
+    afterColChange();
+  };
+  const deleteRow = (row: HTMLElement) => {
+    if (hasContent(row) && !confirm('In dieser Zeile steht etwas. Zeile mit Inhalt löschen?')) return;
+    editor.current?.focus();
+    removeRow(row);
     afterColChange();
   };
 
@@ -731,7 +744,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
       },
     },
     { icon: 'sigma', label: 'Formel einfügen', on: !!formula, run: () => (formula ? finishFormula() : insertFormula()) },
-    { icon: 'columns', label: 'Spalten einfügen', run: addColumnsBlock },
+    { icon: 'columns', label: 'Spalten / Tabelle einfügen', run: addColumnsBlock },
   ];
 
   return (
@@ -878,31 +891,40 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
               }
             }}
           />
-          {colBoxes.map((b, bi) => (
-            <div key={bi} className="cols-overlay" style={{ left: b.left, top: b.top, width: b.width }} data-no-swipe>
-              {b.cols.map((c, ci) => (
-                <div key={ci} className="col-bar" style={{ left: c.left, width: c.width }} onMouseDown={(e) => e.preventDefault()}>
-                  {ci === 0 && b.cols.length < MAX_COLS ? (
-                    <button type="button" className="icon-btn small" aria-label="Spalte links einfügen" title="Spalte links einfügen" onClick={() => addCol(c.el, 'left')}>
-                      <Icon name="colAddLeft" size={17} />
-                    </button>
-                  ) : (
-                    <span className="col-bar-gap" />
-                  )}
-                  <button type="button" className="icon-btn small danger" aria-label="Spalte löschen" title="Spalte löschen" onClick={() => deleteCol(c.el)}>
-                    <Icon name="trash" size={16} />
-                  </button>
-                  {b.cols.length < MAX_COLS ? (
-                    <button type="button" className="icon-btn small" aria-label="Spalte rechts einfügen" title="Spalte rechts einfügen" onClick={() => addCol(c.el, 'right')}>
-                      <Icon name="colAddRight" size={17} />
-                    </button>
-                  ) : (
-                    <span className="col-bar-gap" />
-                  )}
+          {colBoxes.map((b, bi) => {
+            const n = b.cols.length;
+            const btn = (label: string, icon: IconName, run: () => void, danger = false) => (
+              <button type="button" className={`icon-btn small${danger ? ' danger' : ''}`} aria-label={label} title={label} onClick={run}>
+                <Icon name={icon} size={icon === 'trash' ? 15 : 16} />
+              </button>
+            );
+            return (
+              <div key={bi} data-no-swipe onMouseDown={(e) => e.preventDefault()}>
+                {/* Oben: pro Spalte löschen / rechts einfügen, ganz links zusätzlich links einfügen */}
+                <div className="cols-overlay cols-top" style={{ left: b.left, top: b.top - 34, width: b.width }}>
+                  {b.cols.map((c, ci) => (
+                    <div key={ci} className="col-bar" style={{ left: c.left, width: c.width }}>
+                      {ci === 0 && n < MAX_COLS ? btn('Spalte links einfügen', 'colAddLeft', () => addCol(b.box, ci, 'left')) : <span className="col-bar-gap" />}
+                      {btn('Spalte löschen', 'trash', () => deleteCol(b.box, ci), true)}
+                      {n < MAX_COLS ? btn('Spalte rechts einfügen', 'colAddRight', () => addCol(b.box, ci, 'right')) : <span className="col-bar-gap" />}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ))}
+                {/* Links: Ecke = Zeile oben einfügen; pro Zeile löschen / darunter einfügen */}
+                <div className="cols-overlay cols-corner" style={{ left: b.left - 32, top: b.top - 34 }}>
+                  {b.rows[0] && btn('Zeile oben einfügen', 'rowAddAbove', () => addRowAt(b.rows[0].el, 'above'))}
+                </div>
+                <div className="cols-overlay cols-side" style={{ left: b.left - 32, top: b.top, height: b.height }}>
+                  {b.rows.map((r, ri) => (
+                    <div key={ri} className="row-bar" style={{ top: r.top, height: r.height }}>
+                      {btn('Zeile löschen', 'trash', () => deleteRow(r.el), true)}
+                      {btn('Zeile darunter einfügen', 'rowAddBelow', () => addRowAt(r.el, 'below'))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
           {image && box && (
             <div className="img-frame" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} data-no-swipe>
               {HANDLES.map((h) => (

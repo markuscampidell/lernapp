@@ -190,6 +190,46 @@ function renderList(l: List): string {
   return `<${tag}${cls}>${l.items.map((it) => `<li>${it.html}${it.children ? renderList(it.children) : ''}</li>`).join('')}</${tag}>`;
 }
 
+/** Zellen einer Markdown-Tabellenzeile („| a | b |“); „\|“ und | in Formeln trennen nicht. */
+function tableCells(line: string): string[] {
+  const inner = line.slice(1, -1);
+  const cells: string[] = [];
+  let cur = '';
+  let math = false;
+  for (let k = 0; k < inner.length; k++) {
+    const ch = inner[k];
+    if (ch === '\\' && inner[k + 1] === '|') {
+      cur += '|';
+      k++;
+    } else if (ch === '$') {
+      math = !math;
+      cur += ch;
+    } else if (ch === '|' && !math) {
+      cells.push(cur.trim());
+      cur = '';
+    } else cur += ch;
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+
+/** Tabelle als Spalten-Block (wie im Editor: höchstens 4 Spalten, alle Zeilen gleich viele). */
+function renderTable(rows: string[][], header: boolean): string {
+  const n = Math.min(4, Math.max(...rows.map((r) => r.length)));
+  const cell = (text: string, bold: boolean) => {
+    // <br> in einer Zelle = neue Zeile in der Zelle
+    const parts = text.split(/<br\s*\/?>/i).map((x) => x.trim());
+    const html = parts.map((x) => (x ? `<p>${bold ? `<strong>${inline(x)}</strong>` : inline(x)}</p>` : '<p><br></p>')).join('');
+    return `<div class="col">${html || '<p><br></p>'}</div>`;
+  };
+  return `<div class="cols">${rows
+    .map((r, ri) => {
+      const cells = Array.from({ length: n }, (_, k) => (k === n - 1 ? r.slice(k).filter(Boolean).join(' – ') : (r[k] ?? '')));
+      return `<div class="row">${cells.map((c) => cell(c, header && ri === 0)).join('')}</div>`;
+    })
+    .join('')}</div>`;
+}
+
 /** Wandelt (KI-)Markdown in das HTML der Text-Dokumente um. */
 export function markdownToHtml(md: string): string {
   const lines = md.replace(/\r\n?/g, '\n').split('\n');
@@ -257,13 +297,19 @@ export function markdownToHtml(md: string): string {
       out.push(`<blockquote>${q.map(inline).join('<br>')}</blockquote>`);
       continue;
     }
-    // Tabellen kennen Text-Dokumente nicht – Zeilen werden zu Aufzählungspunkten.
+    // Tabelle -> Spalten & Zeilen (höchstens 4 Spalten; Kopfzeile fett).
     if (/^\|.*\|$/.test(trimmed)) {
-      flushPara();
-      if (/^\|[\s:|-]+\|$/.test(trimmed)) continue;
-      const cells = trimmed.slice(1, -1).split('|').map((c) => c.trim()).filter(Boolean);
-      if (!stack.length) stack = [{ ordered: false, check: false, indent: 0, items: [] }];
-      stack[0].items.push({ html: inline(cells.join(' – ')), check: false, children: null });
+      flush();
+      const rows: string[][] = [];
+      let header = false;
+      while (i < lines.length && /^\|.*\|$/.test(lines[i].trim())) {
+        const t = lines[i].trim();
+        if (/^\|[\s:|-]+\|$/.test(t)) header = rows.length === 1;
+        else rows.push(tableCells(t));
+        i++;
+      }
+      i--;
+      if (rows.length) out.push(renderTable(rows, header));
       continue;
     }
     const li = line.match(/^(\s*)([-*+•]|\d{1,3}[.)])\s+(\[[ xX]\]\s+)?(.*)$/);

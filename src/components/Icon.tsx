@@ -7,6 +7,8 @@ const PATHS = {
   columns: 'M4 5h16v14H4ZM12 5v14',
   colAddLeft: 'M14 4.5h6v15h-6ZM3 12h7M6.5 8.5v7',
   colAddRight: 'M4 4.5h6v15H4ZM14 12h7M17.5 8.5v7',
+  rowAddAbove: 'M4.5 14h15v6h-15ZM12 3v7M8.5 6.5h7',
+  rowAddBelow: 'M4.5 4h15v6h-15ZM12 14v7M8.5 17.5h7',
   close: 'M6 6l12 12M18 6 6 18',
   check: 'M5 12.5l4.5 4.5L19 7.5',
   chevron: 'M9 6l6 6-6 6',
