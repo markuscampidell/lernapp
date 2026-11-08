@@ -139,13 +139,13 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
           </>
         )}
 
-        <label className="toggle-row">
+        <div className="toggle-row">
           <span>
             Auch „Meine Ordner“ auf diesem Gerät löschen
             <span className="muted small block">Alle eigenen Ordner und Dateien auf diesem Gerät – nicht rückgängig zu machen.</span>
           </span>
           <input type="checkbox" className="switch" checked={wipeLocal} onChange={(e) => setWipeLocal(e.target.checked)} />
-        </label>
+        </div>
         {wipeLocal && <p className="notice critical">„Meine Ordner“ auf diesem Gerät werden endgültig gelöscht. Exportiere vorher ein Backup, wenn du sie behalten willst.</p>}
 
         <label className="field">

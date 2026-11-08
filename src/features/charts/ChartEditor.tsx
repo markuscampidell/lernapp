@@ -215,10 +215,10 @@ export function ChartEditor({
               <span className="field-label">Einheit</span>
               <TextLine value={chart.unit} onChange={(unit) => set({ unit })} placeholder="z. B. %, h, €" maxLength={12} />
             </label>
-            <label className="toggle-row small-toggle chart-values-toggle">
+            <div className="toggle-row small-toggle chart-values-toggle">
               <span>{round ? 'Prozent anzeigen' : 'Werte anzeigen'}</span>
               <input type="checkbox" className="switch" checked={chart.showValues} onChange={(e) => set({ showValues: e.target.checked })} />
-            </label>
+            </div>
           </div>
         </div>
         {err && <p className="notice critical">{err}</p>}

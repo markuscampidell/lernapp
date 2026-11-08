@@ -51,10 +51,10 @@ export function GapsPanel({ file, text }: { file: FileItem; text: string }) {
         </button>
       </div>
       {n > 0 && (
-        <label className="toggle-row small-toggle">
+        <div className="toggle-row small-toggle">
           <span>Lösungen anzeigen</span>
           <input type="checkbox" className="switch" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)} />
-        </label>
+        </div>
       )}
       {doc.text.trim() ? (
         <div className="card gaps-text pre-wrap">

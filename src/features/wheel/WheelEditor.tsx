@@ -185,13 +185,13 @@ export function WheelEditor({
             )}
           </div>
 
-          <label className="toggle-row small-toggle">
+          <div className="toggle-row small-toggle">
             <span>
               Gezogene entfernen
               <span className="muted small block">Was gezogen wurde, ist beim nächsten Drehen nicht mehr dabei – bis „Zurücksetzen“.</span>
             </span>
             <input type="checkbox" className="switch" checked={wheel.removePicked} onChange={(ev) => set({ removePicked: ev.target.checked })} />
-          </label>
+          </div>
         </div>
         {err && <p className="notice critical">{err}</p>}
       </div>

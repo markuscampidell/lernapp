@@ -60,7 +60,7 @@ export function NotificationSetting() {
     <>
       <h3 className="section-title">Benachrichtigungen</h3>
       <div className="card stack">
-        <label className="toggle-row">
+        <div className="toggle-row">
           <span>
             Benachrichtigungen auf diesem Gerät
             <span className="muted small block">
@@ -75,7 +75,7 @@ export function NotificationSetting() {
             disabled={busy || !available || !online}
             onChange={(e) => toggle(e.target.checked)}
           />
-        </label>
+        </div>
         {hint[state] && <p className="notice warning">{hint[state]}</p>}
         {state === 'on' && (
           <button className="link" onClick={test} disabled={busy || !online}>

@@ -709,10 +709,10 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
               autoCapitalize="off"
               autoCorrect="off"
             />
-            <label className="toggle-row small-toggle">
+            <div className="toggle-row small-toggle">
               <span>In eigener Zeile (zentriert)</span>
               <input type="checkbox" className="switch" checked={display} onChange={(e) => updateFormula({ display: e.target.checked })} />
-            </label>
+            </div>
             <div className="input-row">
               <button className="btn ghost danger" onClick={deleteFormula}>
                 <Icon name="trash" size={18} /> Löschen

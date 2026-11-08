@@ -167,13 +167,13 @@ export function GapsEditor({
             <span className="muted small">Beim Lernen kann man trotzdem jedes Mal wählen.</span>
           </div>
 
-          <label className="input-row">
+          <div className="input-row">
             <span className="grow">
               Kleine Tippfehler erlauben
               <span className="muted small block">Beim Selbst-Schreiben zählt z. B. „Mitoes“ statt „Mitose“ noch als richtig. Groß-/Kleinschreibung zählt nie.</span>
             </span>
             <input type="checkbox" className="switch" checked={doc.typos} onChange={(e) => set({ typos: e.target.checked })} />
-          </label>
+          </div>
         </div>
 
         {err && <p className="notice critical">{err}</p>}

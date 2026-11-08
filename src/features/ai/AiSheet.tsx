@@ -404,13 +404,13 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
                 </div>
                 <Seg value={s.answers} onChange={(v) => set({ answers: v })} options={[3, 4, 5].map((n) => ({ id: n, label: String(n) }))} />
               </div>
-              <label className="input-row">
+              <div className="input-row">
                 <span className="grow">
                   Mehrere richtige Antworten erlaubt
                   <span className="muted small block">Sonst ist immer genau eine Antwort richtig.</span>
                 </span>
                 <input type="checkbox" className="switch" checked={s.multi} onChange={(e) => set({ multi: e.target.checked })} />
-              </label>
+              </div>
             </>
           )}
 
@@ -490,13 +490,13 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
           )}
 
           {s.kind === 'wheel' && (
-            <label className="input-row">
+            <div className="input-row">
               <span className="grow">
                 Gezogene Einträge herausnehmen
                 <span className="muted small block">Jeder Eintrag kommt erst wieder dran, wenn du das Rad zurücksetzt.</span>
               </span>
               <input type="checkbox" className="switch" checked={s.removePicked} onChange={(e) => set({ removePicked: e.target.checked })} />
-            </label>
+            </div>
           )}
 
           {s.kind !== 'chart' && s.kind !== 'wheel' && (

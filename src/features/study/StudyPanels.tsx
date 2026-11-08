@@ -158,10 +158,10 @@ export function QuizPanel({ file, text }: { file: FileItem; text: string }) {
         </button>
       </div>
       {n > 0 && (
-        <label className="toggle-row small-toggle">
+        <div className="toggle-row small-toggle">
           <span>Richtige Antworten anzeigen</span>
           <input type="checkbox" className="switch" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)} />
-        </label>
+        </div>
       )}
       {n === 0 ? (
         <p className="muted center-text">Noch keine Fragen.</p>

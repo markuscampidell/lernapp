@@ -247,7 +247,7 @@ function SyncSetting() {
 
   return (
     <div className="stack sync-setting">
-      <label className="toggle-row">
+      <div className="toggle-row">
         <span>
           „Meine Ordner“ auf allen Geräten
           <span className="muted small block">
@@ -255,7 +255,7 @@ function SyncSetting() {
           </span>
         </span>
         <input type="checkbox" className="switch" checked={sync.on} disabled={busy || !online} onChange={(e) => toggle(e.target.checked)} />
-      </label>
+      </div>
       {sync.on && sync.busy && <p className="notice info">{sync.busy}</p>}
       {sync.on && !sync.busy && sync.pending > sync.errors.length && (
         <p className="muted small">{online ? 'Wird gleich hochgeladen …' : 'Offline – wird hochgeladen, sobald du wieder online bist.'}</p>
