@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Icon, type IconName } from './components/Icon';
 import { InstallBanner } from './components/InstallBanner';
 import { HandoverBanner } from './features/account/HandoverBanner';
+import { NotificationPrompt } from './features/notifications/NotificationPrompt';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FoldersView } from './features/folders/FoldersView';
 import { UploadView } from './features/upload/UploadView';
@@ -81,6 +82,7 @@ export function App() {
         ) : (
           <ErrorBoundary>
             <HandoverBanner />
+            <NotificationPrompt />
             {tab === 'ordner' && <FoldersView folderId={route.folderId} fileId={route.fileId} />}
             {tab === 'hochladen' && <UploadView />}
             {tab === 'einstellungen' && <SettingsView />}
