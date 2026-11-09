@@ -8,7 +8,9 @@ export const HL_COLORS = ['#ffe14d', '#8de08a', '#ff8fc8', '#8fd3ff', '#ffb35c']
 const PEN_SIZES = [1.6, 3, 5.5];
 const HL_SIZES = [12, 18, 28];
 
-const DEFAULTS: PenSettings = { tool: 'pen', color: PEN_COLORS[0], size: 3, hlColor: HL_COLORS[0], hlSize: 18, eraseWhole: false };
+const DEFAULTS: PenSettings = { tool: 'pen', color: PEN_COLORS[0], size: 3, hlColor: HL_COLORS[0], hlSize: 18, eraseWhole: false, eraserSize: 12 };
+/** Bereich der Stärke je Werkzeug (Seiten-Pixel; Radierer: Radius). */
+const RANGE = { pen: [0.8, 14], hl: [6, 44], eraser: [3, 60] } as const;
 
 /** Stift-Einstellungen (bleiben auf dem Gerät gespeichert). */
 export function usePenSettings() {
@@ -49,6 +51,26 @@ const TOOLS: [PenTool, IconName, string][] = [
   ['eraser', 'eraser', 'Radierer'],
   ['lasso', 'lasso', 'Lasso (auswählen, verschieben, Größe ändern)'],
 ];
+
+/** Stufenlose Stärke (logarithmisch, damit kleine Werte fein einstellbar sind). */
+function SizeSlider({ value, range, label, onChange }: { value: number; range: readonly [number, number]; label: string; onChange: (v: number) => void }) {
+  const [lo, hi] = range;
+  const pos = Math.log(Math.min(hi, Math.max(lo, value)) / lo) / Math.log(hi / lo);
+  return (
+    <label className="size-slider" title={label}>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.005}
+        value={pos}
+        aria-label={label}
+        onChange={(e) => onChange(Math.round(lo * Math.pow(hi / lo, Number(e.target.value)) * 10) / 10)}
+      />
+      <span className="size-val">{value < 10 ? value.toFixed(1).replace('.', ',') : Math.round(value)}</span>
+    </label>
+  );
+}
 
 /** Werkzeugleiste zum Schreiben mit dem Stift. */
 export function PenBar({ settings, onChange, onUndo, onRedo, canUndo, canRedo, extra }: Props) {
@@ -101,6 +123,14 @@ export function PenBar({ settings, onChange, onUndo, onRedo, canUndo, canRedo, e
             </button>
           ))}
         </>
+      )}
+      {(t === 'pen' || t === 'hl' || t === 'eraser') && (
+        <SizeSlider
+          value={t === 'eraser' ? settings.eraserSize : size}
+          range={RANGE[t]}
+          label={t === 'eraser' ? 'Größe des Radierers' : 'Stärke'}
+          onChange={(v) => onChange(t === 'eraser' ? { eraserSize: v } : hl ? { hlSize: v } : { size: v })}
+        />
       )}
       {t === 'eraser' && (
         <div className="segmented small-seg">

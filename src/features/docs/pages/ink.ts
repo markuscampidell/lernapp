@@ -355,7 +355,7 @@ export function lassoPick(strokes: Stroke[], poly: number[]): string[] {
     .map((s) => s.id);
 }
 
-/** Striche verschieben und (um ox, oy) skalieren. */
+/** Striche verschieben und (um ox, oy) skalieren – samt Strichstärke. */
 export function transformStrokes(list: Stroke[], dx: number, dy: number, k = 1, ox = 0, oy = 0): Stroke[] {
   return list.map((s) => {
     const pts = s.pts.slice();
@@ -363,7 +363,8 @@ export function transformStrokes(list: Stroke[], dx: number, dy: number, k = 1, 
       pts[i] = ox + (pts[i] - ox) * k + dx;
       pts[i + 1] = oy + (pts[i + 1] - oy) * k + dy;
     }
-    return { ...s, pts, size: Math.max(0.5, s.size * (k === 1 ? 1 : Math.sqrt(k))) };
+    // Strichstärke wächst genauso mit wie die Form (wie in der Vorschau beim Ziehen)
+    return { ...s, pts, size: Math.max(0.2, s.size * k) };
   });
 }
 

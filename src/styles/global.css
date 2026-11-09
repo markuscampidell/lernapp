@@ -3211,8 +3211,9 @@ button.avatar-edit-badge {
 .ink-live {
   z-index: 3;
 }
+/* Textmarker: Deckkraft nur einmal (Ebene bzw. der gerade gezogene Strich) – sonst wäre er fertig blasser als beim Ziehen */
 .ink-hl-layer,
-path.ink-hl {
+.ink-live path.ink-hl {
   opacity: 0.42;
 }
 .ink-lasso {
@@ -3449,4 +3450,32 @@ path.ink-hl {
 }
 .size-btn .size-dot {
   box-shadow: 0 0 0 1px var(--text-3);
+}
+.ink-cursor {
+  position: absolute;
+  z-index: 4;
+  border-radius: 50%;
+  border: 1px solid rgba(42, 120, 214, 0.55);
+  pointer-events: none;
+}
+.ink-cursor.eraser {
+  border: 1.5px solid rgba(60, 60, 60, 0.75);
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+.size-slider {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: auto 6px;
+}
+.size-slider input {
+  width: 110px;
+}
+.size-val {
+  min-width: 26px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
 }

@@ -13,6 +13,8 @@ export interface PenSettings {
   hlColor: string;
   hlSize: number;
   eraseWhole: boolean;
+  /** Radius des Radierers in Seiten-Pixeln. */
+  eraserSize: number;
 }
 
 /** Zeichnen erlaubt – und womit. */
@@ -266,6 +268,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
   // ---------- Zeichnen ----------
   const live = useRef<{ page: number; pts: number[]; pointer: number; tool: PenTool; shape?: boolean; lastX: number; lastY: number; timer?: number } | null>(null);
   const livePath = useRef<SVGPathElement>(null);
+  const cursor = useRef<HTMLDivElement>(null);
   const liveSvg = useRef<SVGSVGElement>(null);
   const [erasing, setErasing] = useState<{ page: number; strokes: Stroke[] } | null>(null);
   const erasingRef = useRef(erasing);
@@ -293,8 +296,10 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     const path = livePath.current;
     const svg = liveSvg.current;
     if (!path || !svg) return;
-    if (!l) {
+    // Radierer zeichnet nichts (sonst bliebe am Startpunkt ein Punkt stehen)
+    if (!l || l.tool === 'eraser') {
       svg.style.display = 'none';
+      path.removeAttribute('d');
       return;
     }
     const set = inkRef.current?.settings;
@@ -350,7 +355,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
       if (e.pointerType === 'mouse') return i.mouse && e.button === 0;
       return i.touch && touches.current < 2;
     };
-    const eraseRadius = () => Math.max(4, 11 / scaleRef.current);
+    const eraseRadius = () => Math.max(2, inkRef.current?.settings.eraserSize ?? 12);
 
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'pen') markPen();
@@ -488,11 +493,37 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
       i.onChange(l.page, [...page.strokes, stroke]);
     };
 
+    // Wirkungskreis (Radierer bzw. Stiftspitze) unter dem Zeiger anzeigen
+    const hover = (e: PointerEvent) => {
+      const c = cursor.current;
+      const i = inkRef.current;
+      if (!c) return;
+      const t = i?.settings.tool;
+      const can = !!i && (e.pointerType === 'pen' ? i.pen : e.pointerType === 'mouse' ? i.mouse : i.touch);
+      if (!i || !can || (t !== 'eraser' && t !== 'pen' && t !== 'hl') || (e.pointerType === 'touch' && !live.current)) {
+        c.style.display = 'none';
+        return;
+      }
+      const { x, y, page } = toPage(e.clientX, e.clientY);
+      const r = t === 'eraser' ? eraseRadius() : (t === 'hl' ? i.settings.hlSize : i.settings.size) / 2;
+      c.style.display = '';
+      c.style.left = `${x - r}px`;
+      c.style.top = `${page * PITCH + y - r}px`;
+      c.style.width = c.style.height = `${2 * r}px`;
+      c.className = `ink-cursor${t === 'eraser' ? ' eraser' : ''}`;
+    };
+    const leave = () => {
+      if (cursor.current) cursor.current.style.display = 'none';
+    };
+    st.addEventListener('pointermove', hover);
+    st.addEventListener('pointerleave', leave);
     st.addEventListener('pointerdown', down, true);
     st.addEventListener('pointermove', move);
     st.addEventListener('pointerup', up);
     st.addEventListener('pointercancel', up);
     return () => {
+      st.removeEventListener('pointermove', hover);
+      st.removeEventListener('pointerleave', leave);
       st.removeEventListener('pointerdown', down, true);
       st.removeEventListener('pointermove', move);
       st.removeEventListener('pointerup', up);
@@ -672,6 +703,22 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     );
     setSel(null);
   };
+  // Entf / ⌫ löscht die Lasso-Auswahl (nicht in Eingabefeldern)
+  const deleteSelRef = useRef(deleteSel);
+  deleteSelRef.current = deleteSel;
+  useEffect(() => {
+    if (!sel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      deleteSelRef.current();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [sel]);
   const duplicateSel = () => {
     if (!sel || !ink) return;
     const copies = transformStrokes(selStrokes, 24, 24).map((x) => ({ ...x, id: newId() }));
@@ -756,6 +803,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
           <svg ref={liveSvg} className="ink ink-live" style={{ display: 'none' }} width={PAGE_W} height={PAGE_H} viewBox={`0 0 ${PAGE_W} ${PAGE_H}`}>
             <path ref={livePath} vectorEffect="non-scaling-stroke" />
           </svg>
+          {ink && <div ref={cursor} className="ink-cursor" style={{ display: 'none' }} />}
           {drag && <div className="page-drop-line" style={{ top: dragSlot * PITCH - GAP / 2 - 2 }} />}
         </div>
         {sel && ink && (

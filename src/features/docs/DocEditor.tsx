@@ -842,9 +842,12 @@ export function DocEditor({
     textPages.current = n;
     setPages((cur) => fitPages(cur, n));
   }, []);
+  // Zuletzt gezeichnet (nicht getippt)? Dann macht Strg+Z auch im Text-Modus den Strich rückgängig.
+  const lastWasInk = useRef(false);
   const onInk = useCallback((i: number, strokes: Stroke[]) => {
     const page = pagesRef.current[i];
     if (!page) return;
+    lastWasInk.current = true;
     history.current.undo.push({ id: page.id, before: page.strokes, after: strokes });
     if (history.current.undo.length > 200) history.current.undo.shift();
     history.current.redo = [];
@@ -912,6 +915,30 @@ export function DocEditor({
     setDirty(true);
   };
   const drawing = drawOnly || penMode;
+  // Strg+Z / Strg+Y (bzw. Strg+Umschalt+Z, ⌘ am Mac) für die Handschrift
+  const stepInkRef = useRef(stepInk);
+  stepInkRef.current = stepInk;
+  const drawingRef = useRef(drawing);
+  drawingRef.current = drawing;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      const redo = key === 'y' || (key === 'z' && e.shiftKey);
+      if (key !== 'z' && key !== 'y') return;
+      // In Eingabefeldern (Titel, Formel …) bleibt Strg+Z beim Feld
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      const h = history.current;
+      const inkTurn = drawingRef.current || lastWasInk.current || (redo && h.redo.length > 0 && !editor.current?.contains(document.activeElement));
+      if (!inkTurn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      stepInkRef.current(redo ? 'redo' : 'undo');
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   const inkInput: InkInput = useMemo(
     () => ({ pen: true, mouse: drawing, touch: drawing && fingerDraws, settings: pen, onChange: onInk }),
     [drawing, fingerDraws, pen, onInk],
@@ -1198,6 +1225,7 @@ export function DocEditor({
             aria-label="Inhalt"
             data-no-swipe
             onInput={(e) => {
+              lastWasInk.current = false;
               setDirty(true);
               measure();
               normalize();
