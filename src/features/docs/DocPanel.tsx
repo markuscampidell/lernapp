@@ -104,7 +104,8 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
         </div>
       )}
       {checks.notReady && <p className="notice warning">Häkchen werden noch nicht synchronisiert: Bitte supabase/005_checklisten.sql im Supabase „SQL Editor“ ausführen.</p>}
-      <PagedDoc pages={doc.pages} flowRef={article}>
+      {/* Der Editor öffnet sich darüber (im selben Bereich) – dann gehören Zoom & Seitenanzeige ihm, nicht der Ansicht dahinter */}
+      <PagedDoc pages={doc.pages} flowRef={article} controls={!editing}>
         <article ref={article} className="doc-content" onClick={onClick} dangerouslySetInnerHTML={{ __html: html || '<p><br></p>' }} />
       </PagedDoc>
       {editing && <DocEditor file={file} initial={text} mode={editing} onClose={() => setEditing(null)} />}

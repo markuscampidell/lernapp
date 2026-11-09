@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { FileItem } from '../../domain/types';
 import { useBackToClose } from '../../lib/router';
 import { Icon } from '../../components/Icon';
@@ -92,7 +93,9 @@ export function StudyScreen({
       window.removeEventListener('scroll', fit);
     };
   }, []);
-  return (
+  // Direkt in <body>: Editoren werden oft aus einer anderen Vollbild-Ansicht heraus geöffnet (z. B. Bearbeiten in der
+  // Datei-Ansicht). Ohne das lägen sie in deren Ebene – deren Knöpfe (Zoom, Seitenanzeige) und Gesten würden mitwirken.
+  return createPortal(
     <div ref={screen} className="viewer study-screen" role="dialog" aria-modal="true" aria-label={title}>
       <header className="viewer-header">
         <button className="icon-btn" aria-label="Schließen" onClick={onClose}>
@@ -111,7 +114,8 @@ export function StudyScreen({
       </div>
       {footer && <footer className="study-footer">{footer}</footer>}
       {locked && <EditingLock others={earlier} onClose={onClose} />}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -47,6 +47,8 @@ interface Props {
   /** Unskalierte Inhalte über den Seiten (Lage relativ zu sizerRef). */
   overlay?: ReactNode;
   sizerRef?: RefObject<HTMLDivElement>;
+  /** Zoom-Knöpfe, Seitenanzeige und Hinweise anzeigen (aus, solange darüber der Editor offen ist). */
+  controls?: boolean;
 }
 
 const PAD_EDIT = 48; // Platz für die Knöpfe über der ersten / unter der letzten Seite
@@ -127,7 +129,7 @@ interface Selection {
 }
 
 /** Text-Dokument als A4-Seiten: Text fließt über die Seiten, Handschrift liegt darüber, Zoomen und frei scrollen. */
-export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, ink: inkProp, overlay, sizerRef: outerSizer }: Props) {
+export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, ink: inkProp, overlay, sizerRef: outerSizer, controls = true }: Props) {
   // Werkzeug "Bewegen": nichts zeichnen, mit Stift, Maus und Finger nur scrollen
   const ink = useMemo(() => (inkProp && inkProp.settings.tool === 'hand' ? { ...inkProp, touch: false, mouse: true } : inkProp), [inkProp]);
   const [textPages, setTextPages] = useState(1);
@@ -1052,7 +1054,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
         )}
         {overlay}
       </div>
-      {hint && (
+      {controls && hint && (
         <div className="finger-hint" role="status" data-no-swipe style={{ top: hint }}>
           <Icon name="info" size={18} />
           <span>Mit einem Finger zeichnest du. Zum Scrollen und Zoomen zwei Finger benutzen.</span>
@@ -1061,7 +1063,8 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
           </button>
         </div>
       )}
-      {n > 1 && <PageScrubber count={n} scroller={scroller} stack={stack} />}
+      {controls && n > 1 && <PageScrubber count={n} scroller={scroller} stack={stack} />}
+      {controls && (
       <div className="zoom-ctl" data-no-swipe>
         <button type="button" className="icon-btn small" onClick={() => zoomTo(s / 1.25)} aria-label="Verkleinern" title="Verkleinern">
           <Icon name="minus" size={17} />
@@ -1073,6 +1076,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
           <Icon name="plus" size={17} />
         </button>
       </div>
+      )}
     </div>
   );
 }
