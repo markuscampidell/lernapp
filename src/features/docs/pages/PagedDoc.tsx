@@ -61,9 +61,11 @@ let penKnown = (() => {
 })();
 /** Wurde auf diesem Gerät schon mit einem Stift geschrieben? (Dann scrollt der Finger beim Zeichnen.) */
 export const penSeen = () => penKnown;
+const penListeners = new Set<() => void>();
 const markPen = () => {
   if (penKnown) return;
   penKnown = true;
+  penListeners.forEach((l) => l());
   try {
     localStorage.setItem(PEN_KEY, '1');
   } catch {
@@ -127,6 +129,22 @@ interface Selection {
 /** Text-Dokument als A4-Seiten: Text fließt über die Seiten, Handschrift liegt darüber, Zoomen und frei scrollen. */
 export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, ink, overlay, sizerRef: outerSizer }: Props) {
   const [textPages, setTextPages] = useState(1);
+  // Gibt es hier einen Stift? Dann darf der Browser nie selbst scrollen (sonst schiebt der Stift die Seiten
+  // statt zu schreiben) – Finger-Scrollen übernimmt die App.
+  const [penHere, setPenHere] = useState(penSeen);
+  useEffect(() => {
+    const on = () => setPenHere(true);
+    penListeners.add(on);
+    // Stifte, die über dem Bildschirm schweben (Surface, Wacom, S Pen), melden sich schon vor der Berührung
+    const hoverPen = (e: PointerEvent) => e.pointerType === 'pen' && markPen();
+    window.addEventListener('pointerover', hoverPen, true);
+    window.addEventListener('pointermove', hoverPen, true);
+    return () => {
+      penListeners.delete(on);
+      window.removeEventListener('pointerover', hoverPen, true);
+      window.removeEventListener('pointermove', hoverPen, true);
+    };
+  }, []);
   const n = Math.max(1, given.length, textPages);
   const pages: InkPage[] = Array.from({ length: n }, (_, i) => given[i] ?? { id: `leer-${i}`, bg: given[given.length - 1]?.bg ?? 'blank', paper: given[given.length - 1]?.paper ?? '#ffffff', strokes: [] });
   const ownSizer = useRef<HTMLDivElement>(null);
@@ -188,6 +206,27 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     };
   }, [flowRef]);
 
+  // ---------- Browser-Zoom verhindern (nur solange ein Dokument offen ist) ----------
+  // Zoomen soll nur die Seiten vergrößern, nie die ganze App (Werkzeugleiste bleibt sichtbar).
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const before = meta?.getAttribute('content') ?? null;
+    if (meta && before) meta.setAttribute('content', `${before.replace(/,\s*(maximum-scale|user-scalable)=[^,]*/g, '')}, maximum-scale=1, user-scalable=no`);
+    const sc = (root.current?.closest('.viewer') as HTMLElement | null) ?? null;
+    const prevTouch = sc?.style.touchAction ?? '';
+    if (sc) sc.style.touchAction = 'pan-x pan-y';
+    // Safari (iPhone/iPad) beachtet das nicht immer – dort die Zoom-Geste selbst abfangen.
+    const stop = (e: Event) => e.preventDefault();
+    document.addEventListener('gesturestart', stop);
+    document.addEventListener('gesturechange', stop);
+    return () => {
+      if (meta && before !== null) meta.setAttribute('content', before);
+      if (sc) sc.style.touchAction = prevTouch;
+      document.removeEventListener('gesturestart', stop);
+      document.removeEventListener('gesturechange', stop);
+    };
+  }, []);
+
   // ---------- Zoom ----------
   useLayoutEffect(() => {
     const sc = (root.current?.closest('.viewer-body') as HTMLElement | null) ?? document.scrollingElement as HTMLElement;
@@ -241,7 +280,9 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
 
   // Strg+Mausrad / Trackpad-Zoom, Safari-Gesten, zwei Finger
   useEffect(() => {
-    const el = sizer.current;
+    // Ganzer Dokumentbereich (auch die Ränder neben den Seiten): sonst zoomt dort der Browser selbst –
+    // dann wird die ganze App größer und die Werkzeugleiste rutscht aus dem Bild.
+    const el = scroller.current ?? sizer.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
@@ -603,7 +644,9 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
   };
 
   useEffect(() => {
-    const el = sizer.current;
+    // Ganzer Dokumentbereich (auch die Ränder neben den Seiten): sonst zoomt dort der Browser selbst –
+    // dann wird die ganze App größer und die Werkzeugleiste rutscht aus dem Bild.
+    const el = scroller.current ?? sizer.current;
     if (!el) return;
     let pinch: { d: number; s: number; x: number; y: number } | null = null;
     let one: { x: number; y: number; id: number; timer: number; moved: boolean } | null = null;
@@ -635,7 +678,8 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     };
     const fingerScrolls = () => {
       const i = inkRef.current;
-      return !!i && !i.touch && i.mouse; // Zeichnen-Modus mit Stift: Finger scrollt (selbst, weil touch-action: none)
+      // Finger scrollt selbst (touch-action: none), wenn er nicht zeichnet: im Zeichnen-Modus, oder überall, sobald es einen Stift gibt
+      return !!i && !i.touch && (i.mouse || penKnown);
     };
     const start = (e: TouchEvent) => {
       touches.current = e.touches.length;
@@ -844,7 +888,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
   // ---------- Darstellung ----------
   const totalH = n * PITCH - GAP;
   const drawingWithFinger = !!ink && ink.touch;
-  const fingerOwnScroll = !!ink && !ink.touch && ink.mouse;
+  const fingerOwnScroll = !!ink && !ink.touch && (ink.mouse || (ink.pen && penHere));
   const touchAction = drawingWithFinger || fingerOwnScroll ? 'none' : 'pan-x pan-y';
   const dragSlot = drag ? slotOf(drag.y) : -1;
   const gapPx = GAP * s;
