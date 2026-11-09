@@ -142,8 +142,27 @@ export function joinDoc(html: string, pages: InkPage[]): string {
 // ---------- Zeichnen ----------
 const f = (n: number) => (Math.round(n * 10) / 10).toString();
 
+/** Druck über mehrere Punkte mitteln – sonst wird der Rand dicker Striche zackig. */
+function smoothPressure(pts: number[], radius = 4): number[] {
+  const n = pts.length / 3;
+  if (n < 3) return pts;
+  const out = pts.slice();
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    let w = 0;
+    for (let j = Math.max(0, i - radius); j <= Math.min(n - 1, i + radius); j++) {
+      const k = radius + 1 - Math.abs(i - j);
+      sum += pts[j * 3 + 2] * k;
+      w += k;
+    }
+    out[i * 3 + 2] = sum / w;
+  }
+  return out;
+}
+
 /** Geglättete Punkte (x, y, Druck). */
-function smooth(pts: number[], amount = 0.45): number[] {
+function smooth(raw: number[], amount = 0.45): number[] {
+  const pts = smoothPressure(raw);
   if (pts.length <= 6) return pts;
   const out = [pts[0], pts[1], pts[2]];
   for (let i = 3; i < pts.length; i += 3) {

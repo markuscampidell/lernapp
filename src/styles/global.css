@@ -3558,3 +3558,16 @@ button.avatar-edit-badge {
 .finger-hint .icon-btn {
   color: inherit;
 }
+/* Breite Bildschirme: Stift-Leiste umbrechen statt abschneiden */
+@media (min-width: 700px) {
+  .doc-toolbar.pen-bar {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+.inking.panning .paged-stack {
+  cursor: grab;
+}
+.inking.panning .paged-stack:active {
+  cursor: grabbing;
+}

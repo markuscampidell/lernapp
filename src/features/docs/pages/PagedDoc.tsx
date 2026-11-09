@@ -1,11 +1,11 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { CONTENT_H, CONTENT_W, GAP, MARGIN_X, MARGIN_Y, MAX_ZOOM, MIN_ZOOM, PAGE_H, PAGE_W, PITCH, typesText } from './geometry';
 import { paginate } from './paginate';
 import { centerline, eraseAlong, lassoPick, outline, recognize, transformStrokes, unionBox, type Box, type InkPage, type Stroke } from './ink';
 import { Icon } from '../../../components/Icon';
 import { newId } from '../../../lib/id';
 
-export type PenTool = 'pen' | 'hl' | 'eraser' | 'lasso';
+export type PenTool = 'pen' | 'hl' | 'eraser' | 'lasso' | 'hand';
 export interface PenSettings {
   tool: PenTool;
   color: string;
@@ -127,7 +127,9 @@ interface Selection {
 }
 
 /** Text-Dokument als A4-Seiten: Text fließt über die Seiten, Handschrift liegt darüber, Zoomen und frei scrollen. */
-export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, ink, overlay, sizerRef: outerSizer }: Props) {
+export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, ink: inkProp, overlay, sizerRef: outerSizer }: Props) {
+  // Werkzeug "Bewegen": nichts zeichnen, mit Stift, Maus und Finger nur scrollen
+  const ink = useMemo(() => (inkProp && inkProp.settings.tool === 'hand' ? { ...inkProp, touch: false, mouse: true } : inkProp), [inkProp]);
   const [textPages, setTextPages] = useState(1);
   // Gibt es hier einen Stift? Dann darf der Browser nie selbst scrollen (sonst schiebt der Stift die Seiten
   // statt zu schreiben) – Finger-Scrollen übernimmt die App.
@@ -337,6 +339,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
   const [sel, setSel] = useState<Selection | null>(null);
   const selRef = useRef(sel);
   selRef.current = sel;
+  const pan = useRef<{ pointer: number; x: number; y: number } | null>(null);
   const selDrag = useRef<{ mode: 'move' | 'scale'; x: number; y: number; pointer: number } | null>(null);
 
   useEffect(() => {
@@ -437,6 +440,18 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
       if (!draws(e) || live.current) return;
       const target = e.target as HTMLElement;
       if (target.closest('.ink-sel-ui, button, .cols-overlay, .img-frame')) return;
+      // Bewegen: überall (auch zwischen den Seiten) ziehen = scrollen
+      if ((penOverride(e) ?? inkRef.current!.settings.tool) === 'hand') {
+        if (e.pointerType === 'touch') return; // Finger: Touch-Behandlung (mit Schwung)
+        e.preventDefault();
+        try {
+          st.setPointerCapture(e.pointerId);
+        } catch {
+          /* egal */
+        }
+        pan.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY };
+        return;
+      }
       const { page, x, y } = toPage(e.clientX, e.clientY);
       if (page < 0 || page >= pagesRef.current.length || y < 0 || y > PAGE_H || x < 0 || x > PAGE_W) return;
       e.preventDefault();
@@ -485,6 +500,18 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     };
 
     const move = (e: PointerEvent) => {
+      const pn = pan.current;
+      if (pn && pn.pointer === e.pointerId) {
+        e.preventDefault();
+        const sc = scroller.current;
+        if (sc) {
+          sc.scrollLeft -= e.clientX - pn.x;
+          sc.scrollTop -= e.clientY - pn.y;
+        }
+        pn.x = e.clientX;
+        pn.y = e.clientY;
+        return;
+      }
       const d = selDrag.current;
       if (d && d.pointer === e.pointerId) {
         e.preventDefault();
@@ -531,6 +558,10 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     };
 
     const up = (e: PointerEvent) => {
+      if (pan.current?.pointer === e.pointerId) {
+        pan.current = null;
+        return;
+      }
       const d = selDrag.current;
       if (d && d.pointer === e.pointerId) {
         selDrag.current = null;
@@ -650,6 +681,18 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     if (!el) return;
     let pinch: { d: number; s: number; x: number; y: number } | null = null;
     let one: { x: number; y: number; id: number; timer: number; moved: boolean } | null = null;
+    // Stift gerade auf dem Bildschirm? (Pointer-Ereignisse kommen vor den Touch-Ereignissen desselben Kontakts.)
+    let penDown = 0;
+    const penTouches = new Set<number>();
+    const penOn = (e: PointerEvent) => {
+      if (e.pointerType === 'pen') penDown++;
+    };
+    const penOff = (e: PointerEvent) => {
+      if (e.pointerType === 'pen') penDown = Math.max(0, penDown - 1);
+    };
+    window.addEventListener('pointerdown', penOn, true);
+    window.addEventListener('pointerup', penOff, true);
+    window.addEventListener('pointercancel', penOff, true);
     // Schwung beim Scrollen mit einem Finger (wie beim normalen Scrollen: gleitet nach dem Loslassen aus)
     let vel = { x: 0, y: 0, t: 0 };
     let glide = 0;
@@ -684,11 +727,14 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     const start = (e: TouchEvent) => {
       touches.current = e.touches.length;
       stopGlide();
-      // Stift (iPad/Android): nicht scrollen, sondern zeichnen
-      if (Array.from(e.changedTouches).some((t) => (t as Touch & { touchType?: string }).touchType === 'stylus')) {
-        if (inkRef.current?.pen) e.preventDefault();
+      // Stift: nicht scrollen, sondern zeichnen. Manche Browser (Windows, Android) melden den Stift zusätzlich als
+      // "Touch" – ohne diese Prüfung würde die App die Seite mit dem Stift mitschieben (Striche werden waagrecht).
+      if (penDown > 0 || Array.from(e.changedTouches).some((t) => (t as Touch & { touchType?: string }).touchType === 'stylus')) {
+        Array.from(e.changedTouches).forEach((t) => penTouches.add(t.identifier));
+        if (inkRef.current?.pen && e.cancelable) e.preventDefault();
         return;
       }
+      if (Array.from(e.touches).some((t) => penTouches.has(t.identifier))) return;
       if (e.touches.length === 2) {
         // laufenden Strich (mit dem ersten Finger) verwerfen
         if (live.current && live.current.tool !== 'eraser') {
@@ -727,6 +773,10 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
       }
     };
     const moveT = (e: TouchEvent) => {
+      if (Array.from(e.touches).some((t) => penTouches.has(t.identifier))) {
+        if (inkRef.current?.pen && e.cancelable) e.preventDefault();
+        return;
+      }
       if (pinch && e.touches.length >= 2) {
         if (e.cancelable) e.preventDefault();
         const [a, b] = [e.touches[0], e.touches[1]];
@@ -766,6 +816,9 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
       }
     };
     const end = (e: TouchEvent) => {
+      Array.from(e.changedTouches).forEach((t) => {
+        if (penTouches.delete(t.identifier) && !e.touches.length) one = null;
+      });
       touches.current = e.touches.length;
       if (e.touches.length < 2) pinch = null;
       if (e.touches.length === 0) {
@@ -785,6 +838,9 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     el.addEventListener('touchcancel', end);
     return () => {
       stopGlide();
+      window.removeEventListener('pointerdown', penOn, true);
+      window.removeEventListener('pointerup', penOff, true);
+      window.removeEventListener('pointercancel', penOff, true);
       el.removeEventListener('pointerdown', stopOnDown, true);
       el.removeEventListener('touchstart', start);
       el.removeEventListener('touchmove', moveT);
@@ -894,7 +950,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
   const gapPx = GAP * s;
 
   return (
-    <div className={`paged${ink ? ' inking' : ''}${ink?.settings.tool === 'eraser' ? ' erasing' : ''}`} ref={root} data-no-swipe>
+    <div className={`paged${ink ? ' inking' : ''}${ink?.settings.tool === 'eraser' ? ' erasing' : ''}${ink?.settings.tool === 'hand' ? ' panning' : ''}`} ref={root} data-no-swipe>
       <div className="paged-sizer" ref={sizer} style={{ width: PAGE_W * s, height: pad * 2 + totalH * s, touchAction }}>
         <div className="paged-stack" ref={stack} style={{ width: PAGE_W, height: totalH, top: pad, transform: `scale(${s})` }}>
           {pages.map((p, i) => (

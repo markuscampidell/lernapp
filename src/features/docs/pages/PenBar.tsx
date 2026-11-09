@@ -50,6 +50,7 @@ const TOOLS: [PenTool, IconName, string][] = [
   ['hl', 'highlighter', 'Textmarker'],
   ['eraser', 'eraser', 'Radierer'],
   ['lasso', 'lasso', 'Lasso (auswählen, verschieben, Größe ändern)'],
+  ['hand', 'hand', 'Bewegen (nichts zeichnen, nur scrollen)'],
 ];
 
 /** Stufenlose Stärke (logarithmisch, damit kleine Werte fein einstellbar sind). */
