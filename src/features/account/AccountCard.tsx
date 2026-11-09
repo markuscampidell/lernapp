@@ -139,12 +139,22 @@ function AccountInfo() {
   return (
     <div className="card stack">
       <div className="person">
-        <button className="avatar-edit" onClick={() => photoInput.current?.click()} disabled={!online} aria-label="Profilbild ändern" title="Profilbild ändern">
-          <Avatar id={user!.id} name={user!.username} size="lg" />
-          <span className="avatar-edit-badge" aria-hidden="true">
-            <Icon name="camera" size={14} />
+        {avatarPath ? (
+          // Mit Profilbild: Antippen zeigt es groß, die Kamera ändert es.
+          <span className="avatar-edit">
+            <Avatar id={user!.id} name={user!.username} size="lg" expand />
+            <button className="avatar-edit-badge" onClick={() => photoInput.current?.click()} disabled={!online} aria-label="Profilbild ändern" title="Profilbild ändern">
+              <Icon name="camera" size={14} />
+            </button>
           </span>
-        </button>
+        ) : (
+          <button className="avatar-edit" onClick={() => photoInput.current?.click()} disabled={!online} aria-label="Profilbild hinzufügen" title="Profilbild hinzufügen">
+            <Avatar id={user!.id} name={user!.username} size="lg" />
+            <span className="avatar-edit-badge" aria-hidden="true">
+              <Icon name="camera" size={14} />
+            </span>
+          </button>
+        )}
         <div className="card-main">
           <span className="muted small">Angemeldet als</span>
           <strong className="ellipsis">{user!.username}</strong>

@@ -287,7 +287,7 @@ function PersonRow({ id, label, you, children }: { id: string; label: string; yo
   const { userName } = useLibrary();
   return (
     <div className="person">
-      <Avatar id={id} />
+      <Avatar id={id} expand />
       <div className="card-main">
         <strong className="ellipsis">
           {userName(id)}

@@ -31,7 +31,7 @@ export function ChangesBanner({ file }: { file: FileItem }) {
       </strong>
       {changes.map((c) => (
         <div key={c.userId ?? '?'} className="changes-row">
-          <Avatar id={c.userId} />
+          <Avatar id={c.userId} expand />
           <div className="card-main">
             <span>
               <strong>{userName(c.userId)}</strong> {ago(c.at)}

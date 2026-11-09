@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
 import { Icon } from '../../components/Icon';
+import { openLightbox } from '../../components/Lightbox';
 import { sanitizeHtml } from './sanitize';
 import { DocEditor } from './DocEditor';
 import { renderMathIn } from '../../lib/math';
@@ -72,6 +73,12 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
       const label = copyBtn.lastChild;
       if (label) label.textContent = ' Kopiert';
       setTimeout(() => label && (label.textContent = ' Kopieren'), 2000);
+      return;
+    }
+    // Bilder im Dokument groß anzeigen (nicht Diagramme/Räder)
+    if (t.tagName === 'IMG' && !t.closest('figure')) {
+      const im = t as HTMLImageElement;
+      if (im.src) openLightbox({ src: im.src, alt: im.alt });
       return;
     }
     // In der Ansicht hakt ein Tipp irgendwo auf den Punkt ab.

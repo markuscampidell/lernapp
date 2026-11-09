@@ -103,7 +103,7 @@ export function Comments({ file }: { file: FileItem }) {
 
   const item = (c: Comment, reply = false) => (
     <div key={c.id} className={`comment${reply ? ' reply' : ''}`}>
-      <Avatar id={c.userId} />
+      <Avatar id={c.userId} expand />
       <div className="comment-main">
         <div className="comment-head">
           <strong>{c.userId === me?.id ? 'Du' : userName(c.userId)}</strong>

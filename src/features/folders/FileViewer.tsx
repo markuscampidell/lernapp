@@ -16,6 +16,7 @@ import { ChangesBanner } from '../changes/ChangesBanner';
 import { cloudEnabled } from '../../cloud/supabase';
 import { ChartPanel } from '../charts/ChartPanel';
 import { WheelPanel } from '../wheel/WheelPanel';
+import { openLightbox } from '../../components/Lightbox';
 import { GapsPanel } from '../gaps/GapsPanel';
 
 const MAX_TEXT = 2 * 1024 * 1024;
@@ -106,7 +107,16 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
       </p>
     );
   else if (!blob || !url) body = <p className="muted">Lädt …</p>;
-  else if (kind === 'image') body = <img className="viewer-media" src={url} alt={file.name} />;
+  else if (kind === 'image')
+    body = (
+      <img
+        className="viewer-media zoomable"
+        src={url}
+        alt={file.name}
+        title="Vergrößern"
+        onClick={() => openLightbox({ src: url, alt: file.name })}
+      />
+    );
   else if (kind === 'video') body = <video className="viewer-media" src={url} controls playsInline />;
   else if (kind === 'audio') body = <audio className="viewer-audio" src={url} controls />;
   else if (kind === 'pdf') body = <PdfView blob={blob} />;

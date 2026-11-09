@@ -81,7 +81,7 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
   const share = root ? shareOf(folder) : undefined;
   const thumb = (
     <span className="thumb-wrap">
-      <FolderThumb folder={folder} />
+      <FolderThumb folder={folder} expand={!rest.selecting} />
       {/* Eigene Ordner, die nur auf meinen Geräten liegen (mit niemandem geteilt), bekommen kein Teilen-Zeichen. */}
       {((root && (share?.ownerId !== me?.id || peopleOf(share?.id).length > 1)) || isOrphan(folder.id)) && (
         <span className="shared-mark" title="Geteilt">
@@ -121,7 +121,7 @@ export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file:
   const comments = commentInfo(file.id);
   const changes = changesFor(file.id);
   return (
-    <ItemCard {...rest} thumb={<FileThumb file={file} />} label={fullName(file)}>
+    <ItemCard {...rest} thumb={<FileThumb file={file} expand={!rest.selecting} />} label={fullName(file)}>
       <strong className="wrap-text">{fullName(file)}</strong>
       {path && <span className="muted small wrap-text">{path}</span>}
       {file.description && <span className="muted small wrap-text">{file.description}</span>}

@@ -10,6 +10,8 @@ import { Sheet } from '../../components/Sheet';
 import { Icon } from '../../components/Icon';
 import { TextLine } from '../../components/TextLine';
 import { FolderPicker } from '../../components/FolderPicker';
+import { ImageCropSheet, type Crop } from '../../components/ImageCropper';
+import { loadBlob } from '../../storage/blobs';
 
 interface Props {
   /** Bestehender Ordner zum Bearbeiten – oder undefined für einen neuen. */
@@ -33,6 +35,19 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Originalbild + gewählter Ausschnitt, damit man den Ausschnitt später noch ändern kann
+  const [source, setSource] = useState<{ blob: Blob; crop?: Crop } | null>(null);
+  const [cropping, setCropping] = useState<{ blob: Blob; crop?: Crop } | null>(null);
+
+  // Ausschnitt ändern: vom Original (falls in diesem Blatt gewählt), sonst vom gespeicherten Bild
+  const editCrop = async () => {
+    if (image instanceof Blob && source) return setCropping(source);
+    if (image === undefined && folder?.imageId) {
+      const blob = await loadBlob(folder.imageId).catch(() => undefined);
+      if (blob) setCropping({ blob });
+      else setErr('Das Bild konnte nicht geladen werden.');
+    }
+  };
 
   const storedUrl = useBlobUrl(image === undefined ? folder?.imageId : undefined);
   const [newUrl, setNewUrl] = useState<string>();
@@ -167,6 +182,11 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
                 {preview ? 'Anderes Bild' : 'Bild wählen'}
               </button>
               {preview && (
+                <button className="btn ghost small" onClick={editCrop}>
+                  Ausschnitt ändern
+                </button>
+              )}
+              {preview && (
                 <button className="btn ghost small danger" onClick={() => setImage(null)}>
                   Entfernen
                 </button>
@@ -179,7 +199,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
               hidden
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) setImage(f);
+                if (f) setCropping({ blob: f });
                 e.target.value = '';
               }}
             />
@@ -203,6 +223,22 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
         <DetailsLockNotice {...lock} noun="dieses Ordners" />
         {err && <p className="notice critical">{err}</p>}
       </Sheet>
+      {cropping && (
+        <ImageCropSheet
+          source={cropping.blob}
+          initial={cropping.crop}
+          title="Bildausschnitt"
+          confirmLabel="Übernehmen"
+          busyLabel="Wird erstellt …"
+          out={480}
+          onClose={() => setCropping(null)}
+          onDone={(blob, crop) => {
+            setSource({ blob: cropping.blob, crop });
+            setImage(blob);
+            setCropping(null);
+          }}
+        />
+      )}
       {picking && folder && (
         <FolderPicker
           title="Verschieben nach"

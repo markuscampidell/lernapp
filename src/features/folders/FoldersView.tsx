@@ -286,7 +286,7 @@ function FolderPage({
             </button>
           </div>
           <header className="folder-head">
-            <FolderThumb folder={folder} size="lg" />
+            <FolderThumb folder={folder} size="lg" expand />
             <div className="grow">
               <h1 className="break">{folder.name}</h1>
               {folder.description && <p className="muted break">{folder.description}</p>}
