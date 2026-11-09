@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Icon, type IconName } from '../../../components/Icon';
-import type { PenSettings, PenTool } from './PagedDoc';
+import { penSeen, type PenSettings, type PenTool } from './PagedDoc';
 
 const KEY = 'lernapp:stift';
 export const PEN_COLORS = ['#1c1c1b', '#2a5bd7', '#d63b3a', '#1f8a4c', '#e08a00', '#7b4fd1'];
@@ -8,7 +8,7 @@ export const HL_COLORS = ['#ffe14d', '#8de08a', '#ff8fc8', '#8fd3ff', '#ffb35c']
 const PEN_SIZES = [1.6, 3, 5.5];
 const HL_SIZES = [12, 18, 28];
 
-const DEFAULTS: PenSettings = { tool: 'pen', color: PEN_COLORS[0], size: 3, hlColor: HL_COLORS[0], hlSize: 18, eraseWhole: false, eraserSize: 12 };
+const DEFAULTS: PenSettings = { tool: 'pen', color: PEN_COLORS[0], size: 3, hlColor: HL_COLORS[0], hlSize: 18, eraseWhole: false, eraserSize: 12, sideButton: 'lasso' };
 /** Bereich der Stärke je Werkzeug (Seiten-Pixel; Radierer: Radius). */
 const RANGE = { pen: [0.8, 14], hl: [6, 44], eraser: [3, 60] } as const;
 
@@ -141,6 +141,16 @@ export function PenBar({ settings, onChange, onUndo, onRedo, canUndo, canRedo, e
             Ganze Striche
           </button>
         </div>
+      )}
+      {penSeen() && (
+        <label className="side-btn-pick" title="Was die Taste an der Seite des Stifts tut, solange du sie gedrückt hältst">
+          <span>Stifttaste</span>
+          <select value={settings.sideButton} onChange={(e) => onChange({ sideButton: e.target.value as PenSettings['sideButton'] })}>
+            <option value="lasso">Lasso</option>
+            <option value="eraser">Radierer</option>
+            <option value="off">Nichts</option>
+          </select>
+        </label>
       )}
       {extra}
     </div>

@@ -3479,3 +3479,16 @@ button.avatar-edit-badge {
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
+.side-btn-pick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: auto 4px auto 8px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.side-btn-pick select {
+  padding: 4px 6px;
+  font-size: 0.85rem;
+}

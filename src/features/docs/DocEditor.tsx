@@ -23,7 +23,7 @@ import { PenBar, usePenSettings } from './pages/PenBar';
 import { PaperSheet } from './pages/PaperSheet';
 import { joinDoc, newPage, splitDoc, type InkPage, type Stroke } from './pages/ink';
 import { reorderPages } from './pages/paginate';
-import { PAGE_W } from './pages/geometry';
+import { PAGE_W, typesText } from './pages/geometry';
 
 /** Lage eines Spalten-Blocks, seiner Spalten und Zeilen (für die Knöpfe oben und links). */
 interface ColBox {
@@ -928,7 +928,7 @@ export function DocEditor({
       if (key !== 'z' && key !== 'y') return;
       // In Eingabefeldern (Titel, Formel …) bleibt Strg+Z beim Feld
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (typesText(t)) return;
       const h = history.current;
       const inkTurn = drawingRef.current || lastWasInk.current || (redo && h.redo.length > 0 && !editor.current?.contains(document.activeElement));
       if (!inkTurn) return;

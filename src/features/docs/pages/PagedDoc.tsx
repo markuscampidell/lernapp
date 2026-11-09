@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { CONTENT_H, CONTENT_W, GAP, MARGIN_X, MARGIN_Y, MAX_ZOOM, MIN_ZOOM, PAGE_H, PAGE_W, PITCH } from './geometry';
+import { CONTENT_H, CONTENT_W, GAP, MARGIN_X, MARGIN_Y, MAX_ZOOM, MIN_ZOOM, PAGE_H, PAGE_W, PITCH, typesText } from './geometry';
 import { paginate } from './paginate';
 import { centerline, eraseAlong, lassoPick, outline, recognize, transformStrokes, unionBox, type Box, type InkPage, type Stroke } from './ink';
 import { Icon } from '../../../components/Icon';
@@ -15,6 +15,8 @@ export interface PenSettings {
   eraseWhole: boolean;
   /** Radius des Radierers in Seiten-Pixeln. */
   eraserSize: number;
+  /** Was die Taste an der Seite des Stifts tut, solange sie gedrückt ist. */
+  sideButton: 'lasso' | 'eraser' | 'off';
 }
 
 /** Zeichnen erlaubt – und womit. */
@@ -357,6 +359,20 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     };
     const eraseRadius = () => Math.max(2, inkRef.current?.settings.eraserSize ?? 12);
 
+    /**
+     * Tasten am Stift (Pointer Events): Radierer-Ende = buttons & 32 (button 5), Seitentaste = buttons & 2 (button 2).
+     * So melden es Surface Pen, Wacom & Co. unter Windows sowie der S Pen unter Android.
+     */
+    const penOverride = (e: PointerEvent): PenTool | null => {
+      if (e.pointerType !== 'pen') return null;
+      if (e.buttons & 32 || e.button === 5) return 'eraser';
+      if (e.buttons & 2 || e.button === 2) {
+        const side = inkRef.current?.settings.sideButton ?? 'lasso';
+        return side === 'off' ? null : side;
+      }
+      return null;
+    };
+
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'pen') markPen();
       if (!draws(e) || live.current) return;
@@ -371,10 +387,12 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
       } catch {
         /* egal */
       }
-      const tool = inkRef.current!.settings.tool;
-      if (tool === 'lasso') {
-        const cur = selRef.current;
-        if (cur && cur.page === page && x >= cur.box.x0 - 6 && x <= cur.box.x1 + 6 && y >= cur.box.y0 - 6 && y <= cur.box.y1 + 6) {
+      const override = penOverride(e);
+      const tool = override ?? inkRef.current!.settings.tool;
+      // Auswahl vorhanden: hineintippen verschiebt sie (auch mit Stift/Seitentaste), daneben hebt sie auf
+      const cur = selRef.current;
+      if (cur && tool !== 'eraser') {
+        if (cur.page === page && x >= cur.box.x0 - 6 && x <= cur.box.x1 + 6 && y >= cur.box.y0 - 6 && y <= cur.box.y1 + 6) {
           selDrag.current = { mode: 'move', x, y, pointer: e.pointerId };
           return;
         }
@@ -498,7 +516,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
       const c = cursor.current;
       const i = inkRef.current;
       if (!c) return;
-      const t = i?.settings.tool;
+      const t = (e.pointerType === 'pen' && (e.buttons & 32 || e.button === 5) ? 'eraser' : null) ?? i?.settings.tool;
       const can = !!i && (e.pointerType === 'pen' ? i.pen : e.pointerType === 'mouse' ? i.mouse : i.touch);
       if (!i || !can || (t !== 'eraser' && t !== 'pen' && t !== 'hl') || (e.pointerType === 'touch' && !live.current)) {
         c.style.display = 'none';
@@ -515,6 +533,11 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     const leave = () => {
       if (cursor.current) cursor.current.style.display = 'none';
     };
+    // Seitentaste = Rechtsklick: kein Kontextmenü über den Seiten beim Zeichnen
+    const noMenu = (e: Event) => {
+      if (inkRef.current) e.preventDefault();
+    };
+    st.addEventListener('contextmenu', noMenu);
     st.addEventListener('pointermove', hover);
     st.addEventListener('pointerleave', leave);
     st.addEventListener('pointerdown', down, true);
@@ -522,6 +545,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     st.addEventListener('pointerup', up);
     st.addEventListener('pointercancel', up);
     return () => {
+      st.removeEventListener('contextmenu', noMenu);
       st.removeEventListener('pointermove', hover);
       st.removeEventListener('pointerleave', leave);
       st.removeEventListener('pointerdown', down, true);
@@ -711,7 +735,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Backspace' && e.key !== 'Delete') return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (typesText(t)) return;
       e.preventDefault();
       e.stopPropagation();
       deleteSelRef.current();

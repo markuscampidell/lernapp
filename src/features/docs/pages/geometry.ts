@@ -13,3 +13,14 @@ export const PITCH = PAGE_H + GAP;
 
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 6;
+
+/**
+ * Tippt man gerade in ein Textfeld (Titel, Formel …)? Dann gehören Strg+Z/Entf dem Feld.
+ * Regler, Farbwähler, Schalter und Auswahllisten zählen nicht – nach dem Einstellen von Farbe/Stärke soll Strg+Z den Strich rückgängig machen.
+ */
+export function typesText(t: EventTarget | null): boolean {
+  if (!(t instanceof HTMLElement)) return false;
+  if (t.tagName === 'TEXTAREA') return true;
+  if (t.tagName !== 'INPUT') return false;
+  return !['range', 'color', 'checkbox', 'radio', 'button', 'submit', 'file'].includes((t as HTMLInputElement).type);
+}
