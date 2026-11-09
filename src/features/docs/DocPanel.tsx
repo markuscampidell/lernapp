@@ -22,7 +22,8 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
   const { canModify, online } = useLibrary();
   const doc = useMemo(() => splitDoc(text), [text]);
   const html = useMemo(() => sanitizeHtml(doc.html), [doc]);
-  const [editing, setEditing] = useState<'edit' | 'draw' | null>(null);
+  // Bearbeiten: oben umschalten zwischen Text und Stift
+  const [editing, setEditing] = useState<'edit' | null>(null);
   const article = useRef<HTMLElement>(null);
   const checks = useChecks(file);
   // Vorbereitete Kopien der Diagramme (Bild erzeugen dauert kurz – der Klick soll sofort kopieren).
@@ -99,9 +100,6 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
         <div className="doc-panel-actions">
           <button className="btn primary" onClick={() => setEditing('edit')}>
             <Icon name="edit" size={18} /> Bearbeiten
-          </button>
-          <button className="btn ghost" onClick={() => setEditing('draw')}>
-            <Icon name="scribble" size={18} /> Zeichnen
           </button>
         </div>
       )}

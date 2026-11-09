@@ -62,11 +62,30 @@ export function StudyScreen({
       if (window.scrollY && document.body.style.overflow === 'hidden') window.scrollTo(0, 0);
     };
     fit();
+    // Die Tastatur fährt animiert ein – Safari meldet das oft erst am Ende. Deshalb nach dem Antippen eines
+    // Eingabefelds eine Weile bei jedem Bild nachziehen, damit die Leisten gar nicht erst aus dem Bild rutschen.
+    let follow = 0;
+    let until = 0;
+    const loop = () => {
+      fit();
+      follow = performance.now() < until ? requestAnimationFrame(loop) : 0;
+    };
+    const track = () => {
+      until = performance.now() + 1200;
+      if (!follow) follow = requestAnimationFrame(loop);
+    };
     vv?.addEventListener('resize', fit);
+    vv?.addEventListener('resize', track);
     vv?.addEventListener('scroll', fit);
     el.addEventListener('scroll', fit);
+    el.addEventListener('focusin', track);
+    el.addEventListener('focusout', track);
     window.addEventListener('scroll', fit);
     return () => {
+      if (follow) cancelAnimationFrame(follow);
+      vv?.removeEventListener('resize', track);
+      el.removeEventListener('focusin', track);
+      el.removeEventListener('focusout', track);
       vv?.removeEventListener('resize', fit);
       vv?.removeEventListener('scroll', fit);
       el.removeEventListener('scroll', fit);

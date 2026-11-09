@@ -1049,7 +1049,16 @@ export function DocEditor({
               <button type="button" className={!penMode ? 'active' : ''} aria-pressed={!penMode} onMouseDown={(e) => e.preventDefault()} onClick={() => setPenMode(false)}>
                 <Icon name="textMode" size={16} /> Text
               </button>
-              <button type="button" className={penMode ? 'active' : ''} aria-pressed={penMode} onMouseDown={(e) => e.preventDefault()} onClick={() => setPenMode(true)}>
+              <button type="button" className={penMode ? 'active' : ''} aria-pressed={penMode} onMouseDown={(e) => e.preventDefault()} onClick={() => {
+                  // Tippen beenden: Cursor/Tastatur weg, Auswahlen (Bild, Formel, Tabelle) aufheben
+                  if (formula) finishFormula();
+                  setImage(null);
+                  selectEmbed(null);
+                  setActiveCols(null);
+                  (document.activeElement as HTMLElement | null)?.blur?.();
+                  document.getSelection()?.removeAllRanges();
+                  setPenMode(true);
+                }}>
                 <Icon name="scribble" size={16} /> Stift
               </button>
             </div>
@@ -1217,8 +1226,9 @@ export function DocEditor({
         >
           <div
             ref={editor}
-            className={`doc-content doc-editable${drawOnly ? ' draw-only' : ''}`}
-            contentEditable={!drawOnly}
+            className={`doc-content doc-editable${drawing ? ' draw-only' : ''}`}
+            // Im Stift-Modus kann man nicht tippen (kein Cursor, keine Tastatur) – nur zeichnen
+            contentEditable={!drawing}
             suppressContentEditableWarning
             role="textbox"
             aria-multiline="true"
