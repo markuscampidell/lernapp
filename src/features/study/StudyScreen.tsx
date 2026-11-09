@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useBackToClose } from '../../lib/router';
 import { Icon } from '../../components/Icon';
@@ -44,8 +44,37 @@ export function StudyScreen({
       document.body.style.overflow = prev;
     };
   }, []);
+  // Kopfzeile und Werkzeugleisten immer sichtbar halten: Öffnet sich am Handy die Tastatur, schiebt der Browser
+  // die ganze Seite nach oben (und die Leisten aus dem Bild). Dann passt sich der Bildschirm dem sichtbaren Bereich an.
+  const screen = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = screen.current;
+    if (!el) return;
+    const vv = window.visualViewport;
+    const fit = () => {
+      if (vv) {
+        el.style.top = `${vv.offsetTop}px`;
+        el.style.height = `${vv.height}px`;
+        el.style.bottom = 'auto';
+      }
+      // Der Browser scrollt beim Tippen manchmal auch den Rahmen selbst – zurück an den Anfang
+      if (el.scrollTop) el.scrollTop = 0;
+      if (window.scrollY && document.body.style.overflow === 'hidden') window.scrollTo(0, 0);
+    };
+    fit();
+    vv?.addEventListener('resize', fit);
+    vv?.addEventListener('scroll', fit);
+    el.addEventListener('scroll', fit);
+    window.addEventListener('scroll', fit);
+    return () => {
+      vv?.removeEventListener('resize', fit);
+      vv?.removeEventListener('scroll', fit);
+      el.removeEventListener('scroll', fit);
+      window.removeEventListener('scroll', fit);
+    };
+  }, []);
   return (
-    <div className="viewer study-screen" role="dialog" aria-modal="true" aria-label={title}>
+    <div ref={screen} className="viewer study-screen" role="dialog" aria-modal="true" aria-label={title}>
       <header className="viewer-header">
         <button className="icon-btn" aria-label="Schließen" onClick={onClose}>
           <Icon name="close" />
