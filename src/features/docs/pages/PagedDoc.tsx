@@ -51,6 +51,7 @@ interface Props {
 
 const PAD_EDIT = 48; // Platz für die Knöpfe über der ersten / unter der letzten Seite
 const PEN_KEY = 'lernapp:stift-erkannt';
+const HINT_KEY = 'lernapp:hinweis-zwei-finger';
 let penKnown = (() => {
   try {
     return localStorage.getItem(PEN_KEY) === '1';
@@ -271,6 +272,23 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
   const live = useRef<{ page: number; pts: number[]; pointer: number; tool: PenTool; shape?: boolean; lastX: number; lastY: number; timer?: number } | null>(null);
   const livePath = useRef<SVGPathElement>(null);
   const cursor = useRef<HTMLDivElement>(null);
+  // Einmaliger Hinweis beim ersten Zeichnen mit dem Finger
+  const [hint, setHint] = useState<number | false>(false);
+  const showFingerHint = () => {
+    try {
+      if (localStorage.getItem(HINT_KEY)) return;
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      return;
+    }
+    // oben im Dokumentbereich (unten liegen Zoom und die Seitenanzeige)
+    setHint((scroller.current?.getBoundingClientRect().top ?? 0) + 12);
+  };
+  useEffect(() => {
+    if (!hint) return;
+    const t = window.setTimeout(() => setHint(false), 7000);
+    return () => window.clearTimeout(t);
+  }, [hint]);
   const liveSvg = useRef<SVGSVGElement>(null);
   const [erasing, setErasing] = useState<{ page: number; strokes: Stroke[] } | null>(null);
   const erasingRef = useRef(erasing);
@@ -404,6 +422,7 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
         setErasing({ page, strokes: next ?? base });
       }
       live.current = { page, pts: [x, y, pressure(e)], pointer: e.pointerId, tool, lastX: x, lastY: y };
+      if (e.pointerType === 'touch') showFingerHint();
       if (tool === 'pen' || tool === 'hl') armShape();
       drawLive();
     };
@@ -588,12 +607,39 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
     if (!el) return;
     let pinch: { d: number; s: number; x: number; y: number } | null = null;
     let one: { x: number; y: number; id: number; timer: number; moved: boolean } | null = null;
+    // Schwung beim Scrollen mit einem Finger (wie beim normalen Scrollen: gleitet nach dem Loslassen aus)
+    let vel = { x: 0, y: 0, t: 0 };
+    let glide = 0;
+    const stopGlide = () => {
+      if (glide) cancelAnimationFrame(glide);
+      glide = 0;
+    };
+    const startGlide = () => {
+      stopGlide();
+      if (performance.now() - vel.t > 80) return; // vor dem Loslassen angehalten
+      let { x: vx, y: vy } = vel; // px pro ms
+      let last = performance.now();
+      const step = (now: number) => {
+        const sc = scroller.current;
+        const dt = Math.min(40, now - last);
+        last = now;
+        if (!sc) return;
+        sc.scrollLeft -= vx * dt;
+        sc.scrollTop -= vy * dt;
+        const k = Math.pow(0.995, dt);
+        vx *= k;
+        vy *= k;
+        glide = Math.hypot(vx, vy) > 0.02 ? requestAnimationFrame(step) : 0;
+      };
+      glide = requestAnimationFrame(step);
+    };
     const fingerScrolls = () => {
       const i = inkRef.current;
       return !!i && !i.touch && i.mouse; // Zeichnen-Modus mit Stift: Finger scrollt (selbst, weil touch-action: none)
     };
     const start = (e: TouchEvent) => {
       touches.current = e.touches.length;
+      stopGlide();
       // Stift (iPad/Android): nicht scrollen, sondern zeichnen
       if (Array.from(e.changedTouches).some((t) => (t as Touch & { touchType?: string }).touchType === 'stylus')) {
         if (inkRef.current?.pen) e.preventDefault();
@@ -666,6 +712,10 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
             sc.scrollLeft -= t.clientX - one.x;
             sc.scrollTop -= t.clientY - one.y;
           }
+          const now = performance.now();
+          const dt = Math.max(1, now - vel.t);
+          const a = vel.t && dt < 100 ? 0.7 : 0; // geglättete Geschwindigkeit
+          vel = { x: a * vel.x + (1 - a) * ((t.clientX - one.x) / dt), y: a * vel.y + (1 - a) * ((t.clientY - one.y) / dt), t: now };
           one.x = t.clientX;
           one.y = t.clientY;
         }
@@ -676,15 +726,22 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
       if (e.touches.length < 2) pinch = null;
       if (e.touches.length === 0) {
         if (one) window.clearTimeout(one.timer);
+        if (one?.moved && fingerScrolls() && !dragRef.current) startGlide();
+        vel = { x: 0, y: 0, t: 0 };
         one = null;
         if (dragRef.current) dropDrag();
       }
     };
     el.addEventListener('touchstart', start, { passive: false });
+    // Tippen/Klicken irgendwo hält das Gleiten an
+    const stopOnDown = () => stopGlide();
+    el.addEventListener('pointerdown', stopOnDown, true);
     el.addEventListener('touchmove', moveT, { passive: false });
     el.addEventListener('touchend', end);
     el.addEventListener('touchcancel', end);
     return () => {
+      stopGlide();
+      el.removeEventListener('pointerdown', stopOnDown, true);
       el.removeEventListener('touchstart', start);
       el.removeEventListener('touchmove', moveT);
       el.removeEventListener('touchend', end);
@@ -884,6 +941,16 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
         )}
         {overlay}
       </div>
+      {hint && (
+        <div className="finger-hint" role="status" data-no-swipe style={{ top: hint }}>
+          <Icon name="info" size={18} />
+          <span>Mit einem Finger zeichnest du. Zum Scrollen und Zoomen zwei Finger benutzen.</span>
+          <button type="button" className="icon-btn small" onClick={() => setHint(false)} aria-label="Hinweis schließen">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
+      {n > 1 && <PageScrubber count={n} scroller={scroller} stack={stack} />}
       <div className="zoom-ctl" data-no-swipe>
         <button type="button" className="icon-btn small" onClick={() => zoomTo(s / 1.25)} aria-label="Verkleinern" title="Verkleinern">
           <Icon name="minus" size={17} />
@@ -895,6 +962,101 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
           <Icon name="plus" size={17} />
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Seitenanzeige am rechten Rand ("3 / 8"): ziehen, um schnell zu einer Seite zu springen. */
+function PageScrubber({ count, scroller, stack }: { count: number; scroller: RefObject<HTMLElement | null>; stack: RefObject<HTMLDivElement> }) {
+  const [state, setState] = useState({ page: 1, frac: 0, top: 0, height: 0, right: 4, visible: false });
+  const [dragging, setDragging] = useState(false);
+  const hideTimer = useRef(0);
+
+  useEffect(() => {
+    const sc = scroller.current;
+    if (!sc) return;
+    let frame = 0;
+    const measure = (show: boolean) => {
+      frame = 0;
+      const st = stack.current;
+      if (!st) return;
+      const r = sc.getBoundingClientRect();
+      const sr = st.getBoundingClientRect();
+      const k = sr.width / PAGE_W || 1;
+      const mid = (r.top + r.height / 2 - sr.top) / k;
+      const page = Math.max(1, Math.min(count, Math.floor(mid / PITCH) + 1));
+      const max = sc.scrollHeight - sc.clientHeight;
+      const frac = max > 0 ? sc.scrollTop / max : 0;
+      // rechts neben der Scrollleiste des Browsers (falls es eine gibt)
+      const right = Math.max(4, window.innerWidth - (r.left + sc.clientWidth) + 4);
+      setState((cur) => ({ page, frac, top: r.top + 12, height: Math.max(80, r.height - 96), right, visible: show || cur.visible }));
+      if (show) {
+        window.clearTimeout(hideTimer.current);
+        hideTimer.current = window.setTimeout(() => setState((cur) => ({ ...cur, visible: false })), 1600);
+      }
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(() => measure(true));
+    };
+    measure(false);
+    sc.addEventListener('scroll', onScroll, { passive: true });
+    const ro = new ResizeObserver(() => measure(false));
+    ro.observe(sc);
+    return () => {
+      sc.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+      window.clearTimeout(hideTimer.current);
+    };
+  }, [scroller, stack, count]);
+
+  const THUMB = 34;
+  const jump = (clientY: number) => {
+    const sc = scroller.current;
+    if (!sc) return;
+    const frac = Math.max(0, Math.min(1, (clientY - state.top - THUMB / 2) / Math.max(1, state.height - THUMB)));
+    sc.scrollTop = frac * (sc.scrollHeight - sc.clientHeight);
+  };
+  const onDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* egal */
+    }
+    setDragging(true);
+    jump(e.clientY);
+    const move = (ev: PointerEvent) => jump(ev.clientY);
+    const up = () => {
+      setDragging(false);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  };
+
+  if (!state.height) return null;
+  const y = state.frac * (state.height - THUMB);
+  return (
+    <div
+      className={`page-scrubber${state.visible || dragging ? ' show' : ''}${dragging ? ' dragging' : ''}`}
+      style={{ top: state.top, height: state.height, right: state.right }}
+      data-no-swipe
+      role="scrollbar"
+      aria-orientation="vertical"
+      aria-valuemin={1}
+      aria-valuemax={count}
+      aria-valuenow={state.page}
+      aria-label="Seite wählen"
+    >
+      <span className="page-scrubber-thumb" style={{ transform: `translateY(${y}px)` }} onPointerDown={onDown}>
+        {state.page} / {count}
+      </span>
     </div>
   );
 }

@@ -3492,3 +3492,69 @@ button.avatar-edit-badge {
   padding: 4px 6px;
   font-size: 0.85rem;
 }
+/* Seitenanzeige am rechten Rand */
+.page-scrubber {
+  position: fixed;
+  z-index: 49;
+  width: 0;
+  pointer-events: none; /* nur der Knopf ist anfassbar – daneben kann man zeichnen */
+}
+.page-scrubber-thumb {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0.55;
+  transition: opacity 0.25s;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.page-scrubber.show .page-scrubber-thumb,
+.page-scrubber:hover .page-scrubber-thumb {
+  opacity: 1;
+}
+.page-scrubber.dragging .page-scrubber-thumb {
+  cursor: grabbing;
+}
+.page-scrubber.dragging .page-scrubber-thumb {
+  background: var(--accent);
+  color: var(--accent-ink);
+  transform-origin: right center;
+}
+/* Hinweis: zwei Finger scrollen */
+.finger-hint {
+  position: fixed;
+  left: 50%;
+  z-index: 51;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 80px); /* rechts bleibt Platz für die Seitenanzeige */
+  padding: 8px 6px 8px 14px;
+  transform: translateX(-50%);
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  font-size: 0.9rem;
+  animation: fade 0.2s ease-out;
+}
+.finger-hint .icon-btn {
+  color: inherit;
+}
