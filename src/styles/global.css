@@ -66,6 +66,11 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Keine automatische Schriftvergrößerung am Handy (Android/iOS) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 html,
 body {
   margin: 0;
@@ -3146,6 +3151,10 @@ button.avatar-edit-badge {
   position: absolute;
   left: 0;
   transform-origin: 0 0;
+  /* Android vergrößert Text in breiten Blöcken sonst automatisch ("Font Boosting") – dann stünde der Text
+     am Handy an anderer Stelle als am PC (und die Handschrift passte nicht mehr dazu). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 .paper {
   position: absolute;

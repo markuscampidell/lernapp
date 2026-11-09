@@ -259,6 +259,17 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
   useLayoutEffect(() => {
     applyAnchor();
     anchor.current = null;
+    // Android (v. a. als installierte App) zeichnet die vergrößerten/verkleinerten Seiten manchmal nicht neu –
+    // die Zahl ändert sich, die Seiten bleiben gleich groß. Kurz eine eigene Ebene erzwingen und wieder lösen,
+    // dann muss der Browser neu zeichnen.
+    const st = stack.current;
+    if (!st) return;
+    st.style.willChange = 'transform';
+    const f1 = requestAnimationFrame(() => {
+      st.style.willChange = '';
+      void st.offsetHeight;
+    });
+    return () => cancelAnimationFrame(f1);
   }, [s, applyAnchor]);
   const docPoint = (cx: number, cy: number) => {
     const r = stack.current!.getBoundingClientRect();
