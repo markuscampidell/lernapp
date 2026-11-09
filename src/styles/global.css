@@ -1945,6 +1945,7 @@ textarea.text-line.doc-title {
 .doc-panel-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 [hidden] {
@@ -2951,36 +2952,32 @@ input.gap-input:disabled { opacity: 1; }
   margin-bottom: 0;
 }
 /* Lesen: dünne, durchgehende Linien zwischen Spalten und Zeilen (Abstand als Innenabstand der Zellen, nicht als Lücke) */
-.doc-content:not(.doc-editable) .row {
+.doc-content .row {
   gap: 0;
 }
-.doc-content:not(.doc-editable) .col:not(:last-child) {
+.doc-content .col:not(:last-child) {
   padding-right: 16px;
 }
-.doc-content:not(.doc-editable) .col + .col {
+.doc-content .col + .col {
   padding-left: 16px;
   border-left: 1px solid var(--border);
 }
-.doc-content:not(.doc-editable) .row + .row > .col {
+.doc-content .row + .row > .col {
   padding-top: 0.35em;
   border-top: 1px solid var(--border);
 }
-.doc-content:not(.doc-editable) .row:not(:last-child) > .col {
+.doc-content .row:not(:last-child) > .col {
   padding-bottom: 0.35em;
 }
-/* Bearbeiten: Platz oben (Spalten-Knöpfe) und links (Zeilen-Knöpfe) */
-.doc-editable .cols {
-  gap: 8px;
-  margin: 40px 0 8px 32px;
-}
-.doc-editable .row {
-  gap: 8px;
-}
+/* Bearbeiten: gleiches Aussehen wie beim Lesen (sonst stünde der Text an anderer Stelle als die Handschrift) */
 .doc-editable .col {
-  min-height: 52px;
-  padding: 8px 10px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
+  min-height: 1.6em;
+}
+.cols-active {
+  position: absolute;
+  border: 1.5px dashed var(--info);
+  border-radius: 8px;
+  pointer-events: none;
 }
 /* Knöpfe liegen über dem Editor (nicht im Text) */
 .cols-overlay {
@@ -3086,4 +3083,370 @@ span.avatar-edit {
 }
 button.avatar-edit-badge {
   padding: 0;
+}
+
+/* ---------- A4-Seiten (Text-Dokumente) ---------- */
+.study-bar {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 8px 10px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.doc-bars {
+  width: 100%;
+  max-width: 1000px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.doc-bars > .doc-toolbar {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.doc-bars > .card,
+.doc-bars > .bar-hint {
+  flex: 1 0 100%;
+}
+.doc-bars .doc-toolbar {
+  position: static;
+}
+.mode-seg {
+  flex: none;
+  flex-wrap: nowrap;
+}
+.bar-hint {
+  margin: -2px 2px 0;
+}
+.study-body.doc-body {
+  padding-top: 12px;
+}
+.study-body.doc-body > .doc-editor,
+.viewer-body > .doc-panel {
+  max-width: none;
+}
+.doc-editor > .text-line,
+.doc-panel-actions {
+  width: 100%;
+  max-width: 794px;
+  align-self: center;
+}
+.paged {
+  width: 100%;
+  position: relative;
+}
+.paged-sizer {
+  position: relative;
+  margin: 0 auto;
+}
+.paged-stack {
+  position: absolute;
+  left: 0;
+  transform-origin: 0 0;
+}
+.paper {
+  position: absolute;
+  left: 0;
+  width: 794px;
+  height: 1123px;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 8px 24px rgba(0, 0, 0, 0.07);
+}
+.paper.dragging {
+  outline: 4px solid var(--info);
+  opacity: 0.7;
+}
+/* Text auf dem Papier: immer helle Farben (auch im dunklen Modus – das Papier ist hell bzw. frei gewählt) */
+.paper-scope {
+  --surface: #ffffff;
+  --surface-2: #f3f3f1;
+  --border: #dcdcd8;
+  --text: #1c1c1b;
+  --text-2: #5f5e5a;
+  --text-3: #8d8c87;
+  --accent: #1c1c1b;
+  --accent-ink: #ffffff;
+  --info: #2a78d6;
+  --info-bg: #e2edfb;
+  --critical: #c23b3a;
+  --critical-bg: #fbe3e2;
+  --good: #1f8a4c;
+  --good-bg: #e3f3e8;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  color: var(--text);
+  color-scheme: light;
+}
+.paged-flow {
+  position: absolute;
+  z-index: 1;
+}
+.paged-flow > .doc-content {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  min-height: inherit;
+  box-shadow: none !important;
+}
+.doc-content hr.pb {
+  display: block;
+  height: 0;
+  margin: 0;
+  border: 0;
+}
+.doc-editable:not(.draw-only) hr.pb {
+  outline: 1px dashed #b9b8b2;
+  outline-offset: 2px;
+}
+.ink {
+  position: absolute;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ink-live {
+  z-index: 3;
+}
+.ink-hl-layer,
+path.ink-hl {
+  opacity: 0.42;
+}
+.ink-lasso {
+  stroke: #2a78d6;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.ink-sel-box {
+  fill: rgba(42, 120, 214, 0.05);
+  stroke: #2a78d6;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.inking .paged-stack {
+  cursor: crosshair;
+}
+.inking.erasing .paged-stack {
+  cursor: cell;
+}
+.ink-sel-ui {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.ink-scale {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: #2a78d6;
+  transform: translate(-50%, -50%);
+  margin: 2px 0 0 2px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.swatch-dot {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+.page-bar {
+  position: absolute;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 4px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.14);
+  white-space: nowrap;
+}
+.page-bar.first {
+  background: transparent;
+  box-shadow: none;
+}
+.page-bar .icon-btn.small {
+  width: 28px;
+  height: 28px;
+}
+.page-bar .icon-btn.small.danger:hover {
+  color: var(--critical);
+}
+.page-grip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: grab;
+  touch-action: none;
+}
+.page-grip:active {
+  cursor: grabbing;
+}
+.page-drop-line {
+  position: absolute;
+  left: -24px;
+  right: -24px;
+  height: 6px;
+  border-radius: 3px;
+  background: #2a78d6;
+  z-index: 7;
+}
+.zoom-ctl {
+  position: fixed;
+  right: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.zoom-val {
+  min-width: 56px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.zoom-val:hover {
+  background: var(--surface-2);
+}
+/* Stift-Leiste */
+.swatch {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin: auto 3px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: pointer;
+  overflow: hidden;
+}
+.swatch.on {
+  box-shadow: 0 0 0 2.5px var(--info);
+}
+.swatch.big {
+  width: 38px;
+  height: 38px;
+}
+.swatch.custom {
+  background: conic-gradient(#f44, #fd4, #4d4, #4dd, #44f, #d4d, #f44);
+}
+.swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.size-btn .size-dot {
+  display: block;
+  border-radius: 50%;
+}
+.small-seg {
+  flex: none;
+  margin: auto 4px;
+}
+.small-seg button {
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+.finger-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: auto 4px auto 8px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.paper-kinds {
+  display: flex;
+  gap: 10px;
+}
+.paper-kind {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.paper-kind.on {
+  border-color: var(--info);
+}
+.paper-sample {
+  width: 66px;
+  height: 92px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.paper-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mode-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cols-top .col-bar {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.cols-side .row-bar {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+@media (max-width: 600px) {
+  .bar-hint {
+    display: none;
+  }
+}
+.size-btn .size-dot {
+  box-shadow: 0 0 0 1px var(--text-3);
 }

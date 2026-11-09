@@ -13,7 +13,12 @@ export function StudyScreen({
   children,
   footer,
   editing,
+  bar,
+  bodyClass,
 }: {
+  /** Feste Leiste zwischen Kopfzeile und Inhalt (scrollt nicht mit). */
+  bar?: ReactNode;
+  bodyClass?: string;
   /** Diese geteilte Datei wird hier bearbeitet: anzeigen, wenn jemand anderes sie gerade auch bearbeitet. */
   editing?: FileItem;
   title: string;
@@ -51,7 +56,8 @@ export function StudyScreen({
         </div>
         {actions}
       </header>
-      <div className="viewer-body study-body">
+      {bar && <div className="study-bar">{bar}</div>}
+      <div className={`viewer-body study-body${bodyClass ? ` ${bodyClass}` : ''}`}>
         <EditingNotice others={others} />
         {children}
       </div>

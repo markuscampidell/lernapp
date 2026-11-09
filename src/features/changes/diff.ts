@@ -4,7 +4,7 @@ import { parseCards, parseQuiz } from '../study/format';
 import { parseChart } from '../charts/chart';
 import { parseWheel } from '../wheel/wheel';
 
-export type Unit = 'word' | 'image' | 'formula' | 'chart' | 'wheel' | 'check' | 'card' | 'question' | 'value' | 'entry' | 'version';
+export type Unit = 'word' | 'image' | 'formula' | 'chart' | 'wheel' | 'check' | 'card' | 'question' | 'value' | 'entry' | 'stroke' | 'version';
 export interface ChangePart {
   unit: Unit;
   added: number;
@@ -23,6 +23,7 @@ const NAMES: Record<Unit, [string, string]> = {
   question: ['Frage', 'Fragen'],
   value: ['Wert', 'Werte'],
   entry: ['Eintrag', 'Einträge'],
+  stroke: ['Strich (Handschrift)', 'Striche (Handschrift)'],
   version: ['neue Version', 'neue Versionen'],
 };
 const n = (count: number, unit: Unit) => `${count} ${NAMES[unit][count === 1 ? 0 : 1]}`;
@@ -65,9 +66,20 @@ function docParts(html: string) {
   const charts = Array.from(doc.querySelectorAll('figure.chart')).map((f) => f.getAttribute('data-chart') ?? '');
   const wheels = Array.from(doc.querySelectorAll('figure.wheel')).map((f) => f.getAttribute('data-wheel') ?? '');
   const checks = Array.from(doc.querySelectorAll('ul.checklist > li')).map((li) => li.getAttribute('data-id') ?? '');
+  // Handschrift: jeder Strich zählt einzeln
+  const strokes: string[] = [];
+  doc.querySelectorAll('div.ink-pages').forEach((el) => {
+    try {
+      const data = JSON.parse(el.getAttribute('data-ink') ?? '{}') as { pages?: { s?: { d?: string; c?: string }[] }[] };
+      data.pages?.forEach((pg) => pg.s?.forEach((st) => strokes.push(`${st.c}|${st.d}`)));
+    } catch {
+      /* kaputt – ignorieren */
+    }
+    el.remove();
+  });
   // Formeln/Diagramme nicht als Wörter zählen.
   doc.querySelectorAll('span.math, figure').forEach((x) => x.remove());
-  return { words: words(doc.body.textContent ?? ''), imgs, maths, charts, wheels, checks };
+  return { words: words(doc.body.textContent ?? ''), imgs, maths, charts, wheels, checks, strokes };
 }
 
 const part = (unit: Unit, d: { added: number; removed: number; changed?: number }): ChangePart => ({ unit, added: d.added, removed: d.removed, changed: d.changed ?? 0 });
@@ -85,6 +97,7 @@ export function summarize(kind: FileKind, before: string, after: string): Change
       part('chart', bagDiff(a.charts, b.charts)),
       part('wheel', bagDiff(a.wheels, b.wheels)),
       part('check', bagDiff(a.checks.filter(Boolean), b.checks.filter(Boolean))),
+      part('stroke', bagDiff(a.strokes, b.strokes)),
     ];
   } else if (kind === 'text') {
     parts = [part('word', bagDiff(words(before), words(after)))];

@@ -73,8 +73,13 @@ function clean(node: Node, out: Node, doc: Document, inCol = false) {
       clean(el, out, doc, inCol);
       return;
     }
+    // Handschrift wird getrennt gespeichert (siehe pages/ink.ts) – nie im Text selbst.
+    if (tag === 'div' && el.classList.contains('ink-pages')) return;
     if (tag === 'br' || tag === 'hr') {
-      out.appendChild(doc.createElement(tag));
+      const n = doc.createElement(tag);
+      // Seitenumbruch: der nächste Block beginnt auf einer neuen Seite.
+      if (tag === 'hr' && el.classList.contains('pb') && !inCol) n.className = 'pb';
+      out.appendChild(n);
       return;
     }
     if (tag === 'img') {

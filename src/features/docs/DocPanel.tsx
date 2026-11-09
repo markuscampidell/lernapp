@@ -11,6 +11,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { copyPrepared, embedOf, prepareEmbed, renderEmbedsIn, useEmbedCopy, type EmbedData, type Prepared } from './embeds';
 import { WheelSpinner } from '../wheel/WheelSpinner';
 import { parseWheel } from '../wheel/wheel';
+import { PagedDoc } from './pages/PagedDoc';
+import { splitDoc } from './pages/ink';
 
 /** Drehbare Glücksräder im Dokument (je Figur eine React-Wurzel). */
 const WHEEL_ROOTS = new WeakMap<Element, Root>();
@@ -18,8 +20,9 @@ const WHEEL_ROOTS = new WeakMap<Element, Root>();
 /** Anzeige eines Text-Dokuments (bereinigtes HTML) mit Bearbeiten-Knopf, abhakbaren Checklisten und kopierbaren Diagrammen. */
 export function DocPanel({ file, text }: { file: FileItem; text: string }) {
   const { canModify, online } = useLibrary();
-  const html = useMemo(() => sanitizeHtml(text), [text]);
-  const [editing, setEditing] = useState(false);
+  const doc = useMemo(() => splitDoc(text), [text]);
+  const html = useMemo(() => sanitizeHtml(doc.html), [doc]);
+  const [editing, setEditing] = useState<'edit' | 'draw' | null>(null);
   const article = useRef<HTMLElement>(null);
   const checks = useChecks(file);
   // Vorbereitete Kopien der Diagramme (Bild erzeugen dauert kurz – der Klick soll sofort kopieren).
@@ -94,14 +97,19 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
     <div className="doc-panel">
       {editable && (
         <div className="doc-panel-actions">
-          <button className="btn primary" onClick={() => setEditing(true)}>
+          <button className="btn primary" onClick={() => setEditing('edit')}>
             <Icon name="edit" size={18} /> Bearbeiten
+          </button>
+          <button className="btn ghost" onClick={() => setEditing('draw')}>
+            <Icon name="scribble" size={18} /> Zeichnen
           </button>
         </div>
       )}
       {checks.notReady && <p className="notice warning">Häkchen werden noch nicht synchronisiert: Bitte supabase/005_checklisten.sql im Supabase „SQL Editor“ ausführen.</p>}
-      <article ref={article} className="doc-content card" onClick={onClick} dangerouslySetInnerHTML={{ __html: html || '<p class="muted">(leer)</p>' }} />
-      {editing && <DocEditor file={file} initial={text} onClose={() => setEditing(false)} />}
+      <PagedDoc pages={doc.pages} flowRef={article}>
+        <article ref={article} className="doc-content" onClick={onClick} dangerouslySetInnerHTML={{ __html: html || '<p><br></p>' }} />
+      </PagedDoc>
+      {editing && <DocEditor file={file} initial={text} mode={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }

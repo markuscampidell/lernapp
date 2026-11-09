@@ -18,6 +18,12 @@ import { EmbedInsertSheet } from './EmbedInsertSheet';
 import { EMBED_SELECTOR, embedFigure, embedFromPaste, embedJson, embedOf, embedTitle, renderEmbedsIn, useEmbedCopy, type EmbedData, type EmbedKind } from './embeds';
 import { afterBack } from '../../lib/router';
 import { addColumn, addRow, blockColumnMerge, columnCells, deleteAcrossCells, fixColumns, hasContent, insertColumns, MAX_COLS, perCell, removeColumn, removeRow } from './columns';
+import { PagedDoc, penSeen, type InkInput, type PageEditing } from './pages/PagedDoc';
+import { PenBar, usePenSettings } from './pages/PenBar';
+import { PaperSheet } from './pages/PaperSheet';
+import { joinDoc, newPage, splitDoc, type InkPage, type Stroke } from './pages/ink';
+import { reorderPages } from './pages/paginate';
+import { PAGE_W } from './pages/geometry';
 
 /** Lage eines Spalten-Blocks, seiner Spalten und Zeilen (für die Knöpfe oben und links). */
 interface ColBox {
@@ -43,7 +49,52 @@ const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const MIN_IMAGE = 40;
 
 /** Text-Dokument mit Formatierung und Bildern bearbeiten (wie ein einfaches Google Doc). */
-export function DocEditor({ file, folderId, initial = '', initialName, initialDescription, onClose }: { file?: FileItem; folderId?: string; initial?: string; initialName?: string; initialDescription?: string; onClose: () => void }) {
+/** Seiten an die Textlänge anpassen: fehlende anlegen, automatisch angelegte leere wieder entfernen. */
+function fitPages(cur: InkPage[], textPages: number): InkPage[] {
+  let next = cur;
+  if (next.length < textPages) {
+    next = [...next];
+    while (next.length < textPages) next.push(newPage(next[next.length - 1], true));
+  }
+  let end = next.length;
+  while (end > Math.max(1, textPages) && next[end - 1].auto && !next[end - 1].strokes.length) end--;
+  return end === next.length ? next : next.slice(0, end);
+}
+
+/**
+ * Text-Dokument bearbeiten: A4-Seiten mit Text (wie ein einfaches Google Doc) und Handschrift darüber.
+ * mode "draw": nur zeichnen (Text bleibt, wie er ist).
+ */
+export function DocEditor({
+  file,
+  folderId,
+  initial = '',
+  initialName,
+  initialDescription,
+  onClose,
+  mode = 'edit',
+}: {
+  file?: FileItem;
+  folderId?: string;
+  initial?: string;
+  initialName?: string;
+  initialDescription?: string;
+  onClose: () => void;
+  mode?: 'edit' | 'draw';
+}) {
+  const drawOnly = mode === 'draw';
+  const doc = useMemo(() => splitDoc(initial), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // ---------- Seiten & Handschrift ----------
+  const [pages, setPages] = useState<InkPage[]>(() => (doc.pages.length ? doc.pages : [newPage(undefined, true)]));
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
+  const textPages = useRef(1);
+  const history = useRef<{ undo: { id: string; before: Stroke[]; after: Stroke[] }[]; redo: { id: string; before: Stroke[]; after: Stroke[] }[] }>({ undo: [], redo: [] });
+  const [, setHistoryTick] = useState(0);
+  const [pen, setPen] = usePenSettings();
+  const [penMode, setPenMode] = useState(drawOnly);
+  const [fingerDraws, setFingerDraws] = useState(() => !penSeen());
+  const [paperFor, setPaperFor] = useState<number | null>(null);
   const [name, setName] = useState(file?.name ?? initialName ?? '');
   const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
   const [dirty, setDirty] = useState(false);
@@ -87,15 +138,21 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
   useEffect(() => {
     const el = editor.current;
     if (!el) return;
-    el.innerHTML = sanitizeHtml(initial) || '<p><br></p>';
+    el.innerHTML = sanitizeHtml(doc.html) || '<p><br></p>';
     normalizeBlocks(el);
     fixColumns(el);
     renderMathIn(el, true);
     renderEmbedsIn(el, { editable: true });
     document.execCommand('defaultParagraphSeparator', false, 'p');
-    if (file) el.focus();
+    if (file && !drawOnly) el.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Aktueller Zoom (Bildschirm-Pixel pro Seiten-Pixel). */
+  const zoomNow = () => {
+    const st = wrap.current?.querySelector('.paged-stack');
+    return st ? st.getBoundingClientRect().width / PAGE_W || 1 : 1;
+  };
 
   // ---------- Bild-Rahmen ----------
   const measure = useCallback(() => {
@@ -115,14 +172,19 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     const scroller = wrap.current?.closest('.viewer-body');
     window.addEventListener('resize', measure);
     scroller?.addEventListener('scroll', measure);
+    const ro = new ResizeObserver(() => measure());
+    if (wrap.current) ro.observe(wrap.current);
     return () => {
       window.removeEventListener('resize', measure);
       scroller?.removeEventListener('scroll', measure);
+      ro.disconnect();
     };
   }, [image, measure]);
 
   // ---------- Spalten ----------
   const [colBoxes, setColBoxes] = useState<ColBox[]>([]);
+  // Knöpfe nur für die Tabelle, in der der Cursor steht (sie liegen über dem Text).
+  const [activeCols, setActiveCols] = useState<HTMLElement | null>(null);
   const measureCols = useCallback(() => {
     const root = editor.current;
     const w = wrap.current;
@@ -156,6 +218,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     measureCols();
     const ro = new ResizeObserver(() => measureCols());
     ro.observe(root);
+    if (wrap.current) ro.observe(wrap.current); // Zoom
     // Seitlich gescrollte Spalten (schmaler Bildschirm) -> Knöpfe mitschieben.
     root.addEventListener('scroll', measureCols, true);
     window.addEventListener('resize', measureCols);
@@ -232,7 +295,8 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     target.setPointerCapture(e.pointerId);
     const startX = e.clientX;
     const startY = e.clientY;
-    const startW = image.getBoundingClientRect().width;
+    const k = zoomNow();
+    const startW = image.getBoundingClientRect().width / k;
     const ratio = image.naturalHeight && image.naturalWidth ? image.naturalHeight / image.naturalWidth : image.offsetHeight / Math.max(1, image.offsetWidth);
     const maxW = editor.current.clientWidth - 40;
     const sx = handle.includes('e') ? 1 : handle.includes('w') ? -1 : 0;
@@ -240,8 +304,8 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     // Bei mittiger Ausrichtung wächst das Bild nach beiden Seiten – dann zählt die Bewegung doppelt.
     const centered = getComputedStyle(image.parentElement ?? image).textAlign === 'center' ? 2 : 1;
     const move = (ev: PointerEvent) => {
-      const byX = sx * (ev.clientX - startX) * centered;
-      const byY = (sy * (ev.clientY - startY)) / ratio;
+      const byX = (sx * (ev.clientX - startX) * centered) / k;
+      const byY = (sy * (ev.clientY - startY)) / ratio / k;
       const delta = sx && sy ? (Math.abs(byX) > Math.abs(byY) ? byX : byY) : sx ? byX : byY;
       const w = Math.round(Math.min(maxW, Math.max(MIN_IMAGE, startW + delta)));
       image.setAttribute('width', String(w));
@@ -286,7 +350,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
       // PNG behält Transparenz, alles andere wird JPEG (kleiner).
       const url = /^data:image\/(png|gif)/i.test(src) ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.92);
       // Beim Drehen bleibt die angezeigte Größe gleich: Die neue Breite ist die bisherige Höhe.
-      if (rotate && img.hasAttribute('width')) img.setAttribute('width', String(Math.max(24, Math.round(img.getBoundingClientRect().height))));
+      if (rotate && img.hasAttribute('width')) img.setAttribute('width', String(Math.max(24, Math.round(img.getBoundingClientRect().height / zoomNow()))));
       await new Promise<void>((res) => {
         img.onload = () => res();
         img.onerror = () => res();
@@ -309,6 +373,9 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
       const block = String(document.queryCommandValue('formatBlock')).toLowerCase();
       const ul = listAt();
       const isCheck = !!ul?.classList.contains('checklist');
+      const anchorNode = document.getSelection()?.anchorNode ?? null;
+      const anchorEl = anchorNode instanceof HTMLElement ? anchorNode : anchorNode?.parentElement;
+      setActiveCols((anchorEl?.closest('div.cols') as HTMLElement | null) ?? null);
       setChecklist(isCheck ? ul : null);
       setListShared(isCheck && ul!.dataset.shared === '1');
       setState({
@@ -767,8 +834,88 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
   const submit = async () => {
     if (!name.trim()) return setErr('Gib dem Dokument einen Namen.');
     const html = sanitizeHtml(editor.current?.innerHTML ?? '');
-    if (await save(name, new Blob([html], { type: DOC_MIME }), description)) onClose();
+    if (await save(name, new Blob([joinDoc(html, pagesRef.current)], { type: DOC_MIME }), description)) onClose();
   };
+
+  // ---------- Handschrift ----------
+  const onLayout = useCallback((n: number) => {
+    textPages.current = n;
+    setPages((cur) => fitPages(cur, n));
+  }, []);
+  const onInk = useCallback((i: number, strokes: Stroke[]) => {
+    const page = pagesRef.current[i];
+    if (!page) return;
+    history.current.undo.push({ id: page.id, before: page.strokes, after: strokes });
+    if (history.current.undo.length > 200) history.current.undo.shift();
+    history.current.redo = [];
+    setHistoryTick((t) => t + 1);
+    setPages((cur) => cur.map((p) => (p.id === page.id ? { ...p, strokes, auto: undefined } : p)));
+    setDirty(true);
+  }, []);
+  const stepInk = (dir: 'undo' | 'redo') => {
+    const h = history.current;
+    const entry = (dir === 'undo' ? h.undo : h.redo).pop();
+    if (!entry) return;
+    (dir === 'undo' ? h.redo : h.undo).push(entry);
+    setHistoryTick((t) => t + 1);
+    setPages((cur) => cur.map((p) => (p.id === entry.id ? { ...p, strokes: dir === 'undo' ? entry.before : entry.after } : p)));
+    setDirty(true);
+  };
+
+  // ---------- Seiten einfügen / löschen / verschieben ----------
+  /** order: alte Seitennummern in neuer Reihenfolge (-1 = neue Seite). Text und Handschrift wandern mit. */
+  const reorder = (order: number[], fresh?: InkPage) => {
+    const el = editor.current;
+    if (!el) return;
+    if (formula) finishFormula();
+    setImage(null);
+    selectEmbed(null);
+    reorderPages(el, textPages.current, order);
+    normalize();
+    refreshChecks();
+    const cur = fitPages(pagesRef.current, textPages.current);
+    const next = order.map((i) => (i >= 0 ? cur[i] ?? newPage(cur[cur.length - 1]) : fresh ?? newPage(cur[cur.length - 1])));
+    setPages(next.map((p) => (p.auto ? { ...p, auto: undefined } : p)));
+    setDirty(true);
+    afterColChange();
+  };
+  const pageCount = () => Math.max(pagesRef.current.length, textPages.current);
+  const pageEditing: PageEditing = {
+    insert: (at) => {
+      const n = pageCount();
+      const cur = pagesRef.current;
+      const like = cur[Math.max(0, Math.min(cur.length - 1, at - 1))];
+      reorder([...Array.from({ length: at }, (_, i) => i), -1, ...Array.from({ length: n - at }, (_, i) => at + i)], newPage(like));
+    },
+    remove: (i) => {
+      const n = pageCount();
+      if (n <= 1) {
+        setErr('Die einzige Seite kann nicht gelöscht werden.');
+        return;
+      }
+      if (!confirm(`Seite ${i + 1} löschen? Text und Handschrift auf dieser Seite werden gelöscht.`)) return;
+      reorder(Array.from({ length: n }, (_, k) => k).filter((k) => k !== i));
+    },
+    move: (from, to) => {
+      const order = Array.from({ length: pageCount() }, (_, k) => k);
+      order.splice(from, 1);
+      order.splice(to, 0, from);
+      reorder(order);
+    },
+    paper: (i) => setPaperFor(i),
+  };
+  const applyPaper = (bg: InkPage['bg'], paper: string, all: boolean) => {
+    const i = paperFor;
+    setPaperFor(null);
+    if (i === null) return;
+    setPages((cur) => fitPages(cur, textPages.current).map((p, k) => (all || k === i ? { ...p, bg, paper, auto: undefined } : p)));
+    setDirty(true);
+  };
+  const drawing = drawOnly || penMode;
+  const inkInput: InkInput = useMemo(
+    () => ({ pen: true, mouse: drawing, touch: drawing && fingerDraws, settings: pen, onChange: onInk }),
+    [drawing, fingerDraws, pen, onInk],
+  );
 
   const tools: ({ icon: IconName; label: string; on?: boolean; run: () => void } | 'sep')[] = [
     { icon: 'undo', label: 'Rückgängig', run: () => cmd('undo') },
@@ -812,126 +959,239 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
     { icon: 'columns', label: 'Spalten / Tabelle einfügen', run: addColumnsBlock },
   ];
 
+  const textBar = (
+    <>
+          <div className="doc-toolbar" role="toolbar" aria-label="Formatierung" data-no-swipe>
+            {tools.map((t, i) =>
+              t === 'sep' ? (
+                <span key={i} className="toolbar-sep" aria-hidden="true" />
+              ) : (
+                <button
+                  key={t.label}
+                  type="button"
+                  className={`icon-btn${t.on ? ' on' : ''}`}
+                  aria-label={t.label}
+                  title={t.label}
+                  aria-pressed={t.on}
+                  // mousedown verhindern, damit die Auswahl im Text erhalten bleibt
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={t.run}
+                >
+                  <Icon name={t.icon} size={19} />
+                </button>
+              ),
+            )}
+          </div>
+    </>
+  );
+  const penBar = (
+    <PenBar
+      settings={pen}
+      onChange={setPen}
+      onUndo={() => stepInk('undo')}
+      onRedo={() => stepInk('redo')}
+      canUndo={history.current.undo.length > 0}
+      canRedo={history.current.redo.length > 0}
+      extra={
+        <div className="finger-toggle" title="Ohne Stift: mit dem Finger zeichnen. Mit Stift: Finger scrollt.">
+          <span>Finger zeichnet</span>
+          <input type="checkbox" className="switch" checked={fingerDraws} onChange={(e) => setFingerDraws(e.target.checked)} aria-label="Mit dem Finger zeichnen" />
+        </div>
+      }
+    />
+  );
+
   return (
     <StudyScreen
       editing={file}
-      title={file ? 'Dokument bearbeiten' : 'Neues Text-Dokument'}
+      title={drawOnly ? `Zeichnen: ${name || 'Dokument'}` : file ? 'Dokument bearbeiten' : 'Neues Text-Dokument'}
       onClose={close}
+      bodyClass="doc-body"
       actions={
         <>
-          {file && <DetailsButton file={file} onRenamed={setName} onDeleted={onClose} />}
+          {file && !drawOnly && <DetailsButton file={file} onRenamed={setName} onDeleted={onClose} />}
           <button className="btn primary small" onClick={submit} disabled={busy}>
             {busy ? 'Speichert …' : 'Speichern'}
           </button>
         </>
       }
+      bar={
+        <div className="doc-bars">
+          {!drawOnly && (
+            <div className="segmented mode-seg" role="radiogroup" aria-label="Eingabe">
+              <button type="button" className={!penMode ? 'active' : ''} aria-pressed={!penMode} onMouseDown={(e) => e.preventDefault()} onClick={() => setPenMode(false)}>
+                <Icon name="textMode" size={16} /> Text
+              </button>
+              <button type="button" className={penMode ? 'active' : ''} aria-pressed={penMode} onMouseDown={(e) => e.preventDefault()} onClick={() => setPenMode(true)}>
+                <Icon name="scribble" size={16} /> Stift
+              </button>
+            </div>
+          )}
+          {drawing ? penBar : textBar}
+          {formula && (
+            <div className="card formula-bar" data-no-swipe>
+              <div className="field-label">
+                <span>Formel (LaTeX)</span>
+                <span className="muted small">{String.raw`z. B. \frac{a}{b}, x^2, \sqrt{x}, \int_0^1`}</span>
+              </div>
+              <textarea
+                autoFocus
+                rows={2}
+                value={tex}
+                placeholder="\int_0^1 x^2\,dx = \frac{1}{3}"
+                onChange={(e) => updateFormula({ tex: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    finishFormula();
+                  } else if (e.key === 'Escape') finishFormula();
+                }}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+              />
+              <div className="toggle-row small-toggle">
+                <span>In eigener Zeile (zentriert)</span>
+                <input type="checkbox" className="switch" checked={display} onChange={(e) => updateFormula({ display: e.target.checked })} />
+              </div>
+              <div className="input-row">
+                <button className="btn ghost danger" onClick={deleteFormula}>
+                  <Icon name="trash" size={18} /> Löschen
+                </button>
+                <button className="btn primary grow" onClick={finishFormula}>
+                  Fertig
+                </button>
+              </div>
+            </div>
+          )}
+          {checklist && inShared && (
+            <div className="card checklist-bar" data-no-swipe onMouseDown={(e) => e.target === e.currentTarget && e.preventDefault()}>
+              <div className="segmented" role="radiogroup" aria-label="Wer hakt ab?">
+                <button type="button" className={!listShared ? 'active' : ''} aria-pressed={!listShared} onMouseDown={(e) => e.preventDefault()} onClick={() => setShared(false)}>
+                  <Icon name="user" size={16} /> Jeder für sich
+                </button>
+                <button type="button" className={listShared ? 'active' : ''} aria-pressed={listShared} onMouseDown={(e) => e.preventDefault()} onClick={() => setShared(true)}>
+                  <Icon name="users" size={16} /> Gemeinsam
+                </button>
+              </div>
+              <p className="muted small">
+                {listShared
+                  ? 'Häkchen gelten für alle Personen im geteilten Ordner.'
+                  : 'Jede Person hakt für sich ab – deine Häkchen siehst nur du (auf allen deinen Geräten).'}
+              </p>
+            </div>
+          )}
+          {embedEl && embedData && (
+            <div className="card chart-bar" data-no-swipe>
+              <strong className="grow ellipsis">
+                <Icon name={embedData.kind === 'chart' ? 'chart' : 'wheel'} size={16} /> {embedTitle(embedData)}
+              </strong>
+              <button className="btn ghost small danger" onClick={deleteEmbed}>
+                <Icon name="trash" size={16} /> Löschen
+              </button>
+              <button className="btn ghost small" onClick={embedCopy.run} disabled={!embedCopy.prepared}>
+                <Icon name={embedCopy.done ? 'check' : 'copy'} size={16} /> {embedCopy.done ? 'Kopiert' : 'Kopieren'}
+              </button>
+              <button className="btn primary small" onClick={() => setEmbedEdit({ el: embedEl, kind: embedData.kind, embed: embedData })}>
+                <Icon name="edit" size={16} /> Bearbeiten
+              </button>
+            </div>
+          )}
+          {!drawOnly && !penMode && <p className="muted small bar-hint">Mit dem Stift kannst du jederzeit direkt auf die Seiten schreiben.</p>}
+        </div>
+      }
     >
       <div className="doc-editor">
-        <TextLine autoFocus={!file} value={name} onChange={(v) => (setName(v), setDirty(true))} placeholder="Titel des Dokuments" maxLength={120} className="doc-title" enterKeyHint="next" onEnter={() => editor.current?.focus()} />
-        <TextLine
-          value={description}
-          onChange={(v) => (setDescription(v), setDirty(true))}
-          placeholder="Beschreibung (optional)"
-          maxLength={500}
-          className="doc-desc"
-          enterKeyHint="next"
-          onEnter={() => editor.current?.focus()}
-        />
-        <div className="doc-toolbar" role="toolbar" aria-label="Formatierung" data-no-swipe>
-          {tools.map((t, i) =>
-            t === 'sep' ? (
-              <span key={i} className="toolbar-sep" aria-hidden="true" />
-            ) : (
-              <button
-                key={t.label}
-                type="button"
-                className={`icon-btn${t.on ? ' on' : ''}`}
-                aria-label={t.label}
-                title={t.label}
-                aria-pressed={t.on}
-                // mousedown verhindern, damit die Auswahl im Text erhalten bleibt
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={t.run}
-              >
-                <Icon name={t.icon} size={19} />
-              </button>
-            ),
-          )}
-        </div>
-        {formula && (
-          <div className="card formula-bar" data-no-swipe>
-            <div className="field-label">
-              <span>Formel (LaTeX)</span>
-              <span className="muted small">{String.raw`z. B. \frac{a}{b}, x^2, \sqrt{x}, \int_0^1`}</span>
-            </div>
-            <textarea
-              autoFocus
-              rows={2}
-              value={tex}
-              placeholder="\int_0^1 x^2\,dx = \frac{1}{3}"
-              onChange={(e) => updateFormula({ tex: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  finishFormula();
-                } else if (e.key === 'Escape') finishFormula();
-              }}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
+        {!drawOnly && (
+          <>
+            <TextLine autoFocus={!file} value={name} onChange={(v) => (setName(v), setDirty(true))} placeholder="Titel des Dokuments" maxLength={120} className="doc-title" enterKeyHint="next" onEnter={() => editor.current?.focus()} />
+            <TextLine
+              value={description}
+              onChange={(v) => (setDescription(v), setDirty(true))}
+              placeholder="Beschreibung (optional)"
+              maxLength={500}
+              className="doc-desc"
+              enterKeyHint="next"
+              onEnter={() => editor.current?.focus()}
             />
-            <div className="toggle-row small-toggle">
-              <span>In eigener Zeile (zentriert)</span>
-              <input type="checkbox" className="switch" checked={display} onChange={(e) => updateFormula({ display: e.target.checked })} />
-            </div>
-            <div className="input-row">
-              <button className="btn ghost danger" onClick={deleteFormula}>
-                <Icon name="trash" size={18} /> Löschen
-              </button>
-              <button className="btn primary grow" onClick={finishFormula}>
-                Fertig
-              </button>
-            </div>
-          </div>
+          </>
         )}
-        {checklist && inShared && (
-          <div className="card checklist-bar" data-no-swipe onMouseDown={(e) => e.target === e.currentTarget && e.preventDefault()}>
-            <div className="segmented" role="radiogroup" aria-label="Wer hakt ab?">
-              <button type="button" className={!listShared ? 'active' : ''} aria-pressed={!listShared} onMouseDown={(e) => e.preventDefault()} onClick={() => setShared(false)}>
-                <Icon name="user" size={16} /> Jeder für sich
-              </button>
-              <button type="button" className={listShared ? 'active' : ''} aria-pressed={listShared} onMouseDown={(e) => e.preventDefault()} onClick={() => setShared(true)}>
-                <Icon name="users" size={16} /> Gemeinsam
-              </button>
-            </div>
-            <p className="muted small">
-              {listShared
-                ? 'Häkchen gelten für alle Personen im geteilten Ordner.'
-                : 'Jede Person hakt für sich ab – deine Häkchen siehst nur du (auf allen deinen Geräten).'}
-            </p>
-          </div>
-        )}
-        {embedEl && embedData && (
-          <div className="card chart-bar" data-no-swipe>
-            <strong className="grow ellipsis">
-              <Icon name={embedData.kind === 'chart' ? 'chart' : 'wheel'} size={16} /> {embedTitle(embedData)}
-            </strong>
-            <button className="btn ghost small danger" onClick={deleteEmbed}>
-              <Icon name="trash" size={16} /> Löschen
-            </button>
-            <button className="btn ghost small" onClick={embedCopy.run} disabled={!embedCopy.prepared}>
-              <Icon name={embedCopy.done ? 'check' : 'copy'} size={16} /> {embedCopy.done ? 'Kopiert' : 'Kopieren'}
-            </button>
-            <button className="btn primary small" onClick={() => setEmbedEdit({ el: embedEl, kind: embedData.kind, embed: embedData })}>
-              <Icon name="edit" size={16} /> Bearbeiten
-            </button>
-          </div>
-        )}
-        <div className="doc-edit-wrap" ref={wrap}>
+        <PagedDoc
+          pages={pages}
+          flowRef={editor}
+          onLayout={onLayout}
+          editing={pageEditing}
+          ink={inkInput}
+          sizerRef={wrap}
+          overlay={
+            <>
+              {colBoxes.filter((b) => b.box === activeCols).map((b, bi) => {
+                const n = b.cols.length;
+                const btn = (label: string, icon: IconName, run: () => void, danger = false) => (
+                  <button type="button" className={`icon-btn small${danger ? ' danger' : ''}`} aria-label={label} title={label} onClick={run}>
+                    <Icon name={icon} size={icon === 'trash' ? 15 : 16} />
+                  </button>
+                );
+                return (
+                  <div key={bi} data-no-swipe onMouseDown={(e) => e.preventDefault()}>
+                    <div className="cols-active" style={{ left: b.left - 4, top: b.top - 4, width: b.width + 8, height: b.height + 8 }} />
+                    {/* Oben: pro Spalte löschen / rechts einfügen, ganz links zusätzlich links einfügen */}
+                    <div className="cols-overlay cols-top" style={{ left: b.left, top: b.top - 34, width: b.width }}>
+                      {b.cols.map((c, ci) => (
+                        <div key={ci} className="col-bar" style={{ left: c.left, width: c.width }}>
+                          {ci === 0 && n < MAX_COLS ? btn('Spalte links einfügen', 'colAddLeft', () => addCol(b.box, ci, 'left')) : <span className="col-bar-gap" />}
+                          {btn('Spalte löschen', 'trash', () => deleteCol(b.box, ci), true)}
+                          {n < MAX_COLS ? btn('Spalte rechts einfügen', 'colAddRight', () => addCol(b.box, ci, 'right')) : <span className="col-bar-gap" />}
+                        </div>
+                      ))}
+                    </div>
+                    {/* Links: Ecke = Zeile oben einfügen; pro Zeile löschen / darunter einfügen */}
+                    <div className="cols-overlay cols-corner" style={{ left: b.left - 32, top: b.top - 34 }}>
+                      {b.rows[0] && btn('Zeile oben einfügen', 'rowAddAbove', () => addRowAt(b.rows[0].el, 'above'))}
+                    </div>
+                    <div className="cols-overlay cols-side" style={{ left: b.left - 32, top: b.top, height: b.height }}>
+                      {b.rows.map((r, ri) => (
+                        <div key={ri} className="row-bar" style={{ top: r.top, height: r.height }}>
+                          {btn('Zeile löschen', 'trash', () => deleteRow(r.el), true)}
+                          {btn('Zeile darunter einfügen', 'rowAddBelow', () => addRowAt(r.el, 'below'))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {image && box && (
+                <div className="img-frame" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} data-no-swipe>
+                  {HANDLES.map((h) => (
+                    <span key={h} className={`img-handle h-${h}`} onPointerDown={startResize(h)} aria-hidden="true" />
+                  ))}
+                  <span className="img-size">{Math.round(box.width)} px</span>
+                  <div
+                    className={`img-tools${box.left + box.width + 52 <= (wrap.current?.clientWidth ?? 0) ? ' outside' : ''}`}
+                    onPointerDown={(e) => e.preventDefault()}
+                  >
+                    {(
+                      [
+                        ['left', 'rotateLeft', '90° nach links drehen'],
+                        ['right', 'rotateRight', '90° nach rechts drehen'],
+                        ['flipH', 'flipH', 'Horizontal spiegeln (links ↔ rechts)'],
+                        ['flipV', 'flipV', 'Vertikal spiegeln (oben ↔ unten)'],
+                      ] as const
+                    ).map(([op, icon, label]) => (
+                      <button key={op} type="button" aria-label={label} title={label} disabled={turning} onClick={() => transformImage(op)}>
+                        <Icon name={icon} size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          }
+        >
           <div
             ref={editor}
-            className="doc-content doc-editable"
-            contentEditable
+            className={`doc-content doc-editable${drawOnly ? ' draw-only' : ''}`}
+            contentEditable={!drawOnly}
             suppressContentEditableWarning
             role="textbox"
             aria-multiline="true"
@@ -956,66 +1216,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
               }
             }}
           />
-          {colBoxes.map((b, bi) => {
-            const n = b.cols.length;
-            const btn = (label: string, icon: IconName, run: () => void, danger = false) => (
-              <button type="button" className={`icon-btn small${danger ? ' danger' : ''}`} aria-label={label} title={label} onClick={run}>
-                <Icon name={icon} size={icon === 'trash' ? 15 : 16} />
-              </button>
-            );
-            return (
-              <div key={bi} data-no-swipe onMouseDown={(e) => e.preventDefault()}>
-                {/* Oben: pro Spalte löschen / rechts einfügen, ganz links zusätzlich links einfügen */}
-                <div className="cols-overlay cols-top" style={{ left: b.left, top: b.top - 34, width: b.width }}>
-                  {b.cols.map((c, ci) => (
-                    <div key={ci} className="col-bar" style={{ left: c.left, width: c.width }}>
-                      {ci === 0 && n < MAX_COLS ? btn('Spalte links einfügen', 'colAddLeft', () => addCol(b.box, ci, 'left')) : <span className="col-bar-gap" />}
-                      {btn('Spalte löschen', 'trash', () => deleteCol(b.box, ci), true)}
-                      {n < MAX_COLS ? btn('Spalte rechts einfügen', 'colAddRight', () => addCol(b.box, ci, 'right')) : <span className="col-bar-gap" />}
-                    </div>
-                  ))}
-                </div>
-                {/* Links: Ecke = Zeile oben einfügen; pro Zeile löschen / darunter einfügen */}
-                <div className="cols-overlay cols-corner" style={{ left: b.left - 32, top: b.top - 34 }}>
-                  {b.rows[0] && btn('Zeile oben einfügen', 'rowAddAbove', () => addRowAt(b.rows[0].el, 'above'))}
-                </div>
-                <div className="cols-overlay cols-side" style={{ left: b.left - 32, top: b.top, height: b.height }}>
-                  {b.rows.map((r, ri) => (
-                    <div key={ri} className="row-bar" style={{ top: r.top, height: r.height }}>
-                      {btn('Zeile löschen', 'trash', () => deleteRow(r.el), true)}
-                      {btn('Zeile darunter einfügen', 'rowAddBelow', () => addRowAt(r.el, 'below'))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {image && box && (
-            <div className="img-frame" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} data-no-swipe>
-              {HANDLES.map((h) => (
-                <span key={h} className={`img-handle h-${h}`} onPointerDown={startResize(h)} aria-hidden="true" />
-              ))}
-              <span className="img-size">{Math.round(box.width)} px</span>
-              <div
-                className={`img-tools${box.left + box.width + 52 <= (wrap.current?.clientWidth ?? 0) ? ' outside' : ''}`}
-                onPointerDown={(e) => e.preventDefault()}
-              >
-                {(
-                  [
-                    ['left', 'rotateLeft', '90° nach links drehen'],
-                    ['right', 'rotateRight', '90° nach rechts drehen'],
-                    ['flipH', 'flipH', 'Horizontal spiegeln (links ↔ rechts)'],
-                    ['flipV', 'flipV', 'Vertikal spiegeln (oben ↔ unten)'],
-                  ] as const
-                ).map(([op, icon, label]) => (
-                  <button key={op} type="button" aria-label={label} title={label} disabled={turning} onClick={() => transformImage(op)}>
-                    <Icon name={icon} size={18} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        </PagedDoc>
         {image && <p className="muted small">Bild ausgewählt: an den Ecken/Kanten ziehen zum Vergrößern/Verkleinern, mit den Knöpfen am Rand drehen oder spiegeln, Ausrichten mit der Leiste, Entf/⌫ löscht es.</p>}
         <input
           ref={cameraInput}
@@ -1042,6 +1243,7 @@ export function DocEditor({ file, folderId, initial = '', initialName, initialDe
         {err && <p className="notice critical">{err}</p>}
         {checks.notReady && <p className="notice warning">Häkchen werden noch nicht synchronisiert: Bitte supabase/005_checklisten.sql im Supabase „SQL Editor“ ausführen.</p>}
       </div>
+      {paperFor !== null && pages[paperFor] && <PaperSheet page={pages[paperFor]} index={paperFor} onApply={applyPaper} onClose={() => setPaperFor(null)} />}
       {insertKind && (
         <EmbedInsertSheet
           kind={insertKind}
