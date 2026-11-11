@@ -15,7 +15,7 @@ import { FolderPicker } from '../../components/FolderPicker';
 import { FileCard, FolderCard } from './Cards';
 import { FolderEditorSheet } from './FolderEditorSheet';
 import { FileViewer } from './FileViewer';
-import { NoteSheet } from './NoteSheet';
+import { MAX_NOTE_EDIT, NoteEditor, NoteSheet } from './NoteSheet';
 import { AiSheet } from '../ai/AiSheet';
 import type { AiResult } from '../ai/recipes';
 import { ShareSheet } from '../share/ShareSheet';
@@ -90,7 +90,7 @@ function FolderPage({
   const [viewing, setViewing] = useState<FileItem | null>(null);
   // Bearbeiten direkt aus der Liste (ohne die Datei zu öffnen).
   const [editing, setEditing] = useState<
-    { kind: 'folder'; folder: Folder } | { kind: 'file'; file: FileItem } | { kind: 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps'; file: FileItem; text: string } | null
+    { kind: 'folder'; folder: Folder } | { kind: 'file'; file: FileItem } | { kind: 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps' | 'note'; file: FileItem; text: string } | null
   >(null);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -217,7 +217,7 @@ function FolderPage({
   const startEdit = async (item: Folder | FileItem) => {
     if (!('folderId' in item)) return setEditing({ kind: 'folder', folder: item });
     const k = fileKind(item);
-    const editor = k === 'flashcards' ? 'cards' : k === 'quiz' ? 'quiz' : k === 'richtext' ? 'doc' : k === 'chart' ? 'chart' : k === 'wheel' ? 'wheel' : k === 'gaps' ? 'gaps' : null;
+    const editor = k === 'flashcards' ? 'cards' : k === 'quiz' ? 'quiz' : k === 'richtext' ? 'doc' : k === 'chart' ? 'chart' : k === 'wheel' ? 'wheel' : k === 'gaps' ? 'gaps' : k === 'text' ? 'note' : null;
     if (!editor) return setEditing({ kind: 'file', file: item });
     const blob = await loadBlob(item.blobId);
     if (!blob) return alert('Die Datei konnte nicht geladen werden – bist du online?');
@@ -226,7 +226,7 @@ function FolderPage({
   // ✏️ nur für Dateien mit bearbeitbarem Inhalt (Karteikarten, Quiz, Text-Dokumente, Diagramme).
   const editProp = (item: Folder | FileItem) => ({
     onEdit:
-      'folderId' in item && ['flashcards', 'quiz', 'richtext', 'chart', 'wheel', 'gaps'].includes(fileKind(item)) && canModify(item) && (!item.shareId || lib.online)
+      'folderId' in item && (['flashcards', 'quiz', 'richtext', 'chart', 'wheel', 'gaps'].includes(fileKind(item)) || (fileKind(item) === 'text' && item.size <= MAX_NOTE_EDIT)) && canModify(item) && (!item.shareId || lib.online)
         ? () => startEdit(item)
         : undefined,
   });
@@ -529,6 +529,7 @@ function FolderPage({
       {editing?.kind === 'doc' && <DocEditor file={editing.file} initial={editing.text} onClose={() => setEditing(null)} />}
       {editing?.kind === 'chart' && <ChartEditor file={editing.file} initial={parseChart(editing.text)} onClose={() => setEditing(null)} />}
       {editing?.kind === 'wheel' && <WheelEditor file={editing.file} initial={parseWheel(editing.text)} onClose={() => setEditing(null)} />}
+      {editing?.kind === 'note' && <NoteEditor file={editing.file} initial={editing.text} onClose={() => setEditing(null)} />}
       {editing?.kind === 'gaps' && <GapsEditor file={editing.file} initial={parseGapsDoc(editing.text)} onClose={() => setEditing(null)} />}
     </section>
   );

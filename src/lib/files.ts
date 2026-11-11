@@ -83,6 +83,9 @@ export function splitName(filename: string): { name: string; ext: string } {
 }
 
 export const fullName = (f: Pick<FileItem, 'name' | 'ext'>) => (f.ext ? `${f.name}.${f.ext}` : f.name);
+/** Name zum Anzeigen: bei den App-eigenen Dateien (Karteikarten, Quiz …) ohne Endung – die Art steht ohnehin daneben. */
+export const shownName = (f: FileItem) => (APP_KINDS.includes(fileKind(f)) ? f.name : fullName(f));
+const APP_KINDS: string[] = ['flashcards', 'quiz', 'richtext', 'chart', 'wheel', 'gaps'];
 
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

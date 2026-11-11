@@ -1096,6 +1096,17 @@ input.narrow {
 .viewer-audio {
   max-width: 560px;
 }
+/* Notiz bearbeiten: Knopf über dem Text, großes Textfeld */
+.note-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+textarea.note-text {
+  min-height: 50dvh;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.92rem;
+}
 .viewer-text {
   margin: 0;
   padding: 16px;

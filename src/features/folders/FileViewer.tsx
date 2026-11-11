@@ -4,7 +4,7 @@ import { pathOf } from '../../domain/tree';
 import { loadBlob } from '../../storage/blobs';
 import { useLibrary } from '../../state/Library';
 import { Icon } from '../../components/Icon';
-import { downloadBlob, fileKind, formatDate, formatSize, fullName, isTouchDevice, KIND_LABEL } from '../../lib/files';
+import { downloadBlob, fileKind, formatDate, formatSize, fullName, isTouchDevice, KIND_LABEL, shownName } from '../../lib/files';
 import { PdfView } from './PdfView';
 import { useBackToClose } from '../../lib/router';
 import { FileEditorSheet } from './FileEditorSheet';
@@ -18,6 +18,7 @@ import { ChartPanel } from '../charts/ChartPanel';
 import { WheelPanel } from '../wheel/WheelPanel';
 import { openLightbox } from '../../components/Lightbox';
 import { GapsPanel } from '../gaps/GapsPanel';
+import { NotePanel } from './NoteSheet';
 
 const MAX_TEXT = 2 * 1024 * 1024;
 
@@ -73,6 +74,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   if (!file) return null;
 
   const name = fullName(file);
+  const title = shownName(file);
   // Kommentare gibt es für Dateien auf dem Server (geteilt oder „Auf allen Geräten“).
   const canComment = cloudEnabled && !!file.shareId && !!me && !isOrphan(file.folderId);
   const comments = commentInfo(file.id);
@@ -120,7 +122,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   else if (kind === 'video') body = <video className="viewer-media" src={url} controls playsInline />;
   else if (kind === 'audio') body = <audio className="viewer-audio" src={url} controls />;
   else if (kind === 'pdf') body = <PdfView blob={blob} />;
-  else if (kind === 'text' && text !== null) body = <pre className="viewer-text">{text}</pre>;
+  else if (kind === 'text' && text !== null) body = <NotePanel file={file} text={text} />;
   else if (kind === 'flashcards' && text !== null) body = <CardsPanel file={file} text={text} />;
   else if (kind === 'quiz' && text !== null) body = <QuizPanel file={file} text={text} />;
   else if (kind === 'richtext' && text !== null) body = <DocPanel file={file} text={text} />;
@@ -148,13 +150,13 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const where = pathOf(folders, file.folderId).map((p) => p.name).join(' / ');
 
   return (
-    <div className="viewer" role="dialog" aria-modal="true" aria-label={name}>
+    <div className="viewer" role="dialog" aria-modal="true" aria-label={title}>
       <header className="viewer-header">
         <button className="icon-btn" aria-label="Schließen" onClick={onClose}>
           <Icon name="back" />
         </button>
         <div className="viewer-title">
-          <strong className="wrap-text">{name}</strong>
+          <strong className="wrap-text">{title}</strong>
           <span className="muted small ellipsis">
             {KIND_LABEL[kind]} · {formatSize(file.size)} · {formatDate(file.createdAt)}
           </span>

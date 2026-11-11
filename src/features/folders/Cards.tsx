@@ -7,7 +7,7 @@ import { Icon } from '../../components/Icon';
 import { Avatar } from '../../components/Avatar';
 import { describe } from '../changes/diff';
 import { useLongPress } from '../../hooks/useLongPress';
-import { fileKind, formatSize, fullName, KIND_LABEL } from '../../lib/files';
+import { fileKind, formatSize, KIND_LABEL, shownName } from '../../lib/files';
 
 export interface ItemCardProps {
   onClick: () => void;
@@ -121,8 +121,8 @@ export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file:
   const comments = commentInfo(file.id);
   const changes = changesFor(file.id);
   return (
-    <ItemCard {...rest} thumb={<FileThumb file={file} expand={!rest.selecting} />} label={fullName(file)}>
-      <strong className="wrap-text">{fullName(file)}</strong>
+    <ItemCard {...rest} thumb={<FileThumb file={file} expand={!rest.selecting} />} label={shownName(file)}>
+      <strong className="wrap-text">{shownName(file)}</strong>
       {path && <span className="muted small wrap-text">{path}</span>}
       {file.description && <span className="muted small wrap-text">{file.description}</span>}
       {changes.length > 0 && (
