@@ -294,8 +294,13 @@ function FolderPage({
           </header>
           <SharedInfo folder={folder} onPeople={() => setSheet('share')} />
           <div className="action-row">
-            <button className="btn primary" onClick={() => setSheet('menu')} disabled={!canAdd}>
-              <Icon name="plus" size={18} /> Hinzufügen <Icon name="chevron" size={16} />
+            <button className="btn primary add-btn" onClick={() => setSheet('menu')} disabled={!canAdd}>
+              <Icon name="plus" size={18} />
+              <span className="add-btn-text">
+                Hinzufügen
+                <small>Dateien, Text-Dokumente, Karteikarten, Quiz …</small>
+              </span>
+              <Icon name="chevron" size={16} />
             </button>
             <button className="btn ghost" onClick={() => setSheet('newFolder')} disabled={!canAdd || !canSub} title={canSub ? undefined : 'Maximale Tiefe erreicht'}>
               <Icon name="folderPlus" size={18} /> Neuer Unterordner
@@ -704,22 +709,23 @@ const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; text: string;
 
 /** Auswahl, was in den Ordner hinzugefügt werden soll. */
 function AddMenu({ onPick, onClose }: { onPick: (c: AddChoice) => void; onClose: () => void }) {
-  return (
-    <Sheet title="Hinzufügen" onClose={onClose}>
-      <div className="add-menu">
-        {ADD_OPTIONS.filter((o) => !o.touchOnly || isTouchDevice).map((o) => (
-          <button key={o.id} className="card card-btn row-card add-option" onClick={() => onPick(o.id)}>
-            <span className={`thumb add-icon add-${o.id}`}>
-              <Icon name={o.icon} size={22} />
-            </span>
-            <div className="card-main">
-              <strong>{o.title}</strong>
-              <span className="muted small">{o.text}</span>
-            </div>
-            <Icon name="chevron" />
-          </button>
-        ))}
+  const option = (o: (typeof ADD_OPTIONS)[number]) => (
+    <button key={o.id} className="card card-btn row-card add-option" onClick={() => onPick(o.id)}>
+      <span className={`thumb add-icon add-${o.id}`}>
+        <Icon name={o.icon} size={22} />
+      </span>
+      <div className="card-main">
+        <strong>{o.title}</strong>
+        <span className="muted small">{o.text}</span>
       </div>
+      <Icon name="chevron" />
+    </button>
+  );
+  const ai = ADD_OPTIONS.find((o) => o.id === 'ai')!;
+  return (
+    // "Mit KI erstellen" bleibt immer unten sichtbar, nur die übrigen Möglichkeiten scrollen
+    <Sheet title="Hinzufügen" onClose={onClose} footer={<div className="add-menu-ai">{option(ai)}</div>}>
+      <div className="add-menu">{ADD_OPTIONS.filter((o) => o.id !== 'ai' && (!o.touchOnly || isTouchDevice)).map(option)}</div>
     </Sheet>
   );
 }
