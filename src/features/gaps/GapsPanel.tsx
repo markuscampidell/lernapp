@@ -98,6 +98,8 @@ function GapsPlay({ title, doc, initialMode, onClose }: { title: string; doc: Ga
   const [values, setValues] = useState<Record<string, string>>({});
   const [selToken, setSelToken] = useState<string | null>(null);
   const [selGap, setSelGap] = useState<string | null>(null);
+  // Wortliste einklappen (bei vielen Lücken verdeckt sie sonst den Text)
+  const [bankOpen, setBankOpen] = useState(true);
   const [verdicts, setVerdicts] = useState<Record<string, Verdict> | null>(null);
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -284,10 +286,16 @@ function GapsPlay({ title, doc, initialMode, onClose }: { title: string; doc: Ga
               if (gap) unplace(gap);
             }}
           >
-            {freeTokens.length === 0 ? (
-              <span className="muted small">Alle Wörter sind verteilt.</span>
-            ) : (
-              freeTokens.map((t) => (
+            <button type="button" className="gap-bank-head" onClick={() => setBankOpen((o) => !o)} aria-expanded={bankOpen}>
+              <span className="muted small">{freeTokens.length === 0 ? 'Alle Wörter sind verteilt.' : `Wörter (${freeTokens.length})`}</span>
+              <span className="gap-bank-toggle">
+                {bankOpen ? 'Einklappen' : 'Ausklappen'}
+                <Icon name="chevron" size={16} />
+              </span>
+            </button>
+            {bankOpen && freeTokens.length > 0 && (
+              <div className="gap-bank-words">
+              {freeTokens.map((t) => (
                 <button
                   key={t.id}
                   type="button"
@@ -298,7 +306,8 @@ function GapsPlay({ title, doc, initialMode, onClose }: { title: string; doc: Ga
                 >
                   {t.text}
                 </button>
-              ))
+              ))}
+              </div>
             )}
           </div>
         )}

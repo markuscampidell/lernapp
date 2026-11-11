@@ -2957,16 +2957,47 @@ input.gap-input:disabled { opacity: 1; }
 .gap-solution.almost { color: var(--warning); }
 .gap-bank {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  min-height: 56px;
+  padding: 8px 12px 12px;
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow);
   position: sticky;
   bottom: 8px;
   z-index: 2;
+}
+/* Viele Lücken: die Wortliste wird nie höher als etwa ein Drittel des Bildschirms und scrollt dann selbst */
+.gap-bank-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: min(32dvh, 260px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gap-bank-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  width: 100%;
+  text-align: left;
+}
+.gap-bank-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.gap-bank-toggle svg { transform: rotate(90deg); transition: transform 0.15s; }
+.gap-bank-head[aria-expanded='false'] .gap-bank-toggle svg { transform: rotate(-90deg); }
+@media (max-width: 600px) {
+  .gap-bank-words { gap: 6px; }
+  .gap-bank-words .gap-token { padding: 5px 11px; font-size: 0.92rem; }
 }
 .gap-token {
   padding: 7px 14px;
