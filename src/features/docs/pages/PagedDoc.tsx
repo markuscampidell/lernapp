@@ -192,6 +192,8 @@ export function PagedDoc({ pages: given, flowRef, children, onLayout, editing, i
         setTextPages(pagesNeeded);
         onLayoutRef.current?.(pagesNeeded);
       }
+      // Blöcke können sich verschoben haben (Rahmen um ausgewählte Bilder, Spalten-Knöpfe neu ausrichten)
+      flow.dispatchEvent(new Event('paginated'));
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(run);

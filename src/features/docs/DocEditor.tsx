@@ -23,7 +23,7 @@ import { PenBar, usePenSettings } from './pages/PenBar';
 import { PaperSheet } from './pages/PaperSheet';
 import { joinDoc, newPage, splitDoc, type InkPage, type Stroke } from './pages/ink';
 import { reorderPages } from './pages/paginate';
-import { PAGE_W, typesText } from './pages/geometry';
+import { CONTENT_H, PAGE_W, typesText } from './pages/geometry';
 
 /** Lage eines Spalten-Blocks, seiner Spalten und Zeilen (für die Knöpfe oben und links). */
 interface ColBox {
@@ -47,6 +47,28 @@ type Align = 'left' | 'center' | 'right';
 type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const MIN_IMAGE = 40;
+/** Höchste Bildhöhe (Seiten-Pixel): ein Bild passt immer auf eine Seite. Gleicher Wert wie in global.css (.paged-flow img). */
+const MAX_IMAGE_H = CONTENT_H - 24;
+
+/** Zu hohe Bilder (z. B. Handy-Screenshots) so schmal machen, dass sie auf eine Seite passen. true = geändert. */
+function fitImage(img: HTMLImageElement): boolean {
+  if (!img.naturalWidth || !img.naturalHeight || img.closest(EMBED_SELECTOR)) return false;
+  const ratio = img.naturalHeight / img.naturalWidth;
+  const attr = parseFloat(img.getAttribute('width') ?? '');
+  const room = img.parentElement?.clientWidth || Infinity;
+  const w = Math.min(attr > 0 ? attr : img.naturalWidth, room);
+  if (w * ratio <= MAX_IMAGE_H + 0.5) return false;
+  img.setAttribute('width', String(Math.max(MIN_IMAGE, Math.floor(MAX_IMAGE_H / ratio))));
+  img.style.removeProperty('height');
+  return true;
+}
+
+/** Steht in diesem Absatz nur das Bild (kein Text, keine Formel)? */
+const onlyImage = (block: Element) => !block.textContent?.trim() && block.querySelectorAll('img').length === 1 && !block.querySelector('span.math, figure');
+/** Leer (nichts Sichtbares mehr drin)? */
+const isEmptyBlock = (block: Element) => !block.textContent?.trim() && !block.querySelector('img, span.math, figure, hr');
+/** Behälter, in denen Blöcke untereinander stehen: das Dokument selbst und Spalten-Zellen. */
+const isBlockHost = (el: Element, root: Element) => el === root || (el.tagName === 'DIV' && el.classList.contains('col'));
 
 /** Text-Dokument mit Formatierung und Bildern bearbeiten (wie ein einfaches Google Doc). */
 /** Seiten an die Textlänge anpassen: fehlende anlegen, automatisch angelegte leere wieder entfernen. */
@@ -298,7 +320,7 @@ export function DocEditor({
     const k = zoomNow();
     const startW = image.getBoundingClientRect().width / k;
     const ratio = image.naturalHeight && image.naturalWidth ? image.naturalHeight / image.naturalWidth : image.offsetHeight / Math.max(1, image.offsetWidth);
-    const maxW = editor.current.clientWidth - 40;
+    const maxW = Math.min(editor.current.clientWidth - 40, MAX_IMAGE_H / ratio);
     const sx = handle.includes('e') ? 1 : handle.includes('w') ? -1 : 0;
     const sy = handle.includes('s') ? 1 : handle.includes('n') ? -1 : 0;
     // Bei mittiger Ausrichtung wächst das Bild nach beiden Seiten – dann zählt die Bewegung doppelt.
@@ -322,6 +344,195 @@ export function DocEditor({
     target.addEventListener('pointerup', up);
     target.addEventListener('pointercancel', up);
   };
+
+  // ---------- Bilder verschieben (Ziehen mit der Maus, Pfeile am Bild) ----------
+  // Ein Bild steht immer in einem eigenen Absatz zwischen den anderen Blöcken – nie mitten im Text
+  // (der Browser würde es sonst irgendwo zwischen zwei Buchstaben fallen lassen).
+  type Spot = { host: Element; ref: Element | null; line: { left: number; top: number; width: number } };
+  const dragImg = useRef<HTMLImageElement | null>(null);
+  const [dropLine, setDropLine] = useState<Spot['line'] | null>(null);
+
+  /** Wohin ein Bild beim Loslassen an dieser Bildschirmstelle kommt (vor welchen Block). */
+  const dropSpot = (x: number, y: number): Spot | null => {
+    const root = editor.current;
+    const w = wrap.current;
+    if (!root || !w) return null;
+    let host: Element = root;
+    const hit = document.elementFromPoint(x, y);
+    const cell = hit && hit !== root && root.contains(hit) ? hit.closest('div.col') : null;
+    if (cell && root.contains(cell)) host = cell;
+    const kids = Array.from(host.children).filter((c) => getComputedStyle(c).display !== 'none');
+    let ref: Element | null = null;
+    for (const c of kids) {
+      const r = c.getBoundingClientRect();
+      if (y < r.top + r.height / 2) {
+        ref = c;
+        break;
+      }
+    }
+    const wr = w.getBoundingClientRect();
+    const hr = host.getBoundingClientRect();
+    const prev = ref ? ref.previousElementSibling : kids[kids.length - 1] ?? null;
+    // Linie unter dem vorigen Block (liegt der nächste schon auf der nächsten Seite, bleibt sie am Ende dieser Seite)
+    const top = prev ? prev.getBoundingClientRect().bottom : ref ? ref.getBoundingClientRect().top : hr.top;
+    return { host, ref, line: { left: hr.left - wr.left, top: top - wr.top, width: hr.width } };
+  };
+
+  /** Absatz, aus dem ein Bild herausgenommen wurde: ist er jetzt leer, kommt er weg. */
+  const tidyAfterMove = (from: Element | null) => {
+    const root = editor.current;
+    const block = from?.closest('p, h2, h3, li, blockquote');
+    if (!root || !block || !root.contains(block) || !isEmptyBlock(block)) return;
+    const host = block.parentElement;
+    if (host && host.children.length === 1 && isBlockHost(host, root)) block.innerHTML = '<br>';
+    else block.remove();
+  };
+
+  /** Bild als eigenen Absatz an diese Stelle setzen. */
+  const moveImageTo = (img: HTMLImageElement, spot: Spot) => {
+    const root = editor.current;
+    if (!root || !root.contains(img)) return;
+    const par = img.parentElement;
+    const whole = !!par && par.tagName === 'P' && !!par.parentElement && isBlockHost(par.parentElement, root) && onlyImage(par);
+    if (whole && (spot.ref === par || spot.ref === par.nextElementSibling)) return; // bleibt, wo es ist
+    if (whole) spot.host.insertBefore(par, spot.ref);
+    else {
+      const p = document.createElement('p');
+      p.appendChild(img);
+      spot.host.insertBefore(p, spot.ref);
+      tidyAfterMove(par);
+    }
+    normalize();
+    setDirty(true);
+    setImage(img);
+    requestAnimationFrame(measure);
+  };
+
+  /** Ausgewähltes Bild einen Block nach oben/unten schieben (geht auch am Handy). */
+  const stepImage = (dir: -1 | 1) => {
+    const root = editor.current;
+    const img = image;
+    if (!root || !img || !root.contains(img)) return;
+    const par = img.parentElement!;
+    if (par.tagName === 'P' && par.parentElement && isBlockHost(par.parentElement, root) && onlyImage(par)) {
+      const sib = dir < 0 ? par.previousElementSibling : par.nextElementSibling;
+      if (!sib) return;
+      if (dir < 0) sib.before(par);
+      else sib.after(par);
+    } else {
+      // Bild steht im Text: als eigenen Absatz davor bzw. danach herauslösen
+      let top: Element = par;
+      while (top.parentElement && !isBlockHost(top.parentElement, root)) top = top.parentElement;
+      if (top === root) return;
+      const p = document.createElement('p');
+      p.appendChild(img);
+      if (dir < 0) top.before(p);
+      else top.after(p);
+      tidyAfterMove(par);
+    }
+    normalize();
+    setDirty(true);
+    requestAnimationFrame(() => {
+      img.scrollIntoView({ block: 'nearest' });
+      measure();
+    });
+  };
+
+  /** Bilder (Dateien) direkt an der Stelle einfügen, an der sie losgelassen wurden. */
+  const dropFiles = async (files: File[], spot: Spot) => {
+    for (const f of files) {
+      const url = await imageToDataUrl(f);
+      if (!url) {
+        setErr('Dieses Bild konnte nicht gelesen werden.');
+        continue;
+      }
+      const p = document.createElement('p');
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      p.appendChild(img);
+      spot.host.insertBefore(p, spot.ref);
+    }
+    normalize();
+    setDirty(true);
+  };
+
+  const dnd = useRef({ dropSpot, moveImageTo, dropFiles });
+  dnd.current = { dropSpot, moveImageTo, dropFiles };
+  useEffect(() => {
+    const root = editor.current;
+    const w = wrap.current;
+    if (!root || !w) return;
+    const start = (e: DragEvent) => {
+      const t = e.target;
+      dragImg.current = t instanceof HTMLImageElement && root.contains(t) && !t.closest(EMBED_SELECTOR) ? t : null;
+    };
+    const wanted = (e: DragEvent) => !drawingRef.current && (!!dragImg.current || !!e.dataTransfer?.types.includes('Files'));
+    const over = (e: DragEvent) => {
+      if (!wanted(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = dragImg.current ? 'move' : 'copy';
+      const spot = dnd.current.dropSpot(e.clientX, e.clientY);
+      setDropLine((prev) => (spot && prev && prev.top === spot.line.top && prev.left === spot.line.left ? prev : spot?.line ?? null));
+    };
+    const leave = (e: DragEvent) => {
+      if (!(e.relatedTarget instanceof Node) || !w.contains(e.relatedTarget)) setDropLine(null);
+    };
+    const drop = (e: DragEvent) => {
+      if (!wanted(e)) return;
+      const img = dragImg.current;
+      const files = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/'));
+      if (!img && !files.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDropLine(null);
+      dragImg.current = null;
+      const spot = dnd.current.dropSpot(e.clientX, e.clientY);
+      if (!spot) return;
+      if (img) dnd.current.moveImageTo(img, spot);
+      else void dnd.current.dropFiles(files, spot);
+    };
+    const end = () => {
+      dragImg.current = null;
+      setDropLine(null);
+    };
+    root.addEventListener('dragstart', start);
+    w.addEventListener('dragover', over);
+    w.addEventListener('dragleave', leave);
+    w.addEventListener('drop', drop, true);
+    document.addEventListener('dragend', end);
+    return () => {
+      root.removeEventListener('dragstart', start);
+      w.removeEventListener('dragover', over);
+      w.removeEventListener('dragleave', leave);
+      w.removeEventListener('drop', drop, true);
+      document.removeEventListener('dragend', end);
+    };
+  }, []);
+
+  // Zu hohe Bilder an die Seite anpassen (beim Öffnen, Einfügen, Drehen …)
+  useEffect(() => {
+    const root = editor.current;
+    if (!root) return;
+    const onLoad = (e: Event) => {
+      if (e.target instanceof HTMLImageElement && root.contains(e.target)) fitImage(e.target);
+    };
+    root.addEventListener('load', onLoad, true);
+    root.querySelectorAll('img').forEach((img) => img.complete && fitImage(img));
+    return () => root.removeEventListener('load', onLoad, true);
+  }, []);
+
+  // Nach jedem Seitenumbruch: Bild-Rahmen und Spalten-Knöpfe an die neue Lage anpassen
+  useEffect(() => {
+    const root = editor.current;
+    if (!root) return;
+    const on = () => {
+      measure();
+      measureCols();
+    };
+    root.addEventListener('paginated', on);
+    return () => root.removeEventListener('paginated', on);
+  }, [measure, measureCols]);
 
   // ---------- Bild drehen / spiegeln ----------
   // Das Bild wird neu gezeichnet und ersetzt – so sieht es überall gleich aus (auch in älteren App-Versionen).
@@ -821,7 +1032,9 @@ export function DocEditor({
     if (!image) return;
     if (e.key === 'Backspace' || e.key === 'Delete') {
       e.preventDefault();
+      const par = image.parentElement;
       image.remove();
+      tidyAfterMove(par);
       setImage(null);
       setDirty(true);
     } else if (e.key !== 'Shift') setImage(null);
@@ -1196,6 +1409,7 @@ export function DocEditor({
                   </div>
                 );
               })}
+              {dropLine && <div className="img-drop-line" style={{ left: dropLine.left, top: dropLine.top, width: dropLine.width }} />}
               {image && box && (
                 <div className="img-frame" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} data-no-swipe>
                   {HANDLES.map((h) => (
@@ -1218,6 +1432,12 @@ export function DocEditor({
                         <Icon name={icon} size={18} />
                       </button>
                     ))}
+                    <button type="button" aria-label="Bild nach oben verschieben" title="Nach oben verschieben" onClick={() => stepImage(-1)}>
+                      <Icon name="arrowUp" size={18} />
+                    </button>
+                    <button type="button" aria-label="Bild nach unten verschieben" title="Nach unten verschieben" onClick={() => stepImage(1)}>
+                      <Icon name="arrowDown" size={18} />
+                    </button>
                   </div>
                 </div>
               )}
@@ -1247,12 +1467,6 @@ export function DocEditor({
             onClick={onEditorClick}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
-            onDrop={(e) => {
-              if (e.dataTransfer.files.length) {
-                e.preventDefault();
-                insertImages(e.dataTransfer.files);
-              }
-            }}
           />
         </PagedDoc>
         {image && <p className="muted small">Bild ausgewählt: an den Ecken/Kanten ziehen zum Vergrößern/Verkleinern, mit den Knöpfen am Rand drehen oder spiegeln, Ausrichten mit der Leiste, Entf/⌫ löscht es.</p>}

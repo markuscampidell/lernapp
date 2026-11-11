@@ -1879,6 +1879,21 @@ textarea.text-line.doc-title {
 .doc-editable img {
   cursor: pointer;
 }
+/* Auf A4-Seiten passt ein Bild immer auf eine Seite (sonst ragt es über den Seitenrand in die Lücke). Gleicher Wert wie MAX_IMAGE_H. */
+.paged-flow .doc-content img {
+  max-height: 955px;
+  object-fit: contain;
+}
+/* Wohin ein gezogenes Bild kommt */
+.img-drop-line {
+  position: absolute;
+  z-index: 5;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+  background: var(--info);
+  pointer-events: none;
+}
 .doc-edit-wrap {
   position: relative;
 }
