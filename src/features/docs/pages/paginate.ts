@@ -28,12 +28,15 @@ function selectorOf(el: Element, flow: HTMLElement): string {
 
 /** Maße relativ zum Textfluss – in Seiten-Pixeln (unabhängig vom Zoom). */
 function measurer(flow: HTMLElement) {
-  const fr = flow.getBoundingClientRect();
-  const s = flow.offsetWidth ? fr.width / flow.offsetWidth : 1;
+  const s = flow.offsetWidth ? flow.getBoundingClientRect().width / flow.offsetWidth : 1;
+  // Die Lage des Textflusses jedes Mal neu messen: Schiebt die Seitenaufteilung Blöcke nach unten, scrollt
+  // der Browser oft mit (Scroll-Anker), und eine einmal gemerkte Lage wäre dann um genau dieses Stück falsch –
+  // Bilder landeten zwischen den Seiten oder unter der letzten Seite.
+  const origin = () => flow.getBoundingClientRect().top;
   return {
-    top: (el: Element) => (el.getBoundingClientRect().top - fr.top) / s,
+    top: (el: Element) => (el.getBoundingClientRect().top - origin()) / s,
     height: (el: Element) => el.getBoundingClientRect().height / s,
-    bottom: (el: Element) => (el.getBoundingClientRect().bottom - fr.top) / s,
+    bottom: (el: Element) => (el.getBoundingClientRect().bottom - origin()) / s,
   };
 }
 
