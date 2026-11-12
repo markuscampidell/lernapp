@@ -863,8 +863,47 @@ export function DocEditor({
         setErr('Dieses Bild konnte nicht gelesen werden.');
         continue;
       }
-      cmd('insertHTML', `<p><img src="${url}" alt=""></p><p><br></p>`);
+      placeImage(url);
     }
+  };
+  /**
+   * Bild als eigenen Absatz hinter den Absatz mit dem Cursor setzen (bzw. statt eines leeren Absatzes),
+   * danach steht der Cursor in einem leeren Absatz unter dem Bild – so landen mehrere Bilder untereinander.
+   * (insertHTML würde das Bild oft mitten in den aktuellen Absatz legen.)
+   */
+  const placeImage = (url: string) => {
+    const root = editor.current;
+    if (!root) return;
+    root.focus();
+    const sel = document.getSelection();
+    let at: Node | null = sel && sel.rangeCount && root.contains(sel.anchorNode) ? sel.anchorNode : (savedRange.current?.startContainer ?? null);
+    if (!at || !root.contains(at)) at = null;
+    // Absatz direkt im Dokument bzw. in einer Spalten-Zelle finden
+    let block: Element | null = at ? (at instanceof Element ? at : at.parentElement) : null;
+    while (block && block !== root && !(block.parentElement && isBlockHost(block.parentElement, root))) block = block.parentElement;
+    if (block === root) block = null;
+    const p = document.createElement('p');
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = '';
+    p.appendChild(img);
+    const after = document.createElement('p');
+    after.appendChild(document.createElement('br'));
+    if (block && isEmptyBlock(block)) block.replaceWith(p);
+    else if (block) block.after(p);
+    else root.appendChild(p);
+    const next = p.nextElementSibling;
+    let cursorP: Element = after;
+    if (next && next.tagName === 'P' && isEmptyBlock(next)) cursorP = next;
+    else p.after(after);
+    const r = document.createRange();
+    r.setStart(cursorP, 0);
+    r.collapse(true);
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+    normalize();
+    setDirty(true);
+    requestAnimationFrame(measure);
   };
 
   const onPaste = (e: React.ClipboardEvent) => {

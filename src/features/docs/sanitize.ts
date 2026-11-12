@@ -222,6 +222,63 @@ export function normalizeBlocks(root: ParentNode): boolean {
   }
   // Leere Absätze, die dabei entstanden sind (nur Leerraum), entfernen.
   if (changed) root.querySelectorAll('p').forEach((p) => !p.textContent?.trim() && !p.querySelector('img, br, span.math') && p.remove());
+  if (isolateImages(root)) changed = true;
+  return changed;
+}
+
+/**
+ * Jedes Bild steht in einem eigenen Absatz. Stehen mehrere Bilder (oder Bild und Text) in einem Absatz,
+ * wird er aufgeteilt – sonst rutscht der ganze Absatz als ein großer Block auf die nächste Seite
+ * (große Lücken) und Bilder lassen sich nicht einzeln dazwischen verschieben.
+ * Nur Absätze direkt im Dokument bzw. in einer Spalten-Zelle; Bilder in Listen o. Ä. bleiben, wo sie sind.
+ */
+function isolateImages(root: ParentNode): boolean {
+  let changed = false;
+  const isImg = (n: Node): n is HTMLImageElement => n.nodeType === Node.ELEMENT_NODE && (n as Element).tagName === 'IMG';
+  const isGap = (n: Node) =>
+    (n.nodeType === Node.TEXT_NODE && !(n.textContent ?? '').replace(/\u200b/g, '').trim()) || (n.nodeType === Node.ELEMENT_NODE && (n as Element).tagName === 'BR');
+  for (const p of Array.from(root.querySelectorAll('p'))) {
+    const host = p.parentElement;
+    if (!host || !(host === root || (host.tagName === 'DIV' && host.classList.contains('col')) || host.tagName === 'BODY')) continue;
+    const kids = Array.from(p.childNodes);
+    const imgs = kids.filter(isImg);
+    if (!imgs.length) continue;
+    // Nur ein Bild (höchstens mit Leerraum/Zeilenumbruch daneben) – passt schon.
+    if (imgs.length === 1 && kids.every((k) => isImg(k) || isGap(k))) continue;
+    changed = true;
+    const doc = p.ownerDocument;
+    const make = () => {
+      const n = doc.createElement('p');
+      if (p.style.textAlign) n.style.textAlign = p.style.textAlign;
+      if (p.dataset.indent) n.dataset.indent = p.dataset.indent;
+      return n;
+    };
+    const parts: HTMLElement[] = [];
+    let run: HTMLElement | null = null;
+    for (const k of kids) {
+      if (isImg(k)) {
+        run = null;
+        const box = make();
+        box.appendChild(k);
+        parts.push(box);
+        continue;
+      }
+      if (!run) {
+        run = make();
+        parts.push(run);
+      }
+      run.appendChild(k);
+    }
+    // Text-Stücke, die nur aus Leerraum/Zeilenumbrüchen bestehen, fallen weg.
+    const keep = parts.filter((x) => x.querySelector('img') || !Array.from(x.childNodes).every(isGap));
+    p.replaceWith(...keep);
+    // Zeilenumbrüche am Rand eines Text-Stücks (stammten von zwischen den Bildern) entfernen
+    for (const x of keep) {
+      if (x.querySelector('img')) continue;
+      while (x.firstChild && isGap(x.firstChild)) x.firstChild.remove();
+      while (x.lastChild && isGap(x.lastChild)) x.lastChild.remove();
+    }
+  }
   return changed;
 }
 
