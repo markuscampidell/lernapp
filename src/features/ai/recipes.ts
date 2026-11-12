@@ -12,14 +12,16 @@ export type AiKind = 'cards' | 'quiz' | 'gaps' | 'doc' | 'note' | 'chart' | 'whe
 
 export interface AiSettings {
   kind: AiKind;
-  topic: string;
+  /** „Nur aus meinen Unterlagen“ oder „KI darf selbst ergänzen“ (eigenes Wissen, Internetsuche) */
+  source: 'materials' | 'open';
+  /** Die große Frage: Was soll mit den Unterlagen passieren, besondere Wünsche? */
+  wish: string;
   language: 'de' | 'en' | 'material';
-  level: 'basic' | 'medium' | 'exam';
-  /** Anzahl Karten / Fragen / Datenpunkte / Einträge */
-  count: number;
-  extra: string;
+  /** Anzahl Karten / Fragen / Lücken / Datenpunkte / Einträge – null = die KI entscheidet */
+  count: number | null;
   cardStyle: 'mixed' | 'term' | 'question';
-  answers: number;
+  /** Antworten pro Quizfrage – null = die KI entscheidet */
+  answers: number | null;
   multi: boolean;
   docStyle: 'summary' | 'sheet' | 'explain' | 'outline';
   length: 'short' | 'medium' | 'long';
@@ -30,13 +32,12 @@ export interface AiSettings {
 
 export const DEFAULT_SETTINGS: AiSettings = {
   kind: 'cards',
-  topic: '',
+  source: 'materials',
+  wish: '',
   language: 'material',
-  level: 'medium',
-  count: 20,
-  extra: '',
+  count: null,
   cardStyle: 'mixed',
-  answers: 4,
+  answers: null,
   multi: false,
   docStyle: 'summary',
   length: 'medium',
@@ -79,16 +80,11 @@ export const KINDS: {
   { id: 'gaps', icon: 'gaps', label: 'Lückentext', count: { label: 'Anzahl Lücken', min: 3, max: 60, def: 12 }, text: 'Wörter einsetzen oder selbst schreiben' },
   { id: 'doc', icon: 'richdoc', label: 'Text-Dokument', count: null, text: 'Zusammenfassung, Lernzettel, Erklärung …' },
   { id: 'note', icon: 'text', label: 'Notiz', count: null, text: 'Kurzer reiner Text' },
-  { id: 'chart', icon: 'chart', label: 'Diagramm', count: { label: 'Höchstens Datenpunkte', min: 2, max: MAX_POINTS, def: 8 }, text: 'Zahlen als Säulen, Linie, Kreis …' },
+  { id: 'chart', icon: 'chart', label: 'Diagramm', count: { label: 'Anzahl Datenpunkte', min: 2, max: MAX_POINTS, def: 8 }, text: 'Zahlen als Säulen, Linie, Kreis …' },
   { id: 'wheel', icon: 'wheel', label: 'Glücksrad', count: { label: 'Anzahl Einträge', min: 2, max: MAX_ENTRIES, def: 12 }, text: 'Zufällig Themen oder Aufgaben ziehen' },
 ];
 export const kindInfo = (k: AiKind) => KINDS.find((x) => x.id === k)!;
 
-const LEVEL: Record<AiSettings['level'], string> = {
-  basic: 'Grundlagen – wichtigste Begriffe, Definitionen und einfache Beispiele; für jemanden, der gerade erst anfängt.',
-  medium: 'Mittel – Begriffe, Definitionen, Zusammenhänge und typische Beispiele; wie in einer normalen Übung.',
-  exam: 'Prüfungsniveau (anspruchsvoll) – Anwendung, Begründungen, Herleitungen, Vergleiche und Transfer statt bloßem Wiedererkennen; typische Fehler und Fallen; so schwer, wie es in einer guten Prüfung drankommen könnte. Wer nur oberflächlich gelernt hat, soll hier scheitern.',
-};
 const LANGUAGE: Record<AiSettings['language'], string> = {
   de: 'Deutsch',
   en: 'Englisch',
@@ -102,9 +98,11 @@ const usable = (mats: Material[]) => mats.filter((m) => (m.route === 'text' && m
 function sources(s: AiSettings, mats: Material[]): string {
   const text = mats.filter((m) => m.route === 'text' && m.text);
   const files = mats.flatMap(attachmentsOf);
+  const open = s.source === 'open';
   if (!text.length && !files.length) {
+    // Nur bei „KI darf selbst ergänzen“ möglich – sonst lässt die App den Prompt gar nicht kopieren.
     return `## Quellen
-Ich gebe dir keine Materialien mit. Nutze dein Fachwissen${s.topic.trim() ? ` zum Thema „${s.topic.trim()}“` : ''}.
+Ich gebe dir keine Materialien mit. Worum es gehen soll, steht oben unter „Mein Wunsch“. Nutze dein eigenes Fachwissen – und wenn du im Internet suchen kannst, darfst du das gern tun, um Fakten zu prüfen oder zu ergänzen.
 - Schreibe nur Dinge, bei denen du dir sicher bist und die fachlich korrekt sind. Lieber etwas weniger, dafür richtig.
 - Verwende die Fachsprache und Notation, die an Universitäten und in Lehrbüchern üblich ist.
 - Wenn das Thema mehrdeutig ist, wähle die im Studium übliche Bedeutung.`;
@@ -118,23 +116,63 @@ Ich gebe dir keine Materialien mit. Nutze dein Fachwissen${s.topic.trim() ? ` zu
     lines.push(
       `${text.length ? 'Zusätzlich hänge' : 'Ich hänge'} ich ${files.length === 1 ? 'eine Datei' : `${files.length} Dateien`} direkt an diese Nachricht an: ${files.map((f) => `„${f.name}“`).join(', ')}. Lies ${files.length === 1 ? 'sie' : 'sie alle'} vollständig und sorgfältig – auch Handschrift, Tafelbilder, Tabellen, Skizzen und Diagramme darin. Wenn du eine angekündigte Datei nicht siehst oder nicht lesen kannst, sag mir das in einem Satz, statt etwas zu erfinden.`,
     );
+  if (files.length && text.length)
+    lines.push('- Im Text stehen Platzhalter wie „[Bild: siehe angehängte Datei „…“]“. Dort gehört das jeweilige angehängte Bild hin – beziehe es an dieser Stelle mit ein (z. B. Tafelbilder, Skizzen, Diagramme, Tabellen als Bild).');
+  if (open)
+    lines.push(
+      '- Die Materialien sind die Grundlage und haben Vorrang. Du darfst aber zusätzlich dein eigenes Fachwissen nutzen und – wenn du im Internet suchen kannst – dort nachschauen, um Lücken zu füllen, Zusammenhänge zu erklären oder passende Beispiele zu ergänzen.',
+      '- Alles, was du ergänzt, muss gesichert und fachlich korrekt sein. Widerspricht etwas den Materialien, gelten die Materialien.',
+    );
+  else
+    lines.push(
+      '- SEHR WICHTIG: Verwende AUSSCHLIESSLICH Informationen aus diesen Materialien. Kein Allgemeinwissen, keine Internetsuche, keine eigenen Ergänzungen – was nicht in den Materialien steht, kommt nicht vor (auch keine zusätzlichen Beispiele, Fakten, Zahlen oder Jahreszahlen).',
+      '- Umformulieren, Zusammenfassen, Ordnen und Erklären mit eigenen Worten ist erlaubt – solange der Inhalt selbst aus den Materialien stammt.',
+    );
+  if (s.kind === 'quiz')
+    lines.push(
+      '- Richtige Antworten und Erklärungen müssen durch die Materialien gedeckt sein.',
+      `- ${open ? 'Falsche Antworten' : 'AUSNAHME – falsche Antworten'}: Die darfst und sollst du frei erfinden (siehe „Regeln für die falschen Antworten“). Sie müssen nicht aus den Materialien stammen, nur laut Materialien eindeutig falsch sein.`,
+    );
+  if (s.kind === 'gaps' && !open) lines.push('- AUSNAHME – Ablenkwörter: Die darfst du frei erfinden (siehe „Regeln für die Ablenkwörter“).');
   lines.push(
-    ...(files.length && text.length
-      ? ['- Im Text stehen Platzhalter wie „[Bild: siehe angehängte Datei „…“]“. Dort gehört das jeweilige angehängte Bild hin – beziehe es an dieser Stelle mit ein (z. B. Tafelbilder, Skizzen, Diagramme, Tabellen als Bild).']
-      : []),
-    '- Stütze dich ausschließlich auf diese Materialien. Sie sind die Grundlage – nicht dein Allgemeinwissen.',
-    s.kind === 'quiz'
-      ? '- Richtige Antworten und Erklärungen: nichts erfinden – sie müssen durch die Materialien gedeckt sein. Ergänze höchstens gesichertes Grundwissen, das direkt dazugehört.'
-      : '- Erfinde nichts dazu. Ergänze höchstens gesichertes Grundwissen, das zum Verständnis direkt dazugehört.',
-    ...(s.kind === 'quiz'
-      ? ['- AUSNAHME – falsche Antworten: Die darfst und sollst du frei erfinden (siehe „Regeln für die falschen Antworten“). Sie müssen nicht aus den Materialien stammen, nur laut Materialien eindeutig falsch sein.']
-      : []),
     '- Übernimm Fachbegriffe, Schreibweisen, Bezeichnungen und Notation (Variablennamen, Symbole, Definitionen) genau so wie in den Materialien – auch wenn du es anders gewohnt bist.',
-    '- Decke die Materialien möglichst gleichmäßig ab – nicht nur den Anfang. Wichtiges (Definitionen, Sätze, Merksätze, hervorgehobene Stellen) hat Vorrang.',
+    '- Decke die Materialien möglichst gleichmäßig ab – nicht nur den Anfang –, außer mein Wunsch sagt etwas anderes (z. B. nur ein Kapitel). Wichtiges (Definitionen, Sätze, Merksätze, hervorgehobene Stellen) hat Vorrang.',
     '- Ignoriere Kopf- und Fußzeilen, Seitenzahlen, Inhaltsverzeichnisse, Literaturangaben und Organisatorisches (Termine, Abgaberegeln, Raumangaben).',
   );
-  if (s.topic.trim()) lines.push(`- Konzentriere dich innerhalb der Materialien auf: ${s.topic.trim()}`);
   return lines.join('\n');
+}
+
+/** Die große Frage aus der App: steht ganz oben und hat Vorrang vor den allgemeinen Regeln. */
+function wishBlock(s: AiSettings, mats: Material[]): string {
+  const w = s.wish.trim();
+  if (!w) return `## Mein Wunsch
+Ich habe keinen besonderen Wunsch: Verarbeite die Materialien vollständig und sinnvoll.`;
+  const strict = s.source === 'materials' && usable(mats).length > 0;
+  return `## Mein Wunsch – das Wichtigste am ganzen Auftrag
+Das habe ich selbst geschrieben:
+
+${w
+  .split('\n')
+  .map((l) => `> ${l}`)
+  .join('\n')}
+
+- Setze diesen Wunsch genau und vollständig um. Er hat Vorrang vor allen allgemeinen Regeln weiter unten (Auswahl der Inhalte, Stil, Schwierigkeit, Länge …) – aber nicht vor dem Antwortformat${strict ? ' und nicht vor der Regel, nur Informationen aus den Materialien zu verwenden' : ''}.`;
+}
+
+/** Feste Anzahl (wird genau eingehalten) oder die KI entscheidet selbst. */
+function countRule(s: AiSettings, noun: string, free: string, fixedExtra = ''): string {
+  if (s.count != null)
+    return `- Anzahl: GENAU ${s.count} ${noun}. Das ist eine feste Vorgabe von mir – nicht mehr und nicht weniger, auch wenn mein Wunsch eine andere Zahl nennt.${fixedExtra ? ` ${fixedExtra}` : ''}`;
+  return `- Anzahl: Die Anzahl der ${noun} bestimmst du selbst – ${free} Nennt mein Wunsch eine Anzahl, halte sie genau ein.`;
+}
+const countShort = (s: AiSettings, noun: string) => (s.count != null ? `Genau ${s.count} ${noun}` : `${noun[0].toUpperCase()}${noun.slice(1)} in sinnvoller Anzahl (deine Wahl)`);
+const ENOUGH = 'Gibt der Stoff dafür wenig her, geh mehr ins Detail (einzelne Voraussetzungen, Beispiele, Anwendungen, Zusammenhänge) – aber ohne Doppelungen und ohne Erfundenes.';
+
+function sourceCheck(s: AiSettings, hasMats: boolean): string {
+  if (!hasMats) return 'Ist alles gesichertes Fachwissen?';
+  return s.source === 'materials'
+    ? 'Stammt JEDER Inhalt aus den Materialien (nichts aus Allgemeinwissen oder Internet ergänzt)?'
+    : 'Sind die Materialien die Grundlage, und ist alles Ergänzte gesichert und korrekt?';
 }
 
 const MATH_TEXT = `## Formeln
@@ -150,10 +188,8 @@ const MATH_JSON = `${MATH_TEXT}
 
 function settingsBlock(s: AiSettings, mats: Material[], parts: string[]): string {
   const lines = ['## Deine Aufgabe', ...parts];
-  if (s.topic.trim() && !usable(mats).length) lines.push(`- Thema: ${s.topic.trim()}`);
-  lines.push(`- Niveau: ${LEVEL[s.level]}`);
+  lines.push(`- Schwierigkeit und Tiefe: wie in meinem Wunsch beschrieben; sagt er nichts dazu, richte dich nach dem Niveau ${usable(mats).length ? 'der Materialien' : 'eines Universitätsstudiums'}.`);
   lines.push(`- Sprache des Inhalts: ${LANGUAGE[s.language]}. Auch der Titel ist in dieser Sprache.${s.kind === 'doc' || s.kind === 'note' ? '' : ' Die JSON-Feldnamen (z. B. "title") bleiben aber immer genau wie in der Vorlage.'}`);
-  if (s.extra.trim()) lines.push(`- Zusätzliche Wünsche (haben Vorrang vor den allgemeinen Regeln, aber nicht vor dem Antwortformat): ${s.extra.trim()}`);
   return lines.join('\n');
 }
 
@@ -208,10 +244,9 @@ function cardsPrompt(s: AiSettings, mats: Material[]): string {
   }[s.cardStyle];
   return join([
     INTRO('Karteikarten'),
+    wishBlock(s, mats),
     settingsBlock(s, mats, [
-      hasMats
-        ? `- Erstelle ${s.count} Karteikarten. Gibt das Material dafür nicht genug her, erstelle lieber weniger, aber keine Wiederholungen oder Füllkarten.`
-        : `- Erstelle genau ${s.count} Karteikarten.`,
+      countRule(s, 'Karteikarten', 'so viele, wie nötig sind, um den Stoff vollständig abzudecken: jede wichtige Definition, jeder Satz und jeder zentrale Zusammenhang bekommt eine Karte, aber keine Füllkarten oder Wiederholungen (höchstens 150).', ENOUGH),
       `- Art der Karten: ${style}`,
     ]),
     sources(s, mats),
@@ -250,13 +285,14 @@ function cardsPrompt(s: AiSettings, mats: Material[]): string {
 }
 \`\`\``,
     SELF_CHECK([
-      `Sind es ${hasMats ? `höchstens ${s.count}` : `genau ${s.count}`} Karten, ohne Doppelungen?`,
+      s.count != null ? `Sind es GENAU ${s.count} Karten (nachzählen!), ohne Doppelungen?` : 'Ist der Stoff vollständig abgedeckt, ohne Doppelungen oder Füllkarten?',
       'Ist jede Rückseite fachlich korrekt und passt sie genau zur Vorderseite?',
-      hasMats ? 'Stammt jeder Inhalt aus den Materialien, und sind diese gleichmäßig abgedeckt?' : 'Ist alles gesichertes Fachwissen?',
+      sourceCheck(s, hasMats),
+      'Ist mein Wunsch vollständig umgesetzt?',
       'Ist das JSON gültig, und sind in Formeln alle Backslashes verdoppelt?',
     ]),
     materialsBlock(mats),
-    finalReminder([...JSON_REMINDER, `${hasMats ? `Bis zu ${s.count}` : `Genau ${s.count}`} Karten, Sprache: ${LANGUAGE[s.language]}.`]),
+    finalReminder([...JSON_REMINDER, `${countShort(s, 'Karten')}, Sprache: ${LANGUAGE[s.language]}.`]),
   ]);
 }
 
@@ -264,11 +300,12 @@ function quizPrompt(s: AiSettings, mats: Material[]): string {
   const hasMats = usable(mats).length > 0;
   return join([
     INTRO('ein Multiple-Choice-Quiz'),
+    wishBlock(s, mats),
     settingsBlock(s, mats, [
-      hasMats
-        ? `- Erstelle ${s.count} Fragen. Gibt das Material dafür nicht genug her, erstelle lieber weniger, aber keine Wiederholungen.`
-        : `- Erstelle genau ${s.count} Fragen.`,
-      `- Jede Frage hat genau ${s.answers} Antwortmöglichkeiten.`,
+      countRule(s, 'Fragen', 'so viele, wie sinnvoll sind, um den Stoff gründlich abzufragen, ohne Wiederholungen (höchstens 60).', ENOUGH),
+      s.answers != null
+        ? `- Antwortmöglichkeiten: Jede Frage hat GENAU ${s.answers} Antworten – bei jeder Frage, ohne Ausnahme. Das ist eine feste Vorgabe von mir.`
+        : '- Antwortmöglichkeiten: Wie viele Antworten eine Frage hat, entscheidest du pro Frage selbst (3 bis 6) – je nachdem, wie viele wirklich gute falsche Antworten es gibt. Lieber 3 starke als 5 mit schwachen Füllern. Nennt mein Wunsch eine Anzahl, halte sie genau ein.',
       s.multi
         ? '- Bei manchen Fragen dürfen mehrere Antworten richtig sein (mindestens eine ist immer richtig). Formuliere solche Fragen so, dass klar ist, dass mehrere stimmen können (z. B. „Welche Aussagen sind richtig?“).'
         : '- Bei jeder Frage ist genau eine Antwort richtig.',
@@ -292,7 +329,7 @@ Ein Quiz ist nur so gut wie seine falschen Antworten. Sie müssen so überzeugen
   - Antworten, die einfach die Beschreibung eines anderen Themas aus den Materialien sind.
   - Absurde, witzige, offensichtlich übertriebene oder widersprüchliche Antworten.
 - Lieber eine Antwort, die zu 90 % stimmt und nur ein falsches Detail enthält, als eine, die komplett falsch ist.
-- Jede falsche Antwort muss trotzdem eindeutig falsch sein – nichts, worüber man streiten könnte.${s.level === 'exam' ? '\n- Auf Prüfungsniveau gilt das für JEDE Frage: alle falschen Antworten knapp daneben.' : s.level === 'basic' ? '\n- Auf Grundlagen-Niveau dürfen die falschen Antworten etwas deutlicher abweichen – aber trotzdem plausibel und ohne Hinweise aus anderen Themen.' : ''}`,
+- Jede falsche Antwort muss trotzdem eindeutig falsch sein – nichts, worüber man streiten könnte.`,
     MATH_JSON,
     jsonAnswerRules([
       `Jede Antwort hat "correct": true oder "correct": false (ohne Anführungszeichen).`,
@@ -348,7 +385,9 @@ Beachte, wie die falschen Antworten jeweils nur in einem Detail abweichen:
 }
 \`\`\``,
     SELF_CHECK([
-      `Sind es ${hasMats ? `höchstens ${s.count}` : `genau ${s.count}`} Fragen mit je genau ${s.answers} Antworten?`,
+      `${s.count != null ? `Sind es GENAU ${s.count} Fragen (nachzählen!)` : 'Ist der Stoff gründlich abgefragt, ohne Wiederholungen'}${s.answers != null ? `, jede mit GENAU ${s.answers} Antworten` : ''}?`,
+      sourceCheck(s, hasMats),
+      'Ist mein Wunsch vollständig umgesetzt?',
       s.multi ? 'Ist bei jeder Frage mindestens eine Antwort richtig?' : 'Ist bei jeder Frage genau eine Antwort richtig?',
       'Ist jede als richtig markierte Antwort wirklich richtig und jede als falsch markierte wirklich falsch?',
       'Steht die richtige Antwort an wechselnden Positionen?',
@@ -359,7 +398,7 @@ Beachte, wie die falschen Antworten jeweils nur in einem Detail abweichen:
     materialsBlock(mats),
     finalReminder([
       ...JSON_REMINDER,
-      `${hasMats ? `Bis zu ${s.count}` : `Genau ${s.count}`} Fragen mit je ${s.answers} Antworten, Sprache: ${LANGUAGE[s.language]}.`,
+      `${countShort(s, 'Fragen')}, ${s.answers != null ? `jede mit genau ${s.answers} Antworten` : 'Antworten pro Frage nach deiner Wahl (3–6)'}, Sprache: ${LANGUAGE[s.language]}.`,
       'Falsche Antworten frei erfinden, knapp daneben, gleich aufgebaut wie die richtige – keine Begriffe aus anderen Themen, nichts, was man ohne Wissen ausschließen kann.',
     ]),
   ]);
@@ -370,15 +409,17 @@ function chartPrompt(s: AiSettings, mats: Material[]): string {
   const types = CHART_TYPES.map((t) => `"${t.id}" (${t.label})`).join(', ');
   return join([
     INTRO('ein Diagramm'),
+    wishBlock(s, mats),
     settingsBlock(s, mats, [
-      `- Erstelle ein Diagramm mit höchstens ${s.count} Datenpunkten (Werten).`,
+      '- Erstelle ein Diagramm.',
+      countRule(s, 'Datenpunkte (Werte)', `so viele, wie die Daten sinnvoll hergeben (höchstens ${MAX_POINTS}; bei Kreis/Ring höchstens 8).`, 'Nur wenn es nachweislich nicht so viele echte Werte gibt, dürfen es weniger sein – erfundene Zahlen sind schlimmer als eine kleinere Anzahl.'),
       s.chartType === 'auto'
         ? '- Wähle den passenden Diagrammtyp: "bar" (Säulen) für Vergleiche, "hbar" (Balken) bei langen Beschriftungen, "line" (Linie) für Entwicklungen über die Zeit, "pie" (Kreis) oder "donut" (Ring) für Anteile an einem Ganzen mit höchstens 8 Teilen.'
         : `- Diagrammtyp: "${s.chartType}" (${CHART_TYPES.find((t) => t.id === s.chartType)?.label}).`,
     ]),
     sources(s, mats),
     `## Regeln für die Daten
-- ERFINDE KEINE ZAHLEN. ${hasMats ? 'Nimm die Werte aus den Materialien.' : 'Verwende nur allgemein bekannte, gesicherte Daten.'}
+- ERFINDE KEINE ZAHLEN. ${hasMats ? (s.source === 'materials' ? 'Nimm die Werte ausschließlich aus den Materialien.' : 'Nimm die Werte aus den Materialien; fehlen dort welche, darfst du gesicherte, belegbare Werte ergänzen (Quelle dann in den Titel).') : 'Verwende nur allgemein bekannte, gesicherte Daten.'}
 - Sind die Werte nur gerundet oder geschätzt, schreibe „(ca.)“ in den Titel. Gibt es keine echten Daten, nimm erkennbare Beispielwerte und schreibe „(Beispielwerte)“ in den Titel.
 - "value" ist immer eine reine Zahl: Punkt als Dezimaltrennzeichen, keine Tausenderpunkte, keine Einheit, keine Anführungszeichen (z. B. 1234.5).
 - Die Einheit steht einmal in "unit" (höchstens 12 Zeichen, z. B. "%", "€", "km/h", "°C") – oder leer "".
@@ -418,17 +459,19 @@ function chartPrompt(s: AiSettings, mats: Material[]): string {
   ]
 }
 \`\`\``,
-    SELF_CHECK([`Höchstens ${s.count} Punkte?`, 'Stimmen alle Zahlen mit der Quelle überein, und ist kein Wert erfunden?', 'Ist jedes "value" eine reine Zahl?', 'Ist das JSON gültig?']),
+    SELF_CHECK([s.count != null ? `GENAU ${s.count} Punkte (außer es gibt nachweislich nicht so viele echte Werte)?` : 'Sinnvolle Anzahl Punkte?', 'Ist mein Wunsch umgesetzt?', 'Stimmen alle Zahlen mit der Quelle überein, und ist kein Wert erfunden?', 'Ist jedes "value" eine reine Zahl?', 'Ist das JSON gültig?']),
     materialsBlock(mats),
-    finalReminder(['Nur ein einziger ```json-Codeblock, nichts davor und nichts danach.', 'Keine erfundenen Zahlen; "value" nur als Zahl.', `Beschriftungen in: ${LANGUAGE[s.language]}.`]),
+    finalReminder(['Nur ein einziger ```json-Codeblock, nichts davor und nichts danach.', 'Keine erfundenen Zahlen; "value" nur als Zahl.', ...(s.count != null ? [`Genau ${s.count} Datenpunkte (sofern es so viele echte Werte gibt).`] : []), `Beschriftungen in: ${LANGUAGE[s.language]}.`]),
   ]);
 }
 
 function wheelPrompt(s: AiSettings, mats: Material[]): string {
   return join([
     INTRO('ein Glücksrad'),
+    wishBlock(s, mats),
     settingsBlock(s, mats, [
-      `- Erstelle ein Glücksrad mit ${s.count} Einträgen. Typisch sind Themen zum Wiederholen, Begriffe zum Erklären oder Aufgaben – richte dich nach dem Thema und den Wünschen.`,
+      '- Erstelle ein Glücksrad. Typisch sind Themen zum Wiederholen, Begriffe zum Erklären oder Aufgaben – richte dich nach meinem Wunsch.',
+      countRule(s, 'Einträge', `so viele, wie sinnvoll sind (höchstens ${MAX_ENTRIES}).`),
       s.removePicked
         ? '- "removePicked": true – ein gezogener Eintrag kommt bis zum Zurücksetzen nicht noch einmal dran.'
         : '- "removePicked": false – jeder Eintrag kann mehrmals gezogen werden.',
@@ -467,9 +510,9 @@ function wheelPrompt(s: AiSettings, mats: Material[]): string {
   ]
 }
 \`\`\``,
-    SELF_CHECK([`Genau ${s.count} Einträge, alle kurz und verschieden?`, 'Ist "weight" überall eine ganze Zahl von 1 bis 10?', 'Ist das JSON gültig?']),
+    SELF_CHECK([`${s.count != null ? `GENAU ${s.count} Einträge (nachzählen!)` : 'Sinnvolle Anzahl Einträge'}, alle kurz und verschieden?`, 'Ist mein Wunsch umgesetzt?', 'Ist "weight" überall eine ganze Zahl von 1 bis 10?', 'Ist das JSON gültig?']),
     materialsBlock(mats),
-    finalReminder(['Nur ein einziger ```json-Codeblock, nichts davor und nichts danach.', `Genau ${s.count} kurze Einträge, Sprache: ${LANGUAGE[s.language]}.`]),
+    finalReminder(['Nur ein einziger ```json-Codeblock, nichts davor und nichts danach.', `${countShort(s, 'kurze Einträge')}, Sprache: ${LANGUAGE[s.language]}.`]),
   ]);
 }
 
@@ -477,8 +520,10 @@ function gapsPrompt(s: AiSettings, mats: Material[]): string {
   const hasMats = usable(mats).length > 0;
   return join([
     INTRO('einen Lückentext'),
+    wishBlock(s, mats),
     settingsBlock(s, mats, [
-      `- Schreibe einen zusammenhängenden Lerntext mit ${hasMats ? `bis zu ${s.count}` : `genau ${s.count}`} Lücken.`,
+      '- Schreibe einen zusammenhängenden Lerntext mit Lücken.',
+      countRule(s, 'Lücken', 'so viele, wie der Text sinnvoll hergibt – etwa eine Lücke alle 1–3 Sätze, nur bei wirklich lernenswerten Wörtern (höchstens 60).', 'Mach den Text dafür so lang wie nötig.'),
       '- Der Text erklärt das Thema in ganzen Sätzen und logischer Reihenfolge – keine Liste unverbundener Einzelsätze.',
       '- Dazu kommen 4–8 Ablenkwörter (falsche Wörter für den Modus „Wörter einsetzen“).',
     ]),
@@ -524,7 +569,9 @@ function gapsPrompt(s: AiSettings, mats: Material[]): string {
 }
 \`\`\``,
     SELF_CHECK([
-      `Sind es ${hasMats ? `höchstens ${s.count}` : `genau ${s.count}`} Lücken, jede mit [[…]] markiert und gleichmäßig verteilt?`,
+      `${s.count != null ? `Sind es GENAU ${s.count} Lücken (nachzählen!)` : 'Ist die Anzahl der Lücken sinnvoll'}, jede mit [[…]] markiert und gleichmäßig verteilt?`,
+      sourceCheck(s, hasMats),
+      'Ist mein Wunsch vollständig umgesetzt?',
       'Ist jede Lücke aus dem Zusammenhang eindeutig, und verrät die Grammatik nichts?',
       'Liegt keine Lücke auf einem Füllwort oder Artikel?',
       'Passt kein Ablenkwort richtig in eine Lücke, und haben alle dieselbe Wortart/Form wie die Lösungen?',
@@ -533,7 +580,7 @@ function gapsPrompt(s: AiSettings, mats: Material[]): string {
     materialsBlock(mats),
     finalReminder([
       ...JSON_REMINDER,
-      `${hasMats ? `Bis zu ${s.count}` : `Genau ${s.count}`} Lücken als [[…]] im Text, 4–8 Ablenkwörter, Sprache: ${LANGUAGE[s.language]}.`,
+      `${countShort(s, 'Lücken')} als [[…]] im Text, 4–8 Ablenkwörter, Sprache: ${LANGUAGE[s.language]}.`,
     ]),
   ]);
 }
@@ -550,6 +597,7 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
   const words = { short: 'etwa 300–500 Wörter', medium: 'etwa 800–1200 Wörter', long: 'etwa 1500–2500 Wörter' }[s.length];
   return join([
     INTRO('ein Text-Dokument'),
+    wishBlock(s, mats),
     settingsBlock(s, mats, [`- Schreibe ${style}`, `- Länge: ${words}.`]),
     sources(s, mats),
     `## Aufbau und erlaubte Formatierung (Markdown)
@@ -578,6 +626,7 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
 - Im Codeblock: erste Zeile "# Titel", zweite Zeile "Beschreibung: …", dann eine Leerzeile.`,
     SELF_CHECK([
       'Ist alles fachlich korrekt und vollständig, ohne Erfundenes?',
+      'Ist mein Wunsch vollständig umgesetzt?',
       `Passen die Länge (${words}) und die Art (${DOC_STYLE_NAME[s.docStyle]})?`,
       'Nur erlaubte Formatierung (kein HTML; Tabellen nur für Gegenüberstellungen und mit höchstens 4 Spalten)?',
     ]),
@@ -596,6 +645,7 @@ function notePrompt(s: AiSettings, mats: Material[]): string {
   const words = { short: 'etwa 80–150 Wörter', medium: 'etwa 200–350 Wörter', long: 'etwa 400–700 Wörter' }[s.length];
   return join([
     INTRO('eine kurze Notiz (reiner Text)'),
+    wishBlock(s, mats),
     settingsBlock(s, mats, [`- Form: ${style}`, `- Länge: ${words}.`, '- Nur das Wichtigste – eine Notiz ist zum schnellen Nachlesen gedacht.']),
     sources(s, mats),
     `## Regeln
@@ -752,7 +802,7 @@ function parseRaw(answer: string, s: AiSettings): Parsed {
     if (!cards.length) throw new Error('Keine Karteikarten gefunden. Steht in der Antwort eine Liste "cards" mit "front" und "back"?');
     const half = cards.filter((c) => !c.front.trim() || !c.back.trim()).length;
     if (half) warnings.push(`${half} ${half === 1 ? 'Karte hat' : 'Karten haben'} eine leere Seite.`);
-    const cw = countWarning(cards.length, s.count, 'Karte', 'Karten', false);
+    const cw = s.count != null ? countWarning(cards.length, s.count, 'Karte', 'Karten', true) : null;
     if (cw) warnings.push(cw);
     return { result: { kind, title: titleOf(o), cards, description }, summary: `${cards.length} ${cards.length === 1 ? 'Karte' : 'Karten'} erkannt`, warnings };
   }
@@ -783,8 +833,12 @@ function parseRaw(answer: string, s: AiSettings): Parsed {
       const multi = questions.filter((q) => q.answers.filter((a) => a.correct).length > 1).length;
       if (multi) warnings.push(`${multi} ${multi === 1 ? 'Frage hat' : 'Fragen haben'} mehrere richtige Antworten, obwohl nur eine richtig sein sollte.`);
     }
-    const cw = countWarning(questions.length, s.count, 'Frage', 'Fragen', false);
+    const cw = s.count != null ? countWarning(questions.length, s.count, 'Frage', 'Fragen', true) : null;
     if (cw) warnings.push(cw);
+    if (s.answers != null) {
+      const off = questions.filter((q) => q.answers.filter((a) => a.text.trim()).length !== s.answers).length;
+      if (off) warnings.push(`${off} ${off === 1 ? 'Frage hat' : 'Fragen haben'} nicht genau ${s.answers} Antworten.`);
+    }
     return { result: { kind, title: titleOf(o), questions, description }, summary: `${questions.length} ${questions.length === 1 ? 'Frage' : 'Fragen'} erkannt`, warnings };
   }
 
@@ -805,6 +859,7 @@ function parseRaw(answer: string, s: AiSettings): Parsed {
     if (!chart.points.length) throw new Error('Keine Datenpunkte gefunden. Steht in der Antwort eine Liste "points" mit "label" und "value"?');
     if (s.chartType !== 'auto' && chart.chart !== s.chartType) warnings.push('Die KI hat einen anderen Diagrammtyp gewählt – du kannst ihn im Editor ändern.');
     if (/beispiel/i.test(chart.title)) warnings.push('Die KI hat Beispielwerte verwendet (keine echten Daten).');
+    if (s.count != null && chart.points.length !== s.count) warnings.push(`Du wolltest ${s.count} Datenpunkte, die KI hat ${chart.points.length} geliefert (evtl. gibt es nicht mehr echte Werte).`);
     return { result: { kind, title: chart.title, chart, description }, summary: `Diagramm mit ${chart.points.length} ${chart.points.length === 1 ? 'Wert' : 'Werten'} erkannt`, warnings };
   }
 
@@ -823,7 +878,7 @@ function parseRaw(answer: string, s: AiSettings): Parsed {
       warnings.push(`${clash.length} Ablenkwort${clash.length === 1 ? ' war' : 'wörter waren'} eine richtige Lösung und wurde${clash.length === 1 ? '' : 'n'} entfernt.`);
     }
     if (!doc.distractors.length) warnings.push('Die KI hat keine Ablenkwörter geliefert – du kannst im Editor welche ergänzen.');
-    const cw = countWarning(gaps.length, s.count, 'Lücke', 'Lücken', false);
+    const cw = s.count != null ? countWarning(gaps.length, s.count, 'Lücke', 'Lücken', true) : null;
     if (cw) warnings.push(cw);
     return {
       result: { kind, title: titleOf(o), doc, description },
@@ -841,7 +896,7 @@ function parseRaw(answer: string, s: AiSettings): Parsed {
   if (!wheel.entries.length) throw new Error('Keine Einträge gefunden. Steht in der Antwort eine Liste "entries" mit "label"?');
   const long = wheel.entries.filter((e) => e.label.length > 40).length;
   if (long) warnings.push(`${long} ${long === 1 ? 'Eintrag ist' : 'Einträge sind'} recht lang und passen evtl. schlecht ins Rad.`);
-  const cw = countWarning(wheel.entries.length, s.count, 'Eintrag', 'Einträge', true);
+  const cw = s.count != null ? countWarning(wheel.entries.length, s.count, 'Eintrag', 'Einträge', true) : null;
   if (cw) warnings.push(cw);
   return { result: { kind, title: wheel.title, wheel, description }, summary: `${wheel.entries.length} ${wheel.entries.length === 1 ? 'Eintrag' : 'Einträge'} erkannt`, warnings };
 }

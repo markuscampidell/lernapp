@@ -5,7 +5,6 @@ import { childFolders, filesIn, pathOf, scopeOf, subtreeIds } from '../../domain
 import { useLibrary } from '../../state/Library';
 import { Sheet } from '../../components/Sheet';
 import { Icon } from '../../components/Icon';
-import { TextLine } from '../../components/TextLine';
 import { FileThumb, FolderThumb } from '../../components/Thumbs';
 import { EmptyState } from '../../components/EmptyState';
 import { downloadBlob, fullName, isTouchDevice } from '../../lib/files';
@@ -15,7 +14,7 @@ import { buildPrompt, DEFAULT_SETTINGS, kindInfo, KINDS, parseAnswer, type AiKin
 
 // Eingaben überleben das Wechseln zur KI-App (auf Handys wird die App dabei manchmal neu geladen).
 // Ein unfertiger Entwurf gilt nur ein paar Stunden; nach „Im Editor öffnen“ wird er geleert.
-// Einstellungen wie Art, Niveau, Sprache und Anzahl bleiben dagegen als Vorgabe für das nächste Mal.
+// Einstellungen wie Art, Quelle, Sprache und Anzahl bleiben dagegen als Vorgabe für das nächste Mal.
 const DRAFT_KEY = 'lernapp-ai-draft';
 const DRAFT_TTL = 2 * 60 * 60 * 1000;
 interface Draft {
@@ -24,13 +23,22 @@ interface Draft {
   answer: string;
   savedAt?: number;
 }
-/** Nur die Vorgaben behalten – Thema, Wünsche, Materialien und Antwort leeren. */
-const keepPreferences = (s: AiSettings): AiSettings => ({ ...s, topic: '', extra: '' });
+/** Nur die Vorgaben behalten – Wunsch, Materialien und Antwort leeren. */
+const keepPreferences = (s: AiSettings): AiSettings => ({ ...s, wish: '' });
 function loadDraft(): Draft | null {
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | null;
     if (!d || typeof d !== 'object') return null;
-    const settings = { ...DEFAULT_SETTINGS, ...d.settings };
+    const old = (d.settings ?? {}) as Partial<AiSettings> & { topic?: string; extra?: string; level?: string };
+    const { topic, extra, level, ...rest } = old;
+    void level;
+    const settings: AiSettings = { ...DEFAULT_SETTINGS, ...rest };
+    if (!('source' in old)) {
+      // Entwurf von vor der Umstellung: Anzahlen gab es damals immer – jetzt entscheidet standardmäßig die KI.
+      settings.count = null;
+      settings.answers = null;
+      settings.wish = [topic, extra].map((x) => (typeof x === 'string' ? x.trim() : '')).filter(Boolean).join('\n');
+    }
     if (!d.savedAt || Date.now() - d.savedAt > DRAFT_TTL) return { settings: keepPreferences(settings), ids: [], answer: '' };
     return { settings, ids: Array.isArray(d.ids) ? d.ids : [], answer: typeof d.answer === 'string' ? d.answer : '' };
   } catch {
@@ -60,13 +68,13 @@ function Seg<T extends string | number>({ value, options, onChange }: { value: T
   );
 }
 
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+function Part({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="ai-step">
-      <div className="ai-step-head">
-        <span className="ai-step-num">{n}</span>
-        <h3>{title}</h3>
-      </div>
+      <h3 className="ai-part-title">
+        {title}
+        {hint && <span className="muted small"> {hint}</span>}
+      </h3>
       {children}
     </section>
   );
@@ -76,7 +84,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onResult: (r: AiResult) => void; onClose: () => void }) {
   const { files } = useLibrary();
   const initial = useRef(loadDraft()).current;
-  const [restored, setRestored] = useState(!!initial && (initial.ids.length > 0 || !!initial.answer || !!initial.settings.topic));
+  const [restored, setRestored] = useState(!!initial && (initial.ids.length > 0 || !!initial.answer || !!initial.settings.wish.trim()));
   const [s, setS] = useState<AiSettings>(initial?.settings ?? DEFAULT_SETTINGS);
   const [ids, setIds] = useState<string[]>(initial?.ids ?? []);
   const [answer, setAnswer] = useState(initial?.answer ?? '');
@@ -132,8 +140,11 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
   const asText = list.filter((m) => m.status === 'ready' && m.route === 'text');
   const attachments = useMemo(() => list.flatMap(attachmentsOf), [list]);
   const prompt = useMemo(() => buildPrompt(s, list), [s, list]);
-  // Ohne Thema und ohne Materialien weiß die KI nicht, worum es gehen soll.
-  const hasSource = !!s.topic.trim() || asText.length > 0 || attachments.length > 0 || loading;
+  const hasMaterials = asText.length > 0 || attachments.length > 0 || loading;
+  // „Nur aus meinen Unterlagen“ geht nur mit Materialien; sonst muss wenigstens der Wunsch sagen, worum es geht.
+  const needsMaterials = s.source === 'materials' && !hasMaterials;
+  const needsWish = s.source === 'open' && !hasMaterials && !s.wish.trim();
+  const hasSource = !needsMaterials && !needsWish;
 
   const parsed = useMemo((): { ok: Parsed } | { err: string } | null => {
     if (!answer.trim()) return null;
@@ -273,8 +284,8 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
   // Andere Art gewählt: Alles Eingegebene gehört zur alten Art und wird geleert.
   const [cleared, setCleared] = useState(false);
   const switchKind = (kind: AiKind) => {
-    const had = !!(s.topic.trim() || s.extra.trim() || ids.length || answer.trim());
-    set({ kind, count: kindInfo(kind).count?.def ?? s.count, topic: '', extra: '' });
+    const had = !!(s.wish.trim() || ids.length || answer.trim());
+    set({ kind, count: null, wish: '' });
     setIds([]);
     setAnswer('');
     setRestored(false);
@@ -282,14 +293,13 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
   };
 
   const reset = () => {
-    setS(DEFAULT_SETTINGS);
+    setS({ ...DEFAULT_SETTINGS, source: s.source });
     setIds([]);
     setAnswer('');
     setRestored(false);
   };
 
   const ok = parsed && 'ok' in parsed ? parsed.ok : null;
-  let stepNo = 0;
 
   return (
     <Sheet
@@ -318,10 +328,10 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
           </p>
         )}
 
-        <Step n={++stepNo} title="Was soll erstellt werden?">
+        <Part title="Was soll erstellt werden?">
           {cleared && (
             <p className="notice info">
-              <span className="grow">Neue Art gewählt – Thema, Wünsche, Materialien und die eingefügte Antwort wurden geleert.</span>
+              <span className="grow">Neue Art gewählt – Wunsch, Materialien und die eingefügte Antwort wurden geleert.</span>
               <button className="link" onClick={() => setCleared(false)}>
                 OK
               </button>
@@ -344,38 +354,138 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
               </button>
             ))}
           </div>
-        </Step>
+        </Part>
 
-        <Step n={++stepNo} title="Worum geht’s?">
-          <div className="field">
-            <div className="field-label">
-              <span>Thema</span>
-            </div>
-            <TextLine value={s.topic} onChange={(v) => set({ topic: v })} placeholder="z. B. Ableitungsregeln, Kapitel 3, Zellbiologie …" maxLength={300} />
-            <p className="muted small">
-              {asText.length + attachments.length > 0
-                ? 'Optional: Worauf soll sich die KI in deinen Materialien konzentrieren? Leer lassen = alles.'
-                : 'Ohne Materialien schreibt die KI aus ihrem eigenen Wissen zu diesem Thema.'}
-            </p>
-          </div>
+                <Part title="Woher soll die KI ihr Wissen nehmen?">
+          <Seg
+            value={s.source}
+            onChange={(v) => set({ source: v })}
+            options={[
+              { id: 'materials', label: 'Nur aus meinen Unterlagen' },
+              { id: 'open', label: 'Darf auch selbst suchen' },
+            ]}
+          />
+          <p className="muted small">
+            {s.source === 'materials'
+              ? 'Die KI verwendet ausschließlich, was in deinen Materialien steht – kein eigenes Wissen, keine Internetsuche.'
+              : 'Deine Materialien (falls du welche wählst) sind die Grundlage. Die KI darf aber ihr eigenes Wissen nutzen und – wenn sie kann – im Internet suchen.'}
+          </p>
+        </Part>
 
+<Part title="Materialien" hint={s.source === 'materials' ? '(Pflicht)' : '(optional)'}>
+          <p className="muted small">
+            Wähle Dateien aus deinen Ordnern, z. B. Skript, Mitschrift, Folien oder Fotos von deinen Notizen.
+          </p>
+          <details className="ai-legend-box">
+            <summary className="muted small">Wie gibt die App die Dateien an die KI?</summary>
+            <ul className="ai-legend muted small">
+              <li>
+                <span className="chip ai-route text">Im Prompt</span> Text-Dokumente, Notizen, Karteikarten, PDFs mit Text, Word und PowerPoint: Der Text
+                wird ausgelesen und steht direkt im Prompt. Bilder darin (z. B. Fotos in einem Text-Dokument oder auf Folien) werden herausgelöst und
+                direkt an die KI gegeben – im Text steht dann, wo sie hingehören.
+              </li>
+              <li>
+                <span className="chip ai-route file">Direkt an die KI</span> Fotos, Bilder und eingescannte PDFs kann die App nicht lesen – die gibst du der
+                KI selbst mit (unten bei „An die KI geben“). KIs wie ChatGPT können Bilder und Handschrift lesen. Bei PDFs mit Text kannst du die Datei
+                zusätzlich anhängen, damit die KI auch Zeichnungen darin sieht.
+              </li>
+            </ul>
+          </details>
+          <button className="btn ghost" onClick={() => setPicking(true)}>
+            <Icon name="folder" size={18} /> {ids.length ? 'Auswahl ändern' : 'Materialien auswählen'}
+          </button>
+          {selected.length > 0 && (
+            <ul className="list ai-mats">
+              {selected.map((f) => {
+                const m = mats.get(f.id);
+                const route = m?.status === 'loading' || !m ? 'loading' : m.status === 'error' ? 'skip' : m.route;
+                return (
+                  <li key={f.id} className="card row-card">
+                    <FileThumb file={f} />
+                    <div className="card-main">
+                      <strong className="ellipsis">{fullName(f)}</strong>
+                      <span className="small">
+                        <span className={`chip ai-route ${route}`}>
+                          {route === 'loading' ? 'Wird gelesen …' : route === 'text' ? 'Im Prompt' : route === 'file' ? 'Direkt an die KI' : 'Wird nicht verwendet'}
+                        </span>{' '}
+                        {m?.images?.length ? <span className="chip ai-route file">+ {m.images.length} {m.images.length === 1 ? 'Bild' : 'Bilder'} direkt an die KI</span> : null}
+                        {m?.note && <span className="muted">{m.note.replace(/ · \d+ Bild(er)? direkt an die KI.*$/, '')}</span>}
+                      </span>
+                      {m?.original && (
+                        <label className="ai-attach">
+                          <input
+                            type="checkbox"
+                            checked={attachPdf.has(f.id)}
+                            onChange={(e) =>
+                              setAttachPdf((old) => {
+                                const next = new Set(old);
+                                if (e.target.checked) next.add(f.id);
+                                else next.delete(f.id);
+                                return next;
+                              })
+                            }
+                          />
+                          <span className="small">PDF zusätzlich anhängen – damit die KI auch Zeichnungen und Bilder darin sieht</span>
+                        </label>
+                      )}
+                    </div>
+                    <button className="icon-btn" aria-label={`„${fullName(f)}“ entfernen`} onClick={() => setIds((x) => x.filter((id) => id !== f.id))}>
+                      <Icon name="close" size={18} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {ids.length > selected.length && <p className="muted small">{ids.length - selected.length} ausgewählte Dateien gibt es nicht mehr.</p>}
+        </Part>
+
+        <Part
+          title={hasMaterials ? 'Was soll mit deinen Unterlagen passieren? Hast du besondere Wünsche?' : 'Worum soll es gehen? Hast du besondere Wünsche?'}
+          hint={s.source === 'open' && !hasMaterials ? '(Pflicht)' : '(optional)'}
+        >
+          <textarea
+            rows={4}
+            value={s.wish}
+            onChange={(e) => set({ wish: e.target.value })}
+            maxLength={3000}
+            placeholder={
+              hasMaterials
+                ? 'z. B. „Nur Kapitel 3“, „Frag besonders die Beweise ab“, „So schwer wie in der Prüfung“, „Mit Beispielen aus der Physik“'
+                : 'z. B. „Ableitungsregeln aus Analysis 1, mit vielen Beispielen“'
+            }
+          />
+          <p className="muted small">Die KI nimmt das als wichtigsten Teil des Auftrags. {hasMaterials ? 'Leer lassen = sie verarbeitet die Materialien vollständig.' : ''}</p>
+        </Part>
+
+        <Part title="Einstellungen">
           {info.count && (
             <div className="field">
               <div className="field-label">
                 <span>{info.count.label}</span>
-                <span className="muted small">
-                  {info.count.min}–{info.count.max}
-                </span>
+                {s.count == null ? (
+                  <span className="muted small">optional</span>
+                ) : (
+                  <button type="button" className="link small" onClick={() => set({ count: null })}>
+                    KI entscheiden lassen
+                  </button>
+                )}
               </div>
               <input
                 type="number"
                 inputMode="numeric"
                 min={info.count.min}
                 max={info.count.max}
-                value={s.count}
-                onChange={(e) => set({ count: Number(e.target.value) || 0 })}
-                onBlur={() => set({ count: Math.max(info.count!.min, Math.min(info.count!.max, Math.round(s.count) || info.count!.def)) })}
+                value={s.count ?? ''}
+                placeholder="KI entscheidet"
+                onChange={(e) => set({ count: e.target.value === '' ? null : Number(e.target.value) })}
+                onBlur={() => s.count != null && set({ count: Math.max(info.count!.min, Math.min(info.count!.max, Math.round(s.count) || info.count!.min)) })}
               />
+              <p className="muted small">
+                {s.count == null
+                  ? `Leer lassen = die KI wählt eine sinnvolle Anzahl. Trägst du eine Zahl ein (${info.count.min}–${info.count.max}), hält sie sich genau daran.`
+                  : `Die KI liefert genau ${s.count}.`}
+              </p>
             </div>
           )}
 
@@ -402,7 +512,11 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
                 <div className="field-label">
                   <span>Antworten pro Frage</span>
                 </div>
-                <Seg value={s.answers} onChange={(v) => set({ answers: v })} options={[3, 4, 5].map((n) => ({ id: n, label: String(n) }))} />
+                <Seg
+                  value={s.answers ?? 0}
+                  onChange={(v) => set({ answers: v || null })}
+                  options={[{ id: 0, label: 'KI entscheidet' }, ...[3, 4, 5].map((n) => ({ id: n, label: String(n) }))]}
+                />
               </div>
               <div className="input-row">
                 <span className="grow">
@@ -499,23 +613,6 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
             </div>
           )}
 
-          {s.kind !== 'chart' && s.kind !== 'wheel' && (
-            <div className="field">
-              <div className="field-label">
-                <span>Niveau</span>
-              </div>
-              <Seg
-                value={s.level}
-                onChange={(v) => set({ level: v })}
-                options={[
-                  { id: 'basic', label: 'Grundlagen' },
-                  { id: 'medium', label: 'Mittel' },
-                  { id: 'exam', label: 'Prüfung' },
-                ]}
-              />
-            </div>
-          )}
-
           <div className="field">
             <div className="field-label">
               <span>Sprache</span>
@@ -531,87 +628,9 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
             />
           </div>
 
-          <div className="field">
-            <div className="field-label">
-              <span>Zusätzliche Wünsche (optional)</span>
-            </div>
-            <textarea
-              rows={2}
-              value={s.extra}
-              onChange={(e) => set({ extra: e.target.value })}
-              maxLength={2000}
-              placeholder="z. B. „nur Kapitel 3“, „besonders die Beweise“, „mit Beispielen aus der Physik“"
-            />
-          </div>
-        </Step>
+        </Part>
 
-        <Step n={++stepNo} title="Materialien (optional)">
-          <p className="muted small">
-            Wähle Dateien aus deinen Ordnern, aus denen die KI arbeiten soll – z. B. Skript, Mitschrift, Folien oder Fotos von deinen Notizen. Ohne
-            Materialien nutzt die KI ihr eigenes Wissen. Die App sortiert automatisch:
-          </p>
-          <ul className="ai-legend muted small">
-            <li>
-              <span className="chip ai-route text">Im Prompt</span> Text-Dokumente, Notizen, Karteikarten, PDFs mit Text, Word und PowerPoint: Der Text
-              wird ausgelesen und steht direkt im Prompt. Bilder darin (z. B. Fotos in einem Text-Dokument oder auf Folien) werden
-              herausgelöst und direkt an die KI gegeben – im Text steht dann, wo sie hingehören.
-            </li>
-            <li>
-              <span className="chip ai-route file">Direkt an die KI</span> Fotos, Bilder und eingescannte PDFs kann die App nicht lesen – die gibst du der
-              KI selbst mit (Schritt {stepNo + 1}). KIs wie ChatGPT können Bilder und Handschrift lesen. Bei PDFs mit Text kannst du die Datei
-              zusätzlich anhängen, damit die KI auch Zeichnungen darin sieht.
-            </li>
-          </ul>
-          <button className="btn ghost" onClick={() => setPicking(true)}>
-            <Icon name="folder" size={18} /> {ids.length ? 'Auswahl ändern' : 'Materialien auswählen'}
-          </button>
-          {selected.length > 0 && (
-            <ul className="list ai-mats">
-              {selected.map((f) => {
-                const m = mats.get(f.id);
-                const route = m?.status === 'loading' || !m ? 'loading' : m.status === 'error' ? 'skip' : m.route;
-                return (
-                  <li key={f.id} className="card row-card">
-                    <FileThumb file={f} />
-                    <div className="card-main">
-                      <strong className="ellipsis">{fullName(f)}</strong>
-                      <span className="small">
-                        <span className={`chip ai-route ${route}`}>
-                          {route === 'loading' ? 'Wird gelesen …' : route === 'text' ? 'Im Prompt' : route === 'file' ? 'Direkt an die KI' : 'Wird nicht verwendet'}
-                        </span>{' '}
-                        {m?.images?.length ? <span className="chip ai-route file">+ {m.images.length} {m.images.length === 1 ? 'Bild' : 'Bilder'} direkt an die KI</span> : null}
-                        {m?.note && <span className="muted">{m.note.replace(/ · \d+ Bild(er)? direkt an die KI.*$/, '')}</span>}
-                      </span>
-                      {m?.original && (
-                        <label className="ai-attach">
-                          <input
-                            type="checkbox"
-                            checked={attachPdf.has(f.id)}
-                            onChange={(e) =>
-                              setAttachPdf((old) => {
-                                const next = new Set(old);
-                                if (e.target.checked) next.add(f.id);
-                                else next.delete(f.id);
-                                return next;
-                              })
-                            }
-                          />
-                          <span className="small">PDF zusätzlich anhängen – damit die KI auch Zeichnungen und Bilder darin sieht</span>
-                        </label>
-                      )}
-                    </div>
-                    <button className="icon-btn" aria-label={`„${fullName(f)}“ entfernen`} onClick={() => setIds((x) => x.filter((id) => id !== f.id))}>
-                      <Icon name="close" size={18} />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {ids.length > selected.length && <p className="muted small">{ids.length - selected.length} ausgewählte Dateien gibt es nicht mehr.</p>}
-        </Step>
-
-        <Step n={++stepNo} title="Prompt an die KI geben">
+        <Part title="An die KI geben">
           {canShareFiles ? (
             <>
               <ol className="ai-howto">
@@ -643,9 +662,13 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
             <li>Füge den Prompt ins Eingabefeld der KI ein (lange tippen → „Einfügen“ bzw. Strg+V) und schick ihn ab.</li>
             </ol>
           )}
-          {!hasSource && (
-            <p className="notice warning">Gib zuerst ein Thema ein (Schritt 2) oder wähle Materialien aus (Schritt 3) – sonst weiß die KI nicht, worum es gehen soll.</p>
+          {needsMaterials && (
+            <p className="notice warning">
+              {ids.length ? 'Keine der ausgewählten Dateien kann verwendet werden. ' : ''}„Nur aus meinen Unterlagen“ braucht Materialien – wähle oben mindestens
+              eine Datei aus oder stell auf „Darf auch selbst suchen“.
+            </p>
           )}
+          {needsWish && <p className="notice warning">Schreib oben, worum es gehen soll – oder wähle Materialien aus.</p>}
           {loading && <p className="notice info">Materialien werden noch gelesen … warte kurz, bevor du den Prompt kopierst.</p>}
           {prompt.length > HUGE_PROMPT ? (
             <p className="notice critical">
@@ -720,9 +743,9 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
             {showPrompt ? 'Prompt ausblenden' : 'Prompt ansehen'}
           </button>
           {showPrompt && <textarea className="ai-prompt" readOnly rows={12} value={prompt} onFocus={(e) => e.currentTarget.select()} />}
-        </Step>
+        </Part>
 
-        <Step n={++stepNo} title="Antwort der KI einfügen">
+        <Part title="Antwort der KI einfügen">
           <p className="muted small">
             Kopiere die Antwort der KI: am einfachsten mit dem „Kopieren“-Knopf direkt am Codeblock (der Kasten mit dem Ergebnis) – oder mit „Kopieren“
             unter der ganzen Antwort. Beides funktioniert. Füge sie dann hier ein.
@@ -764,7 +787,7 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
               </p>
             </>
           )}
-        </Step>
+        </Part>
       </div>
 
       {picking && (

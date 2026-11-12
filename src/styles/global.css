@@ -2836,6 +2836,9 @@ textarea.text-line.doc-desc {
 .ai-step { display: flex; flex-direction: column; gap: 10px; }
 .ai-step-head { display: flex; align-items: center; gap: 10px; }
 .ai-step-head h3 { margin: 0; font-size: 1.02rem; }
+.ai-part-title { margin: 0; font-size: 1.02rem; }
+.ai-legend-box summary { cursor: pointer; }
+.ai-legend-box[open] summary { margin-bottom: 6px; }
 .ai-step-num {
   flex: none;
   display: inline-grid;
