@@ -3,6 +3,7 @@ import { Icon } from '../../components/Icon';
 import { StudyScreen } from './StudyScreen';
 import { shuffled, type Card } from './format';
 import { MathText } from '../../components/MathText';
+import { ResultMeter } from '../../components/ResultMeter';
 import { nextDue, type Grade, type ProgressMap } from './progress';
 
 interface Round {
@@ -13,6 +14,8 @@ interface Round {
   missed: string[];
   /** Beim Wiederholen: wie oft „Nochmal“ gedrückt wurde (für die Zusammenfassung). */
   again: number;
+  /** Für den Balken: pro Karte das letzte Ergebnis (gewusst = grün, „Nochmal“ = rot), in der Reihenfolge der ersten Antwort. */
+  marks: { id: string; ok: boolean }[];
 }
 
 const formatIn = (ms: number) => {
@@ -52,7 +55,7 @@ export function CardsStudy({
   const idsKey = cards.map((c) => c.id).join('|');
   const allIds = useMemo(() => (idsKey ? idsKey.split('|') : []), [idsKey]);
   const makeRound = useCallback(
-    (ids: string[] = allIds): Round => ({ queue: mix ? shuffled(ids) : [...ids], known: 0, missed: [], again: 0 }),
+    (ids: string[] = allIds): Round => ({ queue: mix ? shuffled(ids) : [...ids], known: 0, missed: [], again: 0, marks: [] }),
     [allIds, mix],
   );
   const [round, setRound] = useState<Round>(() => makeRound());
@@ -78,7 +81,10 @@ export function CardsStudy({
       setRound((r) => {
         const [first, ...rest] = r.queue;
         if (first !== id) return r;
-        if (grade !== 'again') return { ...r, queue: rest, known: r.known + 1 };
+        const ok = grade !== 'again';
+        const marks = r.marks.some((m) => m.id === id) ? r.marks.map((m) => (m.id === id ? { id, ok } : m)) : [...r.marks, { id, ok }];
+        r = { ...r, marks };
+        if (ok) return { ...r, queue: rest, known: r.known + 1 };
         // Wiederholen: gleich nochmal (ans Ende), sonst für die nächste Runde merken.
         return review
           ? { ...r, queue: [...rest, id], again: r.again + 1, missed: r.missed.includes(id) ? r.missed : [...r.missed, id] }
@@ -124,9 +130,7 @@ export function CardsStudy({
       }
     >
       <div className="study-play">
-        <div className="meter wide">
-          <div className="meter-fill" style={{ width: `${total ? (shown / total) * 100 : 0}%` }} />
-        </div>
+        <ResultMeter total={total} marks={round.marks.map((m) => (m.ok ? 'ok' : 'bad'))} />
 
         {done && review ? (
           <div className="card study-done">

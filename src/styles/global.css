@@ -1445,6 +1445,24 @@ button.person {
 .meter-fill.critical {
   background: var(--critical);
 }
+.result-meter {
+  display: flex;
+}
+.meter-seg {
+  height: 100%;
+  flex: none;
+  transition: width 0.3s ease;
+}
+.meter-seg.ok {
+  background: var(--good);
+}
+.meter-seg.bad {
+  background: var(--critical);
+}
+.meter-seg.pending {
+  background: var(--accent);
+  opacity: 0.55;
+}
 
 /* ---------- Karteikarten & Quiz ---------- */
 .pre-wrap {

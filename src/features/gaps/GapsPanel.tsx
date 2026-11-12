@@ -7,6 +7,7 @@ import { StudyScreen } from '../study/StudyScreen';
 import { shuffled } from '../study/format';
 import { GapsEditor } from './GapsEditor';
 import { bankFor, judge, parseGapsDoc, segments, type GapMode, type GapsDoc, type Segment, type Verdict } from './gaps';
+import { ResultMeter } from '../../components/ResultMeter';
 
 type Gap = Extract<Segment, { kind: 'gap' }>;
 
@@ -264,9 +265,10 @@ function GapsPlay({ title, doc, initialMode, onClose }: { title: string; doc: Ga
       }
     >
       <div className="study-play">
-        <div className="meter wide">
-          <div className="meter-fill" style={{ width: `${activeGaps.length ? (filled / activeGaps.length) * 100 : 0}%` }} />
-        </div>
+        <ResultMeter
+          total={activeGaps.length}
+          marks={verdicts ? activeGaps.map((g) => (verdicts[g.id] === 'wrong' ? 'bad' : 'ok')) : Array.from({ length: filled }, () => 'pending' as const)}
+        />
         <p className="muted small">
           {mode === 'drag'
             ? 'Tippe ein Wort an und dann die Lücke, in die es gehört (am PC kannst du es auch hineinziehen). Ein Wort in einer Lücke antippen schickt es zurück.'

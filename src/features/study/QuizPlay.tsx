@@ -3,6 +3,7 @@ import { Icon } from '../../components/Icon';
 import { StudyScreen } from './StudyScreen';
 import { shuffled, type Question } from './format';
 import { MathText } from '../../components/MathText';
+import { ResultMeter } from '../../components/ResultMeter';
 
 const LETTERS = 'ABCDEF';
 
@@ -82,9 +83,7 @@ export function QuizPlay({ title, questions, onClose }: { title: string; questio
       }
     >
       <div className="study-play">
-        <div className="meter wide">
-          <div className="meter-fill" style={{ width: `${order.length ? ((pos + (checked ? 1 : 0)) / order.length) * 100 : 0}%` }} />
-        </div>
+        <ResultMeter total={order.length} marks={results.map((r) => (r.ok ? 'ok' : 'bad'))} />
 
         {done ? (
           <div className="card study-done">
