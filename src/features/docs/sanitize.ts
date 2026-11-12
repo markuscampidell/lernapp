@@ -2,6 +2,7 @@
 // wird vor dem Anzeigen/Einfügen alles entfernt, was nicht ausdrücklich erlaubt ist.
 import { EMBED_KINDS, embedJson, parseEmbed } from './embeds';
 import { MAX_COLS } from './columns';
+import { MAX_GLOSS } from './gloss';
 
 export const DOC_EXT = 'dokument';
 export const DOC_MIME = 'application/vnd.lernapp.dokument+html';
@@ -94,6 +95,21 @@ function clean(node: Node, out: Node, doc: Document, inCol = false) {
         if (w >= 24 && w <= 4000) img.setAttribute('width', String(w));
         out.appendChild(img);
       }
+      return;
+    }
+    // Erklärung zu einem Wort/Satz: der markierte Text bleibt, die Erklärung steht in data-gloss.
+    // Leere oder verschachtelte Erklärungen werden aufgelöst (nur der Text bleibt).
+    if (tag === 'span' && el.classList.contains('gloss')) {
+      const g = (el.getAttribute('data-gloss') ?? '').replace(/\r\n?/g, '\n').trim().slice(0, MAX_GLOSS);
+      if (!g || el.parentElement?.closest('span.gloss')) {
+        clean(el, out, doc, inCol);
+        return;
+      }
+      const span = doc.createElement('span');
+      span.className = 'gloss';
+      span.setAttribute('data-gloss', g);
+      clean(el, span, doc, inCol);
+      if ((span.textContent ?? '').trim() || span.querySelector('span.math, img')) out.appendChild(span);
       return;
     }
     // Formel: nur der LaTeX-Quelltext wird gespeichert, die Darstellung erzeugt KaTeX beim Anzeigen.

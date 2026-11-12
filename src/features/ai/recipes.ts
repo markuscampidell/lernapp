@@ -27,6 +27,8 @@ export interface AiSettings {
   length: 'short' | 'medium' | 'long';
   chartType: 'auto' | ChartType;
   noteStyle: 'bullets' | 'summary';
+  /** Text-Dokument: schwierige Wörter/Sätze mit antippbaren Erklärungen versehen */
+  glosses: boolean;
   removePicked: boolean;
 }
 
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: AiSettings = {
   length: 'medium',
   chartType: 'auto',
   noteStyle: 'bullets',
+  glosses: false,
   removePicked: false,
 };
 
@@ -618,7 +621,15 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
   - Jede Zelle ist kurz (ein Wort bis ein Satz). Keine Listen, Überschriften oder Absätze in Zellen; Formeln in $…$ sind erlaubt.
   - Ein senkrechter Strich im Text einer Zelle wird als "\\|" geschrieben.
   - Fließtext, Erklärungen und Aufzählungen gehören NICHT in Tabellen.
-- NICHT erlaubt: HTML, Bilder, Fußnoten, Links (außer sie stehen im Material), Emojis.`,
+- NICHT erlaubt: HTML, Bilder, Fußnoten, Links (außer sie stehen im Material), Emojis.${s.glosses ? `
+
+## Erklärungen zum Antippen (gewünscht)
+Versieh schwierige Stellen mit einer kurzen Erklärung. In der App ist so eine Stelle unterstrichen; tippt man sie an, erscheint die Erklärung daneben.
+- Schreibweise direkt im Text: {{markierter Text::Erklärung}} – z. B. „Die {{Mitose::Kernteilung, bei der zwei genetisch gleiche Tochterkerne entstehen.}} läuft in vier Phasen ab.“
+- Geeignet: schwere Fachbegriffe, Fremdwörter und Vokabeln, Abkürzungen, und ganze Sätze, die man leicht missversteht (Erklärung dann: was damit gemeint ist, in einfachen Worten).
+- Die Erklärung ist kurz und verständlich: 1–3 Sätze, ohne Markdown; Formeln in $…$ sind erlaubt. Bei Vokabeln: Übersetzung und, wenn hilfreich, ein Beispiel.
+- Der markierte Text ist höchstens ein Satz und steht innerhalb einer Zeile. Nicht in Überschriften und nicht in Formeln; keine Erklärung in einer Erklärung.
+- Sparsam: nur wirklich Schwieriges, jeden Begriff nur beim ersten Auftreten – lieber wenige gute als jedes zweite Wort.${s.source === 'materials' ? '\n- Auch hier gilt: Inhalte nur aus den Materialien. Reine Wortbedeutungen und Übersetzungen darfst du aber erklären.' : ''}` : ''}`,
     MATH_TEXT,
     `## Antwortformat (exakt einhalten)
 - Schreibe das ganze Dokument in genau einen Codeblock, der mit \`\`\`\`markdown (vier Backticks) beginnt und mit \`\`\`\` (vier Backticks) endet – so bleibt der Text beim Kopieren unverändert.
@@ -629,6 +640,7 @@ function docPrompt(s: AiSettings, mats: Material[]): string {
       'Ist mein Wunsch vollständig umgesetzt?',
       `Passen die Länge (${words}) und die Art (${DOC_STYLE_NAME[s.docStyle]})?`,
       'Nur erlaubte Formatierung (kein HTML; Tabellen nur für Gegenüberstellungen und mit höchstens 4 Spalten)?',
+      ...(s.glosses ? ['Haben die schwierigen Stellen eine Erklärung im Format {{Text::Erklärung}} – sparsam und jede verständlich?'] : []),
     ]),
     materialsBlock(mats),
     finalReminder([

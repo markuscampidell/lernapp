@@ -24,6 +24,7 @@ import { PaperSheet } from './pages/PaperSheet';
 import { joinDoc, newPage, splitDoc, type InkPage, type Stroke } from './pages/ink';
 import { reorderPages } from './pages/paginate';
 import { CONTENT_H, PAGE_W, typesText } from './pages/geometry';
+import { glossLabel, MAX_GLOSS } from './gloss';
 
 /** Lage eines Spalten-Blocks, seiner Spalten und Zeilen (für die Knöpfe oben und links). */
 interface ColBox {
@@ -135,6 +136,9 @@ export function DocEditor({
   const [display, setDisplay] = useState(false);
   // Checkliste, in der der Cursor steht (für den Schalter "gemeinsam abhaken").
   const [checklist, setChecklist] = useState<HTMLUListElement | null>(null);
+  // Erklärung zu einem markierten Wort/Satz, die gerade bearbeitet wird
+  const [gloss, setGloss] = useState<{ el: HTMLElement; label: string; text: string } | null>(null);
+  const [glossHint, setGlossHint] = useState<string | null>(null);
   const [listShared, setListShared] = useState(false);
   const checks = useChecks(file);
   const { folders, shareOf, peopleOf } = useLibrary();
@@ -954,6 +958,77 @@ export function DocEditor({
     setFormula(null);
     setDirty(true);
   };
+  // ---------- Erklärungen ----------
+  const openGloss = (el: HTMLElement | null) => {
+    editor.current?.querySelectorAll('span.gloss.selected').forEach((x) => x !== el && x.classList.remove('selected'));
+    el?.classList.add('selected');
+    setGlossHint(null);
+    setGloss(el ? { el, label: glossLabel(el), text: el.dataset.gloss ?? '' } : null);
+  };
+  /** Erklärung auflösen: der Text bleibt stehen. */
+  const unwrapGloss = (el: HTMLElement) => {
+    if (!el.isConnected) return;
+    el.replaceWith(...Array.from(el.childNodes));
+    setDirty(true);
+  };
+  const finishGloss = () => {
+    const g = gloss;
+    openGloss(null);
+    if (!g || !g.el.isConnected) return;
+    g.el.classList.remove('selected');
+    if (!(g.el.dataset.gloss ?? '').trim()) return unwrapGloss(g.el);
+    // Cursor hinter die Markierung, damit Weitertippen nicht mit erklärt wird.
+    let after = g.el.nextSibling;
+    if (!(after instanceof Text) || !after.data.startsWith('\u200b')) {
+      after = document.createTextNode('\u200b');
+      g.el.after(after);
+    }
+    editor.current?.focus();
+    const r = document.createRange();
+    r.setStart(after, 1);
+    r.collapse(true);
+    const sel = document.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+  };
+  const removeGloss = () => {
+    const g = gloss;
+    openGloss(null);
+    if (g) unwrapGloss(g.el);
+  };
+  const glossOf = (n: Node | null) => ((n instanceof Element ? n : n?.parentElement)?.closest('span.gloss') as HTMLElement | null) ?? null;
+  const addGloss = () => {
+    const ed = editor.current;
+    const sel = document.getSelection();
+    if (!ed || !sel || !sel.rangeCount || !ed.contains(sel.anchorNode)) {
+      setGlossHint('Markiere zuerst im Text ein Wort oder einen Satz, den du erklären willst.');
+      return;
+    }
+    const r = sel.getRangeAt(0);
+    const existing = glossOf(r.startContainer) ?? glossOf(r.endContainer);
+    if (existing && ed.contains(existing)) return openGloss(existing);
+    if (r.collapsed) {
+      setGlossHint('Markiere zuerst im Text ein Wort oder einen Satz, den du erklären willst.');
+      return;
+    }
+    const blockOf = (n: Node) => (n instanceof Element ? n : n.parentElement)?.closest('p, h2, h3, li, blockquote, pre, div.col');
+    if (blockOf(r.startContainer) !== blockOf(r.endContainer)) {
+      setGlossHint('Eine Erklärung geht nur innerhalb eines Absatzes – markiere etwas weniger.');
+      return;
+    }
+    const frag = r.cloneContents();
+    frag.querySelectorAll('span.gloss').forEach((x) => x.replaceWith(...Array.from(x.childNodes)));
+    const box = document.createElement('div');
+    box.appendChild(frag);
+    if (!box.textContent?.trim() && !box.querySelector('span.math')) return;
+    cmd('insertHTML', `<span class="gloss" data-gloss="" data-new="1">${box.innerHTML}</span>\u200b`);
+    const el = ed.querySelector<HTMLElement>('span.gloss[data-new]');
+    if (!el) return;
+    delete el.dataset.new;
+    if (el.querySelector('span.math')) renderMathIn(el);
+    openGloss(el);
+  };
+
   /** Gerade "$…$" getippt? Dann in eine Formel umwandeln (gleiche Regeln wie bei Karteikarten). */
   const autoFormula = () => {
     const sel = document.getSelection();
@@ -990,6 +1065,13 @@ export function DocEditor({
       return;
     }
     if (embedEl) selectEmbed(null);
+    const g = t.closest?.('span.gloss') as HTMLElement | null;
+    if (g && editor.current?.contains(g) && !t.closest('span.math')) {
+      if (gloss?.el !== g) {
+        if (gloss) finishGloss();
+        openGloss(g);
+      }
+    } else if (gloss) finishGloss();
     const math = t.closest?.('span.math') as HTMLElement | null;
     if (math && editor.current?.contains(math)) {
       selectFormula(math);
@@ -1197,6 +1279,8 @@ export function DocEditor({
     },
     { icon: 'sigma', label: 'Formel einfügen', on: !!formula, run: () => (formula ? finishFormula() : insertFormula()) },
     { icon: 'columns', label: 'Spalten / Tabelle einfügen', run: addColumnsBlock },
+    'sep',
+    { icon: 'explain', label: 'Erklärung zum markierten Text', on: !!gloss, run: () => (gloss ? finishGloss() : addGloss()) },
   ];
 
   const textBar = (
@@ -1265,6 +1349,7 @@ export function DocEditor({
               <button type="button" className={penMode ? 'active' : ''} aria-pressed={penMode} onMouseDown={(e) => e.preventDefault()} onClick={() => {
                   // Tippen beenden: Cursor/Tastatur weg, Auswahlen (Bild, Formel, Tabelle) aufheben
                   if (formula) finishFormula();
+                  if (gloss) finishGloss();
                   setImage(null);
                   selectEmbed(null);
                   setActiveCols(null);
@@ -1308,6 +1393,49 @@ export function DocEditor({
                   <Icon name="trash" size={18} /> Löschen
                 </button>
                 <button className="btn primary grow" onClick={finishFormula}>
+                  Fertig
+                </button>
+              </div>
+            </div>
+          )}
+          {glossHint && !gloss && (
+            <p className="notice info gloss-hint" data-no-swipe>
+              <span className="grow">{glossHint}</span>
+              <button className="link" onClick={() => setGlossHint(null)}>
+                OK
+              </button>
+            </p>
+          )}
+          {gloss && (
+            <div className="card formula-bar gloss-bar" data-no-swipe>
+              <div className="field-label">
+                <span className="ellipsis">Erklärung zu „{gloss.label}“</span>
+              </div>
+              <textarea
+                autoFocus
+                rows={3}
+                value={gloss.text}
+                maxLength={MAX_GLOSS}
+                placeholder="Was bedeutet das? z. B. Übersetzung, Definition oder was mit dem Satz gemeint ist"
+                onChange={(e) => {
+                  const text = e.target.value;
+                  gloss.el.dataset.gloss = text;
+                  setGloss({ ...gloss, text });
+                  setDirty(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
+                    e.preventDefault();
+                    finishGloss();
+                  }
+                }}
+              />
+              <p className="muted small">Beim Lesen ist der Text unterstrichen – antippen zeigt die Erklärung. Formeln mit $…$ gehen auch.</p>
+              <div className="input-row">
+                <button className="btn ghost danger" onClick={removeGloss}>
+                  <Icon name="trash" size={18} /> Erklärung entfernen
+                </button>
+                <button className="btn primary grow" onClick={finishGloss}>
                   Fertig
                 </button>
               </div>

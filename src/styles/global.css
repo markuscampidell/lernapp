@@ -1445,6 +1445,73 @@ button.person {
 .meter-fill.critical {
   background: var(--critical);
 }
+/* Erklärungen zu Wörtern/Sätzen in Text-Dokumenten */
+span.gloss {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+span.gloss:hover,
+span.gloss.active,
+span.gloss.selected {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.gloss-panel {
+  position: fixed;
+  z-index: 70;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  max-height: 45vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.22);
+  animation: gloss-in 0.18s ease-out;
+}
+@media (min-width: 900px) {
+  .gloss-panel {
+    left: auto;
+    right: 20px;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    width: 340px;
+    max-height: 70vh;
+    animation: none;
+  }
+}
+@keyframes gloss-in {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+.gloss-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.gloss-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.gloss-bar textarea {
+  font-family: inherit;
+}
+.gloss-term {
+  font-size: 1.02rem;
+}
+.gloss-text {
+  line-height: 1.5;
+}
 .result-meter {
   display: flex;
 }

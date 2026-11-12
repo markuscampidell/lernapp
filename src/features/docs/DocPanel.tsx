@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
 import { Icon } from '../../components/Icon';
@@ -13,6 +13,7 @@ import { WheelSpinner } from '../wheel/WheelSpinner';
 import { parseWheel } from '../wheel/wheel';
 import { PagedDoc } from './pages/PagedDoc';
 import { splitDoc } from './pages/ink';
+import { GlossPanel, glossLabel } from './gloss';
 
 /** Drehbare Glücksräder im Dokument (je Figur eine React-Wurzel). */
 const WHEEL_ROOTS = new WeakMap<Element, Root>();
@@ -28,6 +29,15 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
   const checks = useChecks(file);
   // Vorbereitete Kopien der Diagramme (Bild erzeugen dauert kurz – der Klick soll sofort kopieren).
   const prepared = useRef(new Map<Element, Prepared>());
+  // Angetippte Erklärung (Wort/Satz im Text)
+  const [gloss, setGloss] = useState<{ el: HTMLElement; label: string; text: string } | null>(null);
+  const closeGloss = useCallback(() => setGloss(null), []);
+  useEffect(() => {
+    if (!gloss) return;
+    gloss.el.classList.add('active');
+    return () => gloss.el.classList.remove('active');
+  }, [gloss]);
+  useEffect(() => setGloss(null), [html, editing]);
 
   useEffect(() => {
     const el = article.current;
@@ -79,6 +89,12 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
       setTimeout(() => label && (label.textContent = ' Kopieren'), 2000);
       return;
     }
+    const g = t.closest?.('span.gloss') as HTMLElement | null;
+    if (g) {
+      e.preventDefault();
+      setGloss((old) => (old?.el === g ? null : { el: g, label: glossLabel(g), text: g.dataset.gloss ?? '' }));
+      return;
+    }
     // Bilder im Dokument groß anzeigen (nicht Diagramme/Räder)
     if (t.tagName === 'IMG' && !t.closest('figure')) {
       const im = t as HTMLImageElement;
@@ -108,6 +124,7 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
       <PagedDoc pages={doc.pages} flowRef={article} controls={!editing}>
         <article ref={article} className="doc-content" onClick={onClick} dangerouslySetInnerHTML={{ __html: html || '<p><br></p>' }} />
       </PagedDoc>
+      {gloss && !editing && <GlossPanel label={gloss.label} text={gloss.text} onClose={closeGloss} />}
       {editing && <DocEditor file={file} initial={text} mode={editing} onClose={() => setEditing(null)} />}
     </div>
   );

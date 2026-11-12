@@ -559,6 +559,13 @@ export function AiSheet({ folderId, onResult, onClose }: { folderId: string; onR
                   ]}
                 />
               </div>
+              <div className="input-row">
+                <span className="grow">
+                  Erklärungen für schwierige Stellen
+                  <span className="muted small block">Schwere Begriffe, Vokabeln oder Sätze werden unterstrichen – antippen zeigt die Erklärung.</span>
+                </span>
+                <input type="checkbox" className="switch" checked={s.glosses} onChange={(e) => set({ glosses: e.target.checked })} />
+              </div>
             </>
           )}
 

@@ -161,8 +161,22 @@ function inlineMd(s: string): string {
   return t.replace(/\u0000(\d+)\u0000/g, (_, n: string) => codes[Number(n)]);
 }
 
-/** Text einer Zeile mit Formeln ($…$, $$…$$) und Markdown-Auszeichnung. */
+/** Text einer Zeile mit Erklärungen ({{Text::Erklärung}}), Formeln ($…$, $$…$$) und Markdown-Auszeichnung. */
 function inline(s: string): string {
+  const re = /\{\{([\s\S]+?)::([\s\S]+?)\}\}/g;
+  let out = '';
+  let last = 0;
+  for (const m of s.matchAll(re)) {
+    out += inlineCore(s.slice(last, m.index));
+    const text = m[1].trim();
+    const gloss = m[2].trim().replace(/\\n/g, '\n');
+    out += text && gloss ? `<span class="gloss" data-gloss="${esc(gloss)}">${inlineCore(text)}</span>` : inlineCore(text);
+    last = (m.index ?? 0) + m[0].length;
+  }
+  return out + inlineCore(s.slice(last));
+}
+
+function inlineCore(s: string): string {
   return parseMath(s)
     .map((seg) =>
       seg.kind === 'math'
