@@ -25,6 +25,7 @@ import { joinDoc, newPage, splitDoc, type InkPage, type Stroke } from './pages/i
 import { reorderPages } from './pages/paginate';
 import { CONTENT_H, PAGE_W, typesText } from './pages/geometry';
 import { glossLabel, MAX_GLOSS } from './gloss';
+import { isBlankPageTarget, placeCaretNear } from './caret';
 
 /** Lage eines Spalten-Blocks, seiner Spalten und Zeilen (für die Knöpfe oben und links). */
 interface ColBox {
@@ -254,6 +255,44 @@ export function DocEditor({
       window.removeEventListener('resize', measureCols);
     };
   }, [measureCols]);
+  // ---------- Klick auf leere Stelle der Seite -> Cursor in die nächste Zeile ----------
+  useEffect(() => {
+    let kind = 'mouse';
+    const ok = (e: MouseEvent) => {
+      const ed = editor.current;
+      const area = wrap.current?.closest('.paged');
+      if (!area || !(e.target instanceof Node) || !area.contains(e.target)) return null;
+      return !!ed && ed.isContentEditable && e.button === 0 && !e.shiftKey && isBlankPageTarget(ed, e.target) ? ed : null;
+    };
+    const onPointer = (e: PointerEvent) => {
+      kind = e.pointerType;
+    };
+    // Maus: schon beim Drücken (sonst verliert der Editor kurz den Fokus bzw. setzt den Cursor nicht)
+    const onDown = (e: MouseEvent) => {
+      if (kind !== 'mouse' || e.detail > 1) return;
+      const ed = ok(e);
+      if (!ed) return;
+      e.preventDefault();
+      placeCaretNear(ed, e.clientX, e.clientY);
+    };
+    // Finger/Stift: erst beim Tippen (Klick) – Wischen zum Scrollen bleibt unberührt
+    const onClick = (e: MouseEvent) => {
+      if (kind === 'mouse' || e.detail > 1) return;
+      const ed = ok(e);
+      if (!ed) return;
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && ed.contains(sel.anchorNode)) return;
+      placeCaretNear(ed, e.clientX, e.clientY);
+    };
+    document.addEventListener('pointerdown', onPointer, true);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('click', onClick);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer, true);
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('click', onClick);
+    };
+  }, []);
   const afterColChange = () => {
     setDirty(true);
     measureCols();
