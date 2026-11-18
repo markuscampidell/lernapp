@@ -4555,3 +4555,11 @@ div.sticky-bar:has(> .view-header) {
     backdrop-filter: blur(6px);
   }
 }
+/* Auch die inneren Kästen (Ordner, Dateien, Suche, Karten in Dateien) durchscheinend */
+:root[data-bg] .main .card,
+:root[data-bg] .main .search {
+  background: color-mix(in srgb, var(--surface) 30%, transparent);
+  border-color: color-mix(in srgb, var(--line) 60%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
