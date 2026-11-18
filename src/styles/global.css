@@ -4620,3 +4620,10 @@ div.sticky-bar:has(> .view-header) {
 .viewer:has(> .comment-panel) .pdf-scroll {
   padding-bottom: calc(34dvh + 16px);
 }
+/* Mit Hintergrund: Seitenleiste (PC) bzw. untere Leiste (Handy) leicht getönt und durchscheinend */
+:root[data-bg] .nav {
+  background: color-mix(in srgb, var(--surface) 30%, transparent);
+  border-color: color-mix(in srgb, var(--line) 60%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
