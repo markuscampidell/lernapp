@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 import { useBackToClose } from '../lib/router';
 
@@ -23,7 +24,8 @@ export function Sheet({ title, onClose, children, footer, leading }: SheetProps)
     };
   }, []);
 
-  return (
+  // Direkt in <body>: sonst schneiden feste Leisten (z. B. oben in der Ordner-Übersicht) den Dialog ab.
+  return createPortal(
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
         <header className="sheet-header">
@@ -36,6 +38,7 @@ export function Sheet({ title, onClose, children, footer, leading }: SheetProps)
         <div className="sheet-body">{children}</div>
         {footer && <footer className="sheet-footer">{footer}</footer>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
