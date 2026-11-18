@@ -4550,3 +4550,10 @@ div.sticky-bar:has(> .view-header) {
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
+
+/* ---------- Kein Zoomen mit zwei Fingern in Ordnern, Hochladen und Einstellungen ----------
+   (Sonst rutschen die festen Knöpfe aus dem Bild.) In Dateien, Bildern und PDFs bleibt Zoomen erlaubt;
+   Text-Dokumente haben ihren eigenen Zoom. */
+:root:not(:has(.viewer, .lightbox)) .app {
+  touch-action: pan-y;
+}
