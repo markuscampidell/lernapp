@@ -589,3 +589,33 @@ export async function copyChecks(idMap: Map<string, string>): Promise<void> {
     await sb().from('checks').upsert(rows, { onConflict: 'file_id,scope,item_id' });
   }
 }
+
+// ---------- Neuigkeiten (Glocke) ----------
+export interface NewsItem {
+  id: string;
+  kind: 'comment' | 'share' | 'handover' | string;
+  title: string;
+  body: string;
+  url: string;
+  createdAt: string;
+}
+/** Eigene Benachrichtigungen der letzten 30 Tage (dieselben wie die Push-Nachrichten), neueste zuerst. */
+export async function fetchNews(): Promise<NewsItem[]> {
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const res = await sb()
+    .from('notifications')
+    .select('id, kind, title, body, url, created_at')
+    .neq('kind', 'test')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(60);
+  if (res.error) throw new Error(res.error.message);
+  return ((res.data ?? []) as Row[]).map((r) => ({
+    id: String(r.id),
+    kind: String(r.kind),
+    title: String(r.title),
+    body: String(r.body),
+    url: String(r.url || '#ordner'),
+    createdAt: String(r.created_at),
+  }));
+}

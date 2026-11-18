@@ -1,6 +1,6 @@
 // Offline-Unterstützung: Die App-Hülle wird zwischengespeichert, damit die installierte App ohne Netz startet.
 // VERSION erhöhen, damit Clients nach einem Deploy alte Caches verwerfen.
-const VERSION = 'v25';
+const VERSION = 'v26';
 const CACHE = `lernapp-${VERSION}`;
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
@@ -128,7 +128,9 @@ self.addEventListener('push', (event) => {
 // Antippen: offene App nach vorne holen und dorthin wechseln – sonst die App neu öffnen.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const hash = (event.notification.data && event.notification.data.url) || '#ordner';
+  let hash = (event.notification.data && event.notification.data.url) || '#ordner';
+  // Kommentar-Benachrichtigung: Datei gleich mit offenen Kommentaren zeigen.
+  if (String(event.notification.tag || '').startsWith('comment-') && /^#ordner\/[^/]+\/[^/]+$/.test(hash)) hash += '/kommentare';
   const target = new URL('./' + hash, self.registration.scope).href;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (list) => {

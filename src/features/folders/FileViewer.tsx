@@ -23,7 +23,7 @@ import { NotePanel } from './NoteSheet';
 const MAX_TEXT = 2 * 1024 * 1024;
 
 /** Vollbild-Ansicht einer Datei mit Vorschau und Aktionen. */
-export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose: () => void }) {
+export function FileViewer({ file: initial, onClose, openComments }: { file: FileItem; onClose: () => void; openComments?: boolean }) {
   const { files, folders, me, userName, isOrphan } = useLibrary();
   // Immer die aktuelle Version (nach Umbenennen/Verschieben).
   const file = files.find((f) => f.id === initial.id);
@@ -195,7 +195,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
         {file.shareId && <ChangesBanner file={file} />}
         {body}
       </div>
-      {canComment && <CommentsToggle file={file} />}
+      {canComment && <CommentsToggle file={file} initialOpen={openComments} />}
       {editing && <FileEditorSheet file={file} onClose={() => setEditing(false)} />}
       {sharing && <ShareSheet file={file} onClose={() => setSharing(false)} />}
     </div>

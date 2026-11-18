@@ -9,18 +9,24 @@ export interface Route {
   folderId: string | null;
   /** Datei, die beim Öffnen des Ordners gleich angezeigt wird (z. B. aus einer Benachrichtigung). */
   fileId?: string;
+  /** Datei mit gleich geöffneten Kommentaren zeigen (#ordner/<ordner>/<datei>/kommentare). */
+  comments?: boolean;
 }
 
 const TABS: Tab[] = ['ordner', 'hochladen', 'einstellungen'];
 
 export function parseHash(hash = window.location.hash): Route {
-  const [tab, id, file] = hash.replace(/^#/, '').split('/');
+  const [tab, id, file, extra] = hash.replace(/^#/, '').split('/');
   // Früher eigener Bereich „Geteilte Ordner“ – jetzt Teil der Ordner-Übersicht.
   if (tab === 'geteilt') return { tab: 'ordner', folderId: null };
   if (!TABS.includes(tab as Tab)) return { tab: 'ordner', folderId: null };
   // #ordner/<id> = geöffneter Ordner
   const folderId = tab === 'ordner' && id ? decodeURIComponent(id) : null;
-  return { tab: tab as Tab, folderId, ...(folderId && file ? { fileId: decodeURIComponent(file) } : {}) };
+  return {
+    tab: tab as Tab,
+    folderId,
+    ...(folderId && file ? { fileId: decodeURIComponent(file), ...(extra === 'kommentare' ? { comments: true } : {}) } : {}),
+  };
 }
 
 export const folderHash = (id: string | null) =>

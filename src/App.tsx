@@ -90,7 +90,7 @@ export function App() {
           <ErrorBoundary>
             <HandoverBanner />
             <NotificationPrompt />
-            {tab === 'ordner' && <FoldersView folderId={route.folderId} fileId={route.fileId} />}
+            {tab === 'ordner' && <FoldersView folderId={route.folderId} fileId={route.fileId} openComments={route.comments} />}
             {tab === 'hochladen' && <UploadView />}
             {tab === 'einstellungen' && <SettingsView />}
           </ErrorBoundary>

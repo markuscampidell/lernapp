@@ -10,7 +10,7 @@ import { cloudEnabled } from '../../cloud/supabase';
 
 const MAX = 4000;
 
-function ago(iso: string): string {
+export function ago(iso: string): string {
   const t = Date.parse(iso);
   const min = Math.round((Date.now() - t) / 60_000);
   if (min < 1) return 'gerade eben';
@@ -197,9 +197,9 @@ export const EDIT_START = 'lernapp:edit-start';
  * Runder Kommentar-Knopf rechts unten; öffnet die Kommentare als Leiste von unten (max. 1/3 der Höhe).
  * Nie automatisch offen. Beim Start des Bearbeitens schließt sie sich (der Knopf bleibt im Editor verfügbar).
  */
-export function CommentsToggle({ file }: { file: FileItem }) {
+export function CommentsToggle({ file, initialOpen = false }: { file: FileItem; initialOpen?: boolean }) {
   const { me, isOrphan, commentInfo } = useLibrary();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   useEffect(() => {
     const close = () => setOpen(false);
     window.addEventListener(EDIT_START, close);

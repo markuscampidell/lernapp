@@ -33,10 +33,11 @@ import { parseCards, parseQuiz } from '../study/format';
 import { loadBlob } from '../../storage/blobs';
 import type { IconName } from '../../components/Icon';
 import { cloudEnabled } from '../../cloud/supabase';
+import { NewsBell } from '../news/NewsBell';
 
 const norm = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-export function FoldersView({ folderId, fileId }: { folderId: string | null; fileId?: string }) {
+export function FoldersView({ folderId, fileId, openComments }: { folderId: string | null; fileId?: string; openComments?: boolean }) {
   const { folders, files } = useLibrary();
   const sharedRoot = folderId === SHARED_ROOT;
   const folder = folderId && !sharedRoot ? folders.find((f) => f.id === folderId) : undefined;
@@ -53,7 +54,7 @@ export function FoldersView({ folderId, fileId }: { folderId: string | null; fil
 
   if (folderId && !sharedRoot && !folder) return null;
   return (
-    <FolderPage key={folderId ?? 'root'} folder={folder ?? null} scope={sharedRoot ? 'shared' : 'mine'} folders={folders} files={files} openFileId={fileId} />
+    <FolderPage key={folderId ?? 'root'} folder={folder ?? null} scope={sharedRoot ? 'shared' : 'mine'} folders={folders} files={files} openFileId={fileId} openComments={openComments} />
   );
 }
 
@@ -68,12 +69,14 @@ function FolderPage({
   folders,
   files,
   openFileId,
+  openComments,
 }: {
   folder: Folder | null;
   scope: 'mine' | 'shared';
   folders: Folder[];
   files: FileItem[];
   openFileId?: string;
+  openComments?: boolean;
 }) {
   const lib = useLibrary();
   const { deleteMany, moveMany, deleteProblem, moveProblem, canModify, canAddIn, isRoot, isOrphan, isNewSince, me } = lib;
@@ -87,6 +90,8 @@ function FolderPage({
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
+  // Datei, die mit offenen Kommentaren aufgeht (aus den Neuigkeiten).
+  const [commentsFor, setCommentsFor] = useState<string | null>(null);
   // Bearbeiten direkt aus der Liste (ohne die Datei zu öffnen).
   const [editing, setEditing] = useState<
     { kind: 'folder'; folder: Folder } | { kind: 'file'; file: FileItem } | { kind: 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps' | 'note'; file: FileItem; text: string } | null
@@ -99,8 +104,11 @@ function FolderPage({
     if (!openFileId || !folder) return;
     replace(folderHash(folder.id));
     const target = files.find((f) => f.id === openFileId && f.folderId === folder.id);
-    if (target) setViewing(target);
-  }, [openFileId]);
+    if (target) {
+      setCommentsFor(openComments ? target.id : null);
+      setViewing(target);
+    }
+  }, [openFileId, openComments]);
 
   const id = folder?.id ?? (rootScope === 'shared' ? SHARED_ROOT : null);
   const path = pathOf(folders, folder?.id ?? null);
@@ -326,9 +334,12 @@ function FolderPage({
           <div className="sticky-bar">
           <header className="view-header">
             <h1>Ordner</h1>
-            <button className="btn primary" onClick={() => setSheet('newFolder')}>
-              <Icon name="plus" /> Neuer Ordner
-            </button>
+            <div className="view-header-actions">
+              <NewsBell />
+              <button className="btn primary" onClick={() => setSheet('newFolder')}>
+                <Icon name="plus" /> Neuer Ordner
+              </button>
+            </div>
           </header>
           </div>
         </>
@@ -572,7 +583,16 @@ function FolderPage({
           onClose={() => setMoving(null)}
         />
       )}
-      {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}
+      {viewing && (
+        <FileViewer
+          file={viewing}
+          openComments={viewing.id === commentsFor}
+          onClose={() => {
+            setViewing(null);
+            setCommentsFor(null);
+          }}
+        />
+      )}
       {editing?.kind === 'folder' && <FolderEditorSheet folder={editing.folder} onClose={() => setEditing(null)} />}
       {editing?.kind === 'file' && <FileEditorSheet file={editing.file} onClose={() => setEditing(null)} />}
       {editing?.kind === 'cards' && <CardsEditor file={editing.file} initial={parseCards(editing.text).cards} onClose={() => setEditing(null)} />}

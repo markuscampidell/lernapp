@@ -3930,3 +3930,45 @@ div.sticky-bar:has(> .view-header) {
     display: none;
   }
 }
+
+/* ---------- Neuigkeiten (Glocke) ---------- */
+.view-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bell-btn {
+  width: 44px;
+  height: 44px;
+  color: var(--text);
+}
+.bell-btn .count-badge {
+  top: 2px;
+  right: 2px;
+}
+.news-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+}
+.news-item.new {
+  box-shadow: inset 3px 0 0 var(--info);
+}
+.news-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-2);
+}
+.news-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
