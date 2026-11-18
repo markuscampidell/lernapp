@@ -1,6 +1,6 @@
 // Offline-Unterstützung: Die App-Hülle wird zwischengespeichert, damit die installierte App ohne Netz startet.
 // VERSION erhöhen, damit Clients nach einem Deploy alte Caches verwerfen.
-const VERSION = 'v27';
+const VERSION = 'v26';
 const CACHE = `lernapp-${VERSION}`;
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
@@ -75,8 +75,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
-  // Versions-Datei nie aus dem Speicher – sie zeigt ja, ob es etwas Neues gibt.
-  if (url.pathname.endsWith('/version.json')) return;
 
   // Seiten: zuerst Netz (damit Updates ankommen), offline die gespeicherte Hülle.
   if (req.mode === 'navigate') {
