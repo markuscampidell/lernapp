@@ -4564,3 +4564,9 @@ div.sticky-bar:has(> .view-header) {
 .study-screen:not(:has(.doc-editor)) {
   touch-action: pan-y;
 }
+/* Bilder (Vergrößern über Antippen hat einen eigenen Zoom), Videos, Audio und sonstige Dateien: kein Seiten-Zoom.
+   Pop-ups (liegen direkt in <body>) ebenso – sonst rutscht ihr Schließen-Knopf weg. */
+.viewer:is([data-kind='image'], [data-kind='video'], [data-kind='audio'], [data-kind='presentation'], [data-kind='document'], [data-kind='spreadsheet'], [data-kind='archive'], [data-kind='other']),
+.sheet-backdrop {
+  touch-action: pan-y;
+}
