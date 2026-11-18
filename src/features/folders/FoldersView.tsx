@@ -381,6 +381,32 @@ function FolderPage({
           {folder && !orphan && subfolders.length === 0 && ownFiles.length === 0 && (
             <EmptyState title="Dieser Ordner ist leer">Füge Dateien hinzu (Text, Bilder, PDFs, Präsentationen …) oder lege Unterordner an.</EmptyState>
           )}
+          {folder && subfolders.length > 0 && ownFiles.length > 0 ? (
+            // Beides vorhanden: zwei Bereiche, die jeweils für sich scrollen (Handy: oben/unten, PC: nebeneinander).
+            <div className="split">
+              <section className="split-pane" aria-label="Unterordner">
+                <h3 className="section-title">Unterordner · {subfolders.length}</h3>
+                <ul className="list">
+                  {subfolders.map((f) => (
+                    <li key={f.id}>
+                      <FolderCard folder={f} {...newProp(f)} {...editProp(f)} {...itemProps('folders', f.id, () => openFolder(f.id))} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+              <section className="split-pane" aria-label="Dateien">
+                <h3 className="section-title">Dateien · {ownFiles.length}</h3>
+                <ul className="list">
+                  {ownFiles.map((f) => (
+                    <li key={f.id}>
+                      <FileCard file={f} {...newProp(f)} {...editProp(f)} {...itemProps('files', f.id, () => setViewing(f))} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          ) : (
+          <>
           {subfolders.length > 0 && (
             <>
               {folder && <h3 className="section-title">Unterordner</h3>}
@@ -405,6 +431,8 @@ function FolderPage({
                 ))}
               </ul>
             </>
+          )}
+          </>
           )}
         </>
       )}

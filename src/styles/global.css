@@ -3762,3 +3762,48 @@ button.avatar-edit-badge {
 .inking.panning .paged-stack:active {
   cursor: grabbing;
 }
+
+/* ---------- Ordner: Unterordner und Dateien getrennt, jeweils eigenes Scrollen ---------- */
+.split {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Zusammen höchstens so hoch wie der Bildschirm (ohne Navigationsleiste). */
+  max-height: calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom) - 40px);
+}
+.split-pane {
+  flex: 0 1 auto;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.split-pane .section-title {
+  margin: 2px 4px 0;
+}
+.split-pane .list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px;
+}
+@media (min-width: 900px) {
+  .view:has(.split) {
+    max-width: 1200px;
+  }
+  .split {
+    flex-direction: row;
+    align-items: flex-start;
+    max-height: none;
+  }
+  .split-pane {
+    flex: 1 1 0;
+    min-width: 0;
+    max-height: calc(100dvh - 72px);
+  }
+}
