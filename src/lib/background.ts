@@ -15,9 +15,9 @@ export const BACKGROUNDS: Background[] = [
   { id: 'tafel', name: 'Tafel', scheme: 'dark' },
   { id: 'strand', name: 'Strand', scheme: 'light' },
   { id: 'weltall', name: 'Weltall', scheme: 'dark' },
-  { id: 'sonnenuntergang', name: 'Abendrot', scheme: 'dark' },
-  { id: 'berge', name: 'Alpensee', scheme: 'light' },
-  { id: 'wald', name: 'Mondwald', scheme: 'dark' },
+  { id: 'sonnenuntergang', name: 'Sonnenuntergang', scheme: 'dark' },
+  { id: 'berge', name: 'Berge', scheme: 'light' },
+  { id: 'wald', name: 'Wald', scheme: 'dark' },
   { id: 'konfetti', name: 'Konfetti', scheme: 'light' },
 ];
 
