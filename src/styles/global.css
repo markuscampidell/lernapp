@@ -4127,7 +4127,7 @@ div.sticky-bar:has(> .view-header) {
   .nav-item.active {
     font-weight: 700;
   }
-  .nav-icon {
+  .nav-item .nav-icon {
     position: relative;
     display: grid;
     place-items: center;
