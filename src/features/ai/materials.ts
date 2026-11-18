@@ -260,7 +260,7 @@ async function pdfText(blob: Blob): Promise<{ text: string; scanned: boolean }> 
   const pdfjs = await import('pdfjs-dist');
   const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
   const pages: string[] = [];
   let chars = 0;
   for (let n = 1; n <= pdf.numPages; n++) {

@@ -25,7 +25,7 @@ export const SERVER_LIMIT = 1024 * 1024 * 1024;
 const USER_DOMAIN = 'lernapp.invalid';
 export const usernameToEmail = (username: string) => `${username.trim().toLowerCase()}@${USER_DOMAIN}`;
 export const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,19}$/;
-export const MIN_PASSWORD = 6;
+export const MIN_PASSWORD = 8;
 
 /** Wirft bei Supabase-Fehlern eine verständliche Meldung. */
 export function check<T>(res: { data: T; error: { message: string } | null }): T {

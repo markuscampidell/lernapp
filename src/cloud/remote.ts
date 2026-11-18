@@ -539,11 +539,16 @@ export async function closeHandover(id: string): Promise<void> {
 
 /** Löscht abgelaufene Übergaben (nach 30 Tagen) samt ihren Dateien im Speicher. */
 export async function expireHandovers(): Promise<boolean> {
+  // Neu (013_sicherheit.sql): zuerst die Dateien löschen (die Ordner gehören mir noch), dann die Ordner.
+  const pre = await sb().rpc('expired_handover_paths');
+  const first = pre.error ? [] : ((pre.data as string[] | null) ?? []).filter(Boolean);
+  if (first.length) await removePaths(first);
   const { data, error } = await sb().rpc('expire_handovers');
   if (error) return false;
+  // Ältere Server-Version gibt die Pfade erst nach dem Löschen zurück.
   const paths = ((data as string[] | null) ?? []).filter(Boolean);
   if (paths.length) await removePaths(paths);
-  return paths.length > 0;
+  return first.length + paths.length > 0;
 }
 
 // ---------- Profilbild ----------

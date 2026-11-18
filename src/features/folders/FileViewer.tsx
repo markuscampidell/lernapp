@@ -98,7 +98,15 @@ export function FileViewer({ file: initial, onClose, openComments }: { file: Fil
       downloadBlob(blob, name);
     }
   };
-  const open = () => url && window.open(url, '_blank', 'noopener');
+  // In neuem Tab öffnen: nur Formate, die keinen Code ausführen können (PDF, Fotos, Video, Audio) direkt – alles andere
+  // (z. B. HTML oder SVG aus geteilten Ordnern) als reinen Text. Sonst liefe fremder Code mit den Rechten der App.
+  const open = () => {
+    if (!blob) return;
+    const safe = /^(application\/pdf|image\/(png|jpe?g|gif|webp|avif|bmp)|video\/|audio\/)/i.test(blob.type) ? blob : new Blob([blob], { type: 'text/plain;charset=utf-8' });
+    const u = URL.createObjectURL(safe);
+    window.open(u, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(u), 60_000);
+  };
 
   let body: React.ReactNode;
   if (missing)
