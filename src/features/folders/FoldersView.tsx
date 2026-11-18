@@ -316,7 +316,7 @@ function FolderPage({
               <Icon name="chevron" size={16} />
             </button>
             <button className="btn ghost" onClick={() => setSheet('newFolder')} disabled={!canAdd || !canSub} title={canSub ? undefined : 'Maximale Tiefe erreicht'}>
-              <Icon name="folderPlus" size={18} /> Neuer Unterordner
+              <Icon name="folderPlus" size={18} /> Unterordner
             </button>
           </div>
           {!canSub && <p className="muted small">Maximale Ordnertiefe ({MAX_DEPTH} Ebenen) erreicht – hier sind keine weiteren Unterordner möglich.</p>}
