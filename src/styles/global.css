@@ -4550,3 +4550,24 @@ div.sticky-bar:has(> .view-header) {
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
+
+/* ---------- „Neue Version ist da“ ---------- */
+.update-banner {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: calc(12px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line, var(--border));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  font-weight: 600;
+  animation: rise 0.2s ease-out;
+}

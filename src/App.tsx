@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Icon, type IconName } from './components/Icon';
 import { InstallBanner } from './components/InstallBanner';
+import { UpdateBanner } from './components/UpdateBanner';
 import { HandoverBanner } from './features/account/HandoverBanner';
 import { NotificationPrompt } from './features/notifications/NotificationPrompt';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -97,6 +98,7 @@ export function App() {
         )}
       </main>
       <LightboxHost />
+      <UpdateBanner />
     </div>
   );
 }
