@@ -4531,3 +4531,27 @@ div.sticky-bar:has(> .view-header) {
 .viewer-header {
   border-bottom: none;
 }
+
+/* ---------- Mit Hintergrund: leichte, durchscheinende Kästen (Milchglas) ---------- */
+/* Feste Leisten: über dem Hintergrundbild eine leichte Tönung (::after liegt über ::before). */
+:root[data-bg] .sticky-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--surface) 30%, transparent);
+}
+/* Die zweite Leiste („Hinzufügen“) schließt direkt an – keine doppelte Tönung an der Kante */
+:root[data-bg] .sticky-bar.sticky-second::after {
+  top: -1px;
+}
+/* PC: Bereiche „Meine Ordner“ / „Geteilt mit dir“ bzw. Unterordner / Dateien */
+@media (min-width: 900px) {
+  :root[data-bg] .split-pane {
+    background: color-mix(in srgb, var(--surface) 30%, transparent);
+    border-color: color-mix(in srgb, var(--line) 60%, transparent);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+}
