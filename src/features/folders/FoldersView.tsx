@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FileItem, Folder } from '../../domain/types';
 import { MAX_DEPTH, SHARED_ROOT } from '../../domain/types';
-import { childFolders, depthOf, filesIn, pathOf, scopeOf, subtreeIds } from '../../domain/tree';
+import { childFolders, depthOf, filesIn, pathOf, subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
-import { afterBack, folderHash, goUp, openFolder, replace, useBackToClose } from '../../lib/router';
+import { afterBack, folderHash, goUp, navigate, openFolder, replace, useBackToClose } from '../../lib/router';
 import { DOCUMENT_ACCEPT, fileKind, fullName, isTouchDevice, KIND_LABEL } from '../../lib/files';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
@@ -32,7 +32,6 @@ import { FileEditorSheet } from './FileEditorSheet';
 import { parseCards, parseQuiz } from '../study/format';
 import { loadBlob } from '../../storage/blobs';
 import type { IconName } from '../../components/Icon';
-import { AccountCard } from '../account/AccountCard';
 import { cloudEnabled } from '../../cloud/supabase';
 
 const norm = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -104,11 +103,12 @@ function FolderPage({
   }, [openFileId]);
 
   const id = folder?.id ?? (rootScope === 'shared' ? SHARED_ROOT : null);
-  const scope = folder ? scopeOf(folders, folder.id) : rootScope;
   const path = pathOf(folders, folder?.id ?? null);
   const depth = folder ? depthOf(folders, folder.id) : 0;
   const canSub = depth < MAX_DEPTH;
   const subfolders = childFolders(folders, id);
+  // Übersicht: eigene Ordner und darunter „Geteilt mit dir“ in einer Liste (kein Umschalter mehr).
+  const sharedTops = !folder && cloudEnabled ? childFolders(folders, SHARED_ROOT) : [];
   const ownFiles = folder ? filesIn(files, folder.id) : [];
   const remote = !!folder?.shareId;
   const orphan = folder ? isOrphan(folder.id) : false;
@@ -132,7 +132,7 @@ function FolderPage({
     if (!q) return null;
     const inside = new Set<string>();
     if (folder) subtreeIds(folders, folder.id).forEach((x) => inside.add(x));
-    else childFolders(folders, id).forEach((top) => subtreeIds(folders, top.id).forEach((x) => inside.add(x)));
+    else [...subfolders, ...sharedTops].forEach((top) => subtreeIds(folders, top.id).forEach((x) => inside.add(x)));
     const inScope = (fid: string) => inside.has(fid);
     const label = (fid: string) => {
       const p = pathOf(folders, fid);
@@ -151,10 +151,10 @@ function FolderPage({
       .filter((f) => inScope(f.folderId) && hit(f.name, f.ext, f.description, KIND_LABEL[fileKind(f)]))
       .map((f) => ({ f, path: label(f.folderId) }));
     return { folders: fs, files: fi };
-  }, [query, folders, files, folder, id]);
+  }, [query, folders, files, folder, id, subfolders, sharedTops]);
 
   // Aktuell sichtbare Einträge (für "Alle auswählen").
-  const visibleFolders = results ? results.folders.map((r) => r.f) : subfolders;
+  const visibleFolders = results ? results.folders.map((r) => r.f) : [...subfolders, ...sharedTops];
   const visibleFiles = results ? results.files.map((r) => r.f) : ownFiles;
 
   /** Fragt nach und löscht. Nennt mitgelöschte Unterordner/Dateien. */
@@ -280,7 +280,7 @@ function FolderPage({
               <Icon name="back" />
             </button>
             <nav className="crumbs grow" aria-label="Pfad">
-              <button onClick={() => replace(scope === 'shared' ? '#geteilt' : '#ordner')}>{scope === 'shared' ? 'Geteilte Ordner' : 'Meine Ordner'}</button>
+              <button onClick={() => replace('#ordner')}>Ordner</button>
               {path.slice(0, -1).map((p) => (
                 <span key={p.id} className="crumb">
                   <Icon name="chevron" size={14} />
@@ -326,19 +326,14 @@ function FolderPage({
           <div className="sticky-bar">
           <header className="view-header">
             <h1>Ordner</h1>
-            {scope === 'mine' && (
-              <button className="btn primary" onClick={() => setSheet('newFolder')}>
-                <Icon name="plus" /> Neuer Ordner
-              </button>
-            )}
+            <button className="btn primary" onClick={() => setSheet('newFolder')}>
+              <Icon name="plus" /> Neuer Ordner
+            </button>
           </header>
-          {cloudEnabled && <ScopeSwitch scope={scope} />}
           </div>
         </>
       )}
-      {!folder && scope === 'shared' && <SharedRootIntro />}
-
-      {(subfolders.length > 0 || ownFiles.length > 0 || query) && (
+      {(subfolders.length > 0 || sharedTops.length > 0 || ownFiles.length > 0 || query) && (
         <SearchBox value={query} onChange={setQuery} placeholder={folder ? `In „${folder.name}“ suchen` : 'Alles durchsuchen'} />
       )}
 
@@ -375,22 +370,16 @@ function FolderPage({
         )
       ) : (
         <>
-          {!folder && scope === 'mine' && subfolders.length === 0 && (
+          {!folder && subfolders.length === 0 && sharedTops.length === 0 && (
             <EmptyState title="Noch keine Ordner">
               Lege einen Ordner an, z. B. für ein Fach oder eine Vorlesung. Darin kannst du Unterordner und Dateien sammeln.
-            </EmptyState>
-          )}
-          {!folder && scope === 'shared' && me && subfolders.length === 0 && (
-            <EmptyState title="Noch keine geteilten Ordner">
-              Öffne einen deiner Ordner und tippe oben auf <Icon name="users" size={14} />, um ihn zu teilen. Wenn jemand einen Ordner mit dir teilt
-              (dein Benutzername: <strong>{me.username}</strong>), erscheint er hier.
             </EmptyState>
           )}
           {folder && orphan && (
             <p className="notice warning">
               {me
                 ? 'Dieser geteilte Ordner ist nicht mehr verfügbar – er wurde gelöscht oder du hast keinen Zugriff mehr. Du kannst ihn löschen.'
-                : 'Das ist ein geteilter Ordner. Melde dich unter „Geteilte Ordner“ an, um seinen Inhalt zu sehen.'}
+                : 'Das ist ein geteilter Ordner. Melde dich in den Einstellungen an, um seinen Inhalt zu sehen.'}
             </p>
           )}
           {folder && !orphan && subfolders.length === 0 && ownFiles.length === 0 && (
@@ -424,8 +413,7 @@ function FolderPage({
           <>
           {subfolders.length > 0 && (
             <>
-              {folder && <h3 className="section-title">Unterordner</h3>}
-              {!folder && scope === 'shared' && !lib.online && <p className="notice warning">Offline – geteilte Ordner sind gerade nur lesbar.</p>}
+              {folder ? <h3 className="section-title">Unterordner</h3> : sharedTops.length > 0 && <h3 className="section-title">Meine Ordner</h3>}
               <ul className="list">
                 {subfolders.map((f) => (
                   <li key={f.id}>
@@ -445,6 +433,26 @@ function FolderPage({
                   </li>
                 ))}
               </ul>
+            </>
+          )}
+          {!folder && cloudEnabled && (sharedTops.length > 0 || !me) && (
+            <>
+              <h3 className="section-title">Geteilt mit dir</h3>
+              {!me && (
+                <p className="muted small">
+                  Melde dich in den <button className="link" onClick={() => navigate('#einstellungen')}>Einstellungen</button> an, um Ordner mit anderen zu teilen.
+                </p>
+              )}
+              {me && !lib.online && <p className="notice warning">Offline – geteilte Ordner sind gerade nur lesbar.</p>}
+              {sharedTops.length > 0 && (
+                <ul className="list">
+                  {sharedTops.map((f) => (
+                    <li key={f.id}>
+                      <FolderCard folder={f} {...newProp(f)} {...editProp(f)} {...itemProps('folders', f.id, () => openFolder(f.id))} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
           )}
           </>
@@ -678,35 +686,7 @@ function SelectionBar({
   );
 }
 
-/** Umschalter „Meine Ordner“ / „Geteilte Ordner“ mit "!" bei Neuem. */
-function ScopeSwitch({ scope }: { scope: 'mine' | 'shared' }) {
-  const { folders, unread } = useLibrary();
-  const has = (s: 'mine' | 'shared') => childFolders(folders, s === 'shared' ? SHARED_ROOT : null).some((f) => unread.has(f.id));
-  return (
-    <div className="segmented" role="tablist" aria-label="Ordner-Bereich">
-      {(['mine', 'shared'] as const).map((s) => (
-        <button key={s} role="tab" aria-selected={scope === s} className={scope === s ? 'active' : ''} onClick={() => replace(s === 'shared' ? '#geteilt' : '#ordner')}>
-          {s === 'shared' ? 'Geteilte Ordner' : 'Meine Ordner'}
-          {has(s) && <span className="unread-dot">!</span>}
-        </button>
-      ))}
-    </div>
-  );
-}
 
-/** Oben in „Geteilte Ordner“: Anmeldung bzw. Hinweise. */
-function SharedRootIntro() {
-  const { me } = useLibrary();
-  if (me) return null;
-  return (
-    <>
-      <p className="muted">
-        Teile Ordner mit anderen: Alle können darin Dateien und Unterordner hinzufügen. Dafür brauchst du ein Konto.
-      </p>
-      <AccountCard />
-    </>
-  );
-}
 
 /** Info-Zeile bei geteilten Ordnern. */
 function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void }) {

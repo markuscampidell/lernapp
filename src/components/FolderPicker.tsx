@@ -101,7 +101,7 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
               {scope === 'shared' && (
                 <span className="crumb">
                   <Icon name="chevron" size={14} />
-                  <button onClick={() => setCurrent(SHARED_ROOT)}>Geteilte Ordner</button>
+                  <button onClick={() => setCurrent(SHARED_ROOT)}>Geteilt mit dir</button>
                 </span>
               )}
               {path.map((p) => (
@@ -117,7 +117,7 @@ export function FolderPicker({ title, startId = null, allowRoot, isDisabled, con
                   <Icon name="users" size={22} />
                 </span>
                 <div className="card-main">
-                  <strong className="ellipsis">Geteilte Ordner</strong>
+                  <strong className="ellipsis">Geteilt mit dir</strong>
                   <span className="muted small ellipsis">{sharedTops.length} geteilt mit dir</span>
                 </div>
                 <Icon name="chevron" />

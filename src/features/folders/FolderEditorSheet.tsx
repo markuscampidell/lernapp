@@ -63,7 +63,7 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
   const isSub = parent !== null && parent !== SHARED_ROOT;
   const noun = isSub ? 'Unterordner' : 'Ordner';
   const targetPath =
-    target === SHARED_ROOT ? 'Geteilte Ordner' : pathOf(folders, target).map((p) => p.name).join(' / ') || (scopeOf(folders, target) === 'mine' ? 'Meine Ordner' : 'Oberste Ebene');
+    target === SHARED_ROOT ? 'Geteilt mit dir' : pathOf(folders, target).map((p) => p.name).join(' / ') || (scopeOf(folders, target) === 'mine' ? 'Meine Ordner' : 'Oberste Ebene');
   // Löschen/Verschieben nur, wenn erlaubt (geteilte Ordner: Besitzer oder eigene Einträge).
   // Nur eine Person gleichzeitig bearbeitet die Details eines geteilten Ordners.
   const lock = useDetailsLock(folder, !!folder && (canEditFolder(folder) || canSetAccess(folder)) && online);

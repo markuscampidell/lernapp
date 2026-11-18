@@ -136,7 +136,7 @@ export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder;
             ? `Die neuen Personen sehen nur „${folder.name}“, nicht den Rest von „${aboveName}“.`
             : share
             ? `Die neuen Personen sehen „${folder.name}“ mit allem darin.`
-            : `„${folder.name}“ wird mit allem darin auf den Server geladen und bleibt bei dir unter „Meine Ordner“. Die Personen sehen ihn unter „Geteilte Ordner“. Max. 50 MB pro Datei.`}
+            : `„${folder.name}“ wird mit allem darin auf den Server geladen und bleibt bei dir unter „Meine Ordner“. Die Personen sehen ihn unter „Geteilt mit dir“. Max. 50 MB pro Datei.`}
         </p>
         {inner.length > 0 && (
           <p className="notice info">

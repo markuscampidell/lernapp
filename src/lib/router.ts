@@ -15,7 +15,8 @@ const TABS: Tab[] = ['ordner', 'hochladen', 'einstellungen'];
 
 export function parseHash(hash = window.location.hash): Route {
   const [tab, id, file] = hash.replace(/^#/, '').split('/');
-  if (tab === 'geteilt') return { tab: 'ordner', folderId: SHARED_ROOT };
+  // Früher eigener Bereich „Geteilte Ordner“ – jetzt Teil der Ordner-Übersicht.
+  if (tab === 'geteilt') return { tab: 'ordner', folderId: null };
   if (!TABS.includes(tab as Tab)) return { tab: 'ordner', folderId: null };
   // #ordner/<id> = geöffneter Ordner
   const folderId = tab === 'ordner' && id ? decodeURIComponent(id) : null;
@@ -23,7 +24,7 @@ export function parseHash(hash = window.location.hash): Route {
 }
 
 export const folderHash = (id: string | null) =>
-  id === SHARED_ROOT ? '#geteilt' : id ? `#ordner/${encodeURIComponent(id)}` : '#ordner';
+  id === SHARED_ROOT ? '#ordner' : id ? `#ordner/${encodeURIComponent(id)}` : '#ordner';
 
 const EVENT = 'lernapp:route';
 const emit = () => window.dispatchEvent(new Event(EVENT));
