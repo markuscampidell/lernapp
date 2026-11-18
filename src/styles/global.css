@@ -3893,3 +3893,42 @@ button.avatar-edit-badge {
 .viewer:has(> .comment-panel) .viewer-body {
   padding-bottom: calc(34dvh + 16px);
 }
+
+/* ---------- Ordner: Kopfzeile und "Hinzufügen" bleiben beim Scrollen oben ---------- */
+.sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  /* Hintergrund seitlich bis zum Rand verlängern, ohne das Layout zu ändern. */
+  box-shadow: 0 0 0 100vmax var(--bg);
+  clip-path: inset(0 -100vmax);
+  padding: 6px 0;
+}
+.sticky-bar.sticky-second {
+  top: var(--sticky-top, 0px);
+  z-index: 4;
+  margin-top: -6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid transparent;
+}
+div.sticky-bar:has(> .view-header) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Handy: beide Knöpfe nebeneinander, ohne Untertitel – damit die feste Leiste schmal bleibt. */
+@media (max-width: 600px) {
+  .action-row.sticky-bar {
+    flex-wrap: nowrap;
+  }
+  .action-row.sticky-bar .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+  }
+  .action-row.sticky-bar .add-btn-text small,
+  .action-row.sticky-bar .add-btn > svg:last-child {
+    display: none;
+  }
+}

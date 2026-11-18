@@ -240,8 +240,19 @@ function FolderPage({
     el.click();
   };
 
+  // Obere Leiste (Zurück, Pfad) und "Hinzufügen" bleiben beim Scrollen oben – die zweite sitzt direkt unter der ersten.
+  const topBar = useRef<HTMLDivElement>(null);
+  const [topH, setTopH] = useState(0);
+  useEffect(() => {
+    const el = topBar.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setTopH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [!!folder]);
+
   return (
-    <section className="view">
+    <section className="view" style={{ '--sticky-top': `${topH}px` } as React.CSSProperties}>
       {sel && (
         <SelectionBar
           count={sel.folders.size + sel.files.size}
@@ -263,6 +274,7 @@ function FolderPage({
       )}
       {folder ? (
         <>
+          <div className="sticky-bar" ref={topBar}>
           <div className="folder-top">
             <button className="icon-btn" aria-label="Zurück" onClick={() => goUp(folder.parentId)}>
               <Icon name="back" />
@@ -285,6 +297,7 @@ function FolderPage({
               <Icon name="info" />
             </button>
           </div>
+          </div>
           <header className="folder-head">
             <FolderThumb folder={folder} size="lg" expand />
             <div className="grow">
@@ -293,7 +306,7 @@ function FolderPage({
             </div>
           </header>
           <SharedInfo folder={folder} onPeople={() => setSheet('share')} />
-          <div className="action-row">
+          <div className="action-row sticky-bar sticky-second">
             <button className="btn primary add-btn" onClick={() => setSheet('menu')} disabled={!canAdd}>
               <Icon name="plus" size={18} />
               <span className="add-btn-text">
@@ -310,6 +323,7 @@ function FolderPage({
         </>
       ) : (
         <>
+          <div className="sticky-bar">
           <header className="view-header">
             <h1>Ordner</h1>
             {scope === 'mine' && (
@@ -319,6 +333,7 @@ function FolderPage({
             )}
           </header>
           {cloudEnabled && <ScopeSwitch scope={scope} />}
+          </div>
         </>
       )}
       {!folder && scope === 'shared' && <SharedRootIntro />}
