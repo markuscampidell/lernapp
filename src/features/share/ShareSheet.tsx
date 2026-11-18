@@ -219,7 +219,22 @@ export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder;
 
   const nobody = fromAbove.length === 0 && onlyHere.length === 0;
   return (
-    <Sheet title={`„${name}“ – Personen`} onClose={() => !busy && onClose()} footer={footer}>
+    <Sheet
+      title={`„${name}“ – Personen`}
+      onClose={() => !busy && onClose()}
+      footer={
+        (amOwner && !busy) || footer ? (
+          <div className="footer-stack">
+            {amOwner && !busy && (
+              <button className="btn primary" onClick={() => setAdding(true)} disabled={!canAdd} title={addProblem ?? undefined}>
+                <Icon name="plus" size={18} /> Personen hinzufügen
+              </button>
+            )}
+            {footer}
+          </div>
+        ) : undefined
+      }
+    >
       <div className="people">
         <PersonRow id={ownerId} you={ownerId === user.id} label="Besitzer" />
       </div>
@@ -265,11 +280,6 @@ export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder;
 
       {nobody && <p className="muted small">{file ? 'Nur du siehst diese Datei.' : 'Noch mit niemandem geteilt – nur du siehst diesen Ordner.'}</p>}
 
-      {amOwner && (
-        <button className="btn ghost" onClick={() => setAdding(true)} disabled={!canAdd} title={addProblem ?? undefined}>
-          <Icon name="plus" size={18} /> Personen hinzufügen
-        </button>
-      )}
       {amOwner && addProblem && <p className="muted small">{addProblem}</p>}
       <p className="muted small">
         {amOwner

@@ -8,7 +8,7 @@ import { LightboxHost } from './components/Lightbox';
 import { FoldersView } from './features/folders/FoldersView';
 import { UploadView } from './features/upload/UploadView';
 import { SettingsView } from './features/settings/SettingsView';
-import { navigate, useRoute, type Tab } from './lib/router';
+import { folderHash, navigate, useRoute, type Tab } from './lib/router';
 import { useLibrary } from './state/Library';
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -24,11 +24,17 @@ export function App() {
   // Richtung des letzten Tabwechsels (für die Einschub-Animation).
   const [slide, setSlide] = useState<'left' | 'right' | null>(null);
 
+  // Zuletzt geöffneter Ort im Ordner-Tab (Ordner, "Geteilte Ordner" …) – beim Zurückkehren dorthin.
+  const lastOrdner = useRef('#ordner');
+  if (tab === 'ordner') lastOrdner.current = folderHash(route.folderId);
+
   const go = (t: Tab, from: 'tap' | 'swipe' = 'tap') => {
     const dir = TABS.findIndex((x) => x.id === t) > TABS.findIndex((x) => x.id === tab) ? 'left' : 'right';
     setSlide(from === 'swipe' && t !== tab ? dir : null);
-    // Erneutes Tippen auf "Ordner" führt zurück zur Übersicht.
-    navigate(`#${t}`);
+    // Von einem anderen Tab: zurück an den zuletzt geöffneten Ort. Erneutes Tippen auf "Ordner" führt zur Übersicht.
+    if (t === 'ordner' && tab !== 'ordner') navigate(lastOrdner.current);
+    else if (t === 'ordner' && route.folderId) navigate(lastOrdner.current = '#ordner');
+    else navigate(`#${t}`);
     window.scrollTo({ top: 0 });
   };
 
