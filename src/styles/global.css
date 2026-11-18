@@ -4306,58 +4306,58 @@ div.sticky-bar:has(> .view-header) {
   background: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px) 0 0 / 100% 34px, radial-gradient(ellipse at 50% 30%, #2a4b3e, #1a3329 75%);
 }
 :root[data-bg='strand'] {
-  --bg: #e9f6fb;
+  --bg: #d8eef8;
 }
 :root[data-bg='strand'] body::before,
 :root[data-bg='strand'] .sticky-bar::before,
 :root[data-bg='strand'] .viewer::before,
 .bgp-strand {
-  background: url('../assets/backgrounds/strand.svg') center / cover no-repeat, #e9f6fb;
+  background: url('../assets/backgrounds/strand.svg') center / cover no-repeat, #d8eef8;
 }
 :root[data-bg='weltall'] {
-  --bg: #0b1020;
+  --bg: #0b0e26;
 }
 :root[data-bg='weltall'] body::before,
 :root[data-bg='weltall'] .sticky-bar::before,
 :root[data-bg='weltall'] .viewer::before,
 .bgp-weltall {
-  background: url('../assets/backgrounds/weltall.svg') center / cover no-repeat, #0b1020;
+  background: url('../assets/backgrounds/weltall.svg') center / cover no-repeat, #0b0e26;
 }
 :root[data-bg='sonnenuntergang'] {
-  --bg: #fbd5bd;
+  --bg: #3a2a5e;
 }
 :root[data-bg='sonnenuntergang'] body::before,
 :root[data-bg='sonnenuntergang'] .sticky-bar::before,
 :root[data-bg='sonnenuntergang'] .viewer::before,
 .bgp-sonnenuntergang {
-  background: url('../assets/backgrounds/sonnenuntergang.svg') center / cover no-repeat, #fbd5bd;
+  background: url('../assets/backgrounds/sonnenuntergang.svg') center / cover no-repeat, #3a2a5e;
 }
 :root[data-bg='berge'] {
-  --bg: #eef4fa;
+  --bg: #e3eef7;
 }
 :root[data-bg='berge'] body::before,
 :root[data-bg='berge'] .sticky-bar::before,
 :root[data-bg='berge'] .viewer::before,
 .bgp-berge {
-  background: url('../assets/backgrounds/berge.svg') center / cover no-repeat, #eef4fa;
+  background: url('../assets/backgrounds/berge.svg') center / cover no-repeat, #e3eef7;
 }
 :root[data-bg='wald'] {
-  --bg: #0b1a15;
+  --bg: #08171a;
 }
 :root[data-bg='wald'] body::before,
 :root[data-bg='wald'] .sticky-bar::before,
 :root[data-bg='wald'] .viewer::before,
 .bgp-wald {
-  background: url('../assets/backgrounds/wald.svg') center / cover no-repeat, #0b1a15;
+  background: url('../assets/backgrounds/wald.svg') center / cover no-repeat, #08171a;
 }
 :root[data-bg='konfetti'] {
-  --bg: #fdfaf3;
+  --bg: #fdf8ef;
 }
 :root[data-bg='konfetti'] body::before,
 :root[data-bg='konfetti'] .sticky-bar::before,
 :root[data-bg='konfetti'] .viewer::before,
 .bgp-konfetti {
-  background: url('../assets/backgrounds/konfetti.svg') center / cover no-repeat, #fdfaf3;
+  background: url('../assets/backgrounds/konfetti.svg') center / cover no-repeat, #fdf8ef;
 }
 /* Mit Muster: feste Leisten halb durchsichtig, Überschriften auf dem Muster gut lesbar */
 .main {

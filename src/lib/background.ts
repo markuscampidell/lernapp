@@ -9,15 +9,15 @@ export interface Background {
 
 export const BACKGROUNDS: Background[] = [
   { id: 'standard', name: 'Standard', scheme: null },
-  { id: 'punkte', name: 'Punkte', scheme: 'light' },
-  { id: 'dunkel', name: 'Dunkel', scheme: 'dark' },
+  { id: 'punkte', name: 'Punkte hell', scheme: 'light' },
+  { id: 'dunkel', name: 'Punkte dunkel', scheme: 'dark' },
   { id: 'karo', name: 'Karopapier', scheme: 'light' },
   { id: 'tafel', name: 'Tafel', scheme: 'dark' },
   { id: 'strand', name: 'Strand', scheme: 'light' },
   { id: 'weltall', name: 'Weltall', scheme: 'dark' },
-  { id: 'sonnenuntergang', name: 'Sonnenuntergang', scheme: 'light' },
-  { id: 'berge', name: 'Berge', scheme: 'light' },
-  { id: 'wald', name: 'Wald', scheme: 'dark' },
+  { id: 'sonnenuntergang', name: 'Abendrot', scheme: 'dark' },
+  { id: 'berge', name: 'Alpensee', scheme: 'light' },
+  { id: 'wald', name: 'Mondwald', scheme: 'dark' },
   { id: 'konfetti', name: 'Konfetti', scheme: 'light' },
 ];
 
