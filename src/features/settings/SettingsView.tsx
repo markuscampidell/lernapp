@@ -11,6 +11,7 @@ import { useAuth } from '../../cloud/auth';
 import { serverUsage } from '../../cloud/remote';
 import { cacheLimit, cacheSize } from '../../storage/blobs';
 import { NotificationSetting } from '../notifications/NotificationSetting';
+import { BackgroundPicker } from '../background/BackgroundPicker';
 
 export function SettingsView() {
   const lib = useLibrary();
@@ -98,6 +99,8 @@ export function SettingsView() {
 
       <h2 className="settings-group">Auf diesem Gerät</h2>
       <p className="muted small">Gilt nur für dieses Gerät – nicht für dein Konto.</p>
+
+      <BackgroundPicker />
 
       {cloudEnabled && <NotificationSetting />}
 

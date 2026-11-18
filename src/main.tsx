@@ -5,6 +5,10 @@ import { LibraryProvider } from './state/Library';
 import { AuthProvider } from './cloud/auth';
 import { navigate } from './lib/router';
 import './styles/global.css';
+import { applyBackground, loadBackground } from './lib/background';
+
+// Gewählten Hintergrund sofort setzen (kein Aufblitzen des Standard-Hintergrunds).
+applyBackground(loadBackground());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
