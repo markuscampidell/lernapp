@@ -157,7 +157,7 @@ export function FileViewer({ file: initial, onClose, openComments }: { file: Fil
   const where = pathOf(folders, file.folderId).map((p) => p.name).join(' / ');
 
   return (
-    <div className="viewer" role="dialog" aria-modal="true" aria-label={title}>
+    <div className="viewer" data-kind={kind} role="dialog" aria-modal="true" aria-label={title}>
       <header className="viewer-header">
         <button className="icon-btn" aria-label="Schließen" onClick={onClose}>
           <Icon name="back" />

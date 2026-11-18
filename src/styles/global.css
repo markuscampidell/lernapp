@@ -4557,3 +4557,10 @@ div.sticky-bar:has(> .view-header) {
 :root:not(:has(.viewer, .lightbox)) .app {
   touch-action: pan-y;
 }
+/* Auch in Notizen, Karteikarten, Quiz, Lückentexten, Diagrammen und Glücksrädern kein Zwei-Finger-Zoom
+   (Ansicht, Editoren und Lern-Modi) – die festen Knöpfe sollen nicht aus dem Bild rutschen.
+   PDFs, Bilder und Text-Dokumente (eigener Zoom) bleiben zoombar. */
+.viewer:is([data-kind='text'], [data-kind='flashcards'], [data-kind='quiz'], [data-kind='gaps'], [data-kind='chart'], [data-kind='wheel']),
+.study-screen:not(:has(.doc-editor)) {
+  touch-action: pan-y;
+}
