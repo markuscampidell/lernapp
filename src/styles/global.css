@@ -4627,3 +4627,12 @@ div.sticky-bar:has(> .view-header) {
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
+/* Mit Hintergrund: nicht gewählte Bereiche in der Leiste immer lesbar – volle Textfarbe plus leichter Schein
+   in der Hintergrundfarbe (hebt sich von hellen wie dunklen Stellen ab). */
+:root[data-bg] .nav-item:not(.active) {
+  color: var(--text);
+  text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg), 0 0 14px var(--bg);
+}
+:root[data-bg] .nav-item:not(.active) svg {
+  filter: drop-shadow(0 0 2px var(--bg)) drop-shadow(0 0 6px var(--bg));
+}
