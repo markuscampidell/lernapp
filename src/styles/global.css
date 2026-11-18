@@ -3763,34 +3763,18 @@ button.avatar-edit-badge {
   cursor: grabbing;
 }
 
-/* ---------- Ordner: Unterordner und Dateien getrennt, jeweils eigenes Scrollen ---------- */
+/* ---------- Ordner: Unterordner und Dateien ----------
+   Handy/Tablet: eine normale Liste, die mit der Seite scrollt (Unterordner oben, Dateien darunter).
+   PC (breiter Bildschirm, automatisch erkannt): zwei Bereiche nebeneinander, die jeweils für sich scrollen. */
 .split {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  /* Zusammen höchstens so hoch wie der Bildschirm (ohne Navigationsleiste). */
-  max-height: calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom) - 40px);
+  gap: 14px;
 }
 .split-pane {
-  flex: 0 1 auto;
-  min-height: 140px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.split-pane .section-title {
-  margin: 2px 4px 0;
-}
-.split-pane .list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 2px;
 }
 @media (min-width: 900px) {
   .view:has(.split) {
@@ -3799,12 +3783,26 @@ button.avatar-edit-badge {
   .split {
     flex-direction: row;
     align-items: flex-start;
-    max-height: none;
+    gap: 12px;
   }
   .split-pane {
     flex: 1 1 0;
     min-width: 0;
-    max-height: calc(100dvh - 72px);
+    max-height: calc(100dvh - var(--sticky-top, 0px) - 120px);
+    padding: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .split-pane .section-title {
+    margin: 2px 4px 0;
+  }
+  .split-pane .list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 2px;
   }
 }
 
