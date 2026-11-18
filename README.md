@@ -82,7 +82,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
    , `supabase/010_aenderungen.sql` („Was hat sich geändert?“ bei geteilten Dateien)
    , `supabase/011_speicher.sql` (belegten Server-Speicher anzeigen und vor Uploads prüfen)
    , `supabase/012_benachrichtigungen.sql` (Push-Benachrichtigungen, siehe unten)
-   und `supabase/013_sicherheit.sql` (Sicherheits-Update: Funktionen und Dateien besser geschützt).
+   , `supabase/013_sicherheit.sql` (Sicherheits-Update: Funktionen und Dateien besser geschützt)
+   und `supabase/014_mehr_benachrichtigungen.sql` (Benachrichtigung bei Neuem in eigenen Ordnern und Änderungen an eigenen Einträgen).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

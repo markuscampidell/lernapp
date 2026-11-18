@@ -17,12 +17,12 @@ const readSeen = (userId: string) => {
   }
 };
 
-const ICON: Record<string, IconName> = { comment: 'comment', share: 'users', handover: 'folder' };
+const ICON: Record<string, IconName> = { comment: 'comment', share: 'users', handover: 'folder', new_item: 'plus', change: 'edit' };
 
 /** Kommentar-Neuigkeiten öffnen die Datei gleich mit offenen Kommentaren. */
 const target = (n: NewsItem) => (n.kind === 'comment' && /^#ordner\/[^/]+\/[^/]+$/.test(n.url) ? `${n.url}/kommentare` : n.url);
 
-/** Glocke in der Ordner-Übersicht: neue Kommentare, neu geteilte Ordner, Übergaben. */
+/** Glocke in der Ordner-Übersicht: neue Kommentare, neu geteilte Ordner, Neues in eigenen Ordnern, Änderungen an eigenen Einträgen, Übergaben. */
 export function NewsBell() {
   const { me, online } = useLibrary();
   const [items, setItems] = useState<NewsItem[] | null>(null);
