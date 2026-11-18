@@ -337,7 +337,7 @@ function FolderPage({
             <div className="view-header-actions">
               <NewsBell />
               <button className="btn primary" onClick={() => setSheet('newFolder')}>
-                <Icon name="plus" /> Neuer Ordner
+                <Icon name="plus" /> Ordner
               </button>
             </div>
           </header>
@@ -400,7 +400,7 @@ function FolderPage({
             // Übersicht: „Meine Ordner“ und „Geteilt mit dir“ – am PC nebeneinander, am Handy untereinander.
             <div className="split">
               <section className="split-pane" aria-label="Meine Ordner">
-                <h3 className="section-title">Meine Ordner{subfolders.length > 0 && ` · ${subfolders.length}`}</h3>
+                <h3 className="section-title">Meine Ordner{subfolders.length > 0 && <span className="section-count">{subfolders.length}</span>}</h3>
                 {subfolders.length === 0 ? (
                   <p className="muted small">Noch keine Ordner. Lege oben mit „Neuer Ordner“ einen an, z. B. für ein Fach.</p>
                 ) : (
@@ -414,7 +414,7 @@ function FolderPage({
                 )}
               </section>
               <section className={`split-pane${me && sharedTops.length === 0 ? ' pc-only' : ''}`} aria-label="Geteilt mit dir">
-                <h3 className="section-title">Geteilt mit dir{sharedTops.length > 0 && ` · ${sharedTops.length}`}</h3>
+                <h3 className="section-title">Geteilt mit dir{sharedTops.length > 0 && <span className="section-count">{sharedTops.length}</span>}</h3>
                 {!me ? (
                   <p className="muted small">
                     Melde dich in den <button className="link" onClick={() => navigate('#einstellungen')}>Einstellungen</button> an, um Ordner mit anderen zu teilen.
@@ -439,7 +439,7 @@ function FolderPage({
             // Beides vorhanden: zwei Bereiche, die jeweils für sich scrollen (Handy: oben/unten, PC: nebeneinander).
             <div className="split">
               <section className="split-pane" aria-label="Unterordner">
-                <h3 className="section-title">Unterordner · {subfolders.length}</h3>
+                <h3 className="section-title">Unterordner<span className="section-count">{subfolders.length}</span></h3>
                 <ul className="list">
                   {subfolders.map((f) => (
                     <li key={f.id}>
@@ -449,7 +449,7 @@ function FolderPage({
                 </ul>
               </section>
               <section className="split-pane" aria-label="Dateien">
-                <h3 className="section-title">Dateien · {ownFiles.length}</h3>
+                <h3 className="section-title">Dateien<span className="section-count">{ownFiles.length}</span></h3>
                 <ul className="list">
                   {ownFiles.map((f) => (
                     <li key={f.id}>
@@ -757,38 +757,43 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
 }
 
 type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz' | 'gaps' | 'chart' | 'wheel' | 'ai';
-const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; text: string; touchOnly?: boolean }[] = [
-  { id: 'files', icon: 'upload', title: 'Dateien durchsuchen', text: 'PDFs, Bilder, Präsentationen, Videos … von deinem Gerät' },
-  { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', text: 'Direkt mit der Kamera', touchOnly: true },
-  { id: 'doc', icon: 'richdoc', title: 'Text-Dokument', text: 'Formatierter Text mit Überschriften, Listen, Checklisten und Bildern' },
-  { id: 'note', icon: 'text', title: 'Notiz', text: 'Schnell ein paar Zeilen reiner Text' },
-  { id: 'cards', icon: 'cards', title: 'Karteikarten', text: 'Vorder- und Rückseite, mit Lernmodus' },
-  { id: 'quiz', icon: 'quiz', title: 'Quiz', text: 'Multiple Choice mit Auswertung' },
-  { id: 'gaps', icon: 'gaps', title: 'Lückentext', text: 'Wörter einsetzen oder selbst schreiben' },
-  { id: 'chart', icon: 'chart', title: 'Diagramm', text: 'Säulen, Balken, Linie, Kreis – auch in Text-Dokumente einfügbar' },
-  { id: 'wheel', icon: 'wheel', title: 'Glücksrad', text: 'Zufällig auswählen – auch in Text-Dokumente einfügbar' },
-  { id: 'ai', icon: 'sparkle', title: 'Mit KI erstellen', text: 'Prompt für ChatGPT, Claude & Co. – Antwort einfügen, fertig' },
+const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; short: string; text: string; touchOnly?: boolean }[] = [
+  { id: 'files', icon: 'upload', title: 'Dateien durchsuchen', short: 'Datei', text: 'PDFs, Bilder, Präsentationen, Videos … von deinem Gerät' },
+  { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', short: 'Foto', text: 'Direkt mit der Kamera', touchOnly: true },
+  { id: 'doc', icon: 'richdoc', title: 'Text-Dokument', short: 'Dokument', text: 'Formatierter Text mit Überschriften, Listen, Checklisten und Bildern' },
+  { id: 'note', icon: 'text', title: 'Notiz', short: 'Notiz', text: 'Schnell ein paar Zeilen reiner Text' },
+  { id: 'cards', icon: 'cards', title: 'Karteikarten', short: 'Karteikarten', text: 'Vorder- und Rückseite, mit Lernmodus' },
+  { id: 'quiz', icon: 'quiz', title: 'Quiz', short: 'Quiz', text: 'Multiple Choice mit Auswertung' },
+  { id: 'gaps', icon: 'gaps', title: 'Lückentext', short: 'Lückentext', text: 'Wörter einsetzen oder selbst schreiben' },
+  { id: 'chart', icon: 'chart', title: 'Diagramm', short: 'Diagramm', text: 'Säulen, Balken, Linie, Kreis – auch in Text-Dokumente einfügbar' },
+  { id: 'wheel', icon: 'wheel', title: 'Glücksrad', short: 'Glücksrad', text: 'Zufällig auswählen – auch in Text-Dokumente einfügbar' },
+  { id: 'ai', icon: 'sparkle', title: 'Mit KI erstellen', short: 'Mit KI erstellen', text: 'Prompt für ChatGPT, Claude & Co. – Antwort einfügen, fertig' },
 ];
 
 /** Auswahl, was in den Ordner hinzugefügt werden soll. */
 function AddMenu({ onPick, onClose }: { onPick: (c: AddChoice) => void; onClose: () => void }) {
-  const option = (o: (typeof ADD_OPTIONS)[number]) => (
-    <button key={o.id} className="card card-btn row-card add-option" onClick={() => onPick(o.id)}>
-      <span className={`thumb add-icon add-${o.id}`}>
-        <Icon name={o.icon} size={22} />
-      </span>
-      <div className="card-main">
-        <strong>{o.title}</strong>
-        <span className="muted small">{o.text}</span>
-      </div>
-      <Icon name="chevron" />
-    </button>
-  );
+  // Kacheln mit einem Wort statt einer Liste mit Beschreibungen; die Beschreibung steht im Tooltip.
   const ai = ADD_OPTIONS.find((o) => o.id === 'ai')!;
   return (
-    // "Mit KI erstellen" bleibt immer unten sichtbar, nur die übrigen Möglichkeiten scrollen
-    <Sheet title="Hinzufügen" onClose={onClose} footer={<div className="add-menu-ai">{option(ai)}</div>}>
-      <div className="add-menu">{ADD_OPTIONS.filter((o) => o.id !== 'ai' && (!o.touchOnly || isTouchDevice)).map(option)}</div>
+    <Sheet
+      title="Hinzufügen"
+      onClose={onClose}
+      footer={
+        <button className="btn ghost grow add-ai-btn" onClick={() => onPick('ai')} title={ai.text}>
+          <Icon name="sparkle" size={20} /> {ai.short}
+        </button>
+      }
+    >
+      <div className="add-grid">
+        {ADD_OPTIONS.filter((o) => o.id !== 'ai' && (!o.touchOnly || isTouchDevice)).map((o) => (
+          <button key={o.id} className="add-tile" onClick={() => onPick(o.id)} title={o.text}>
+            <span className={`thumb add-icon add-${o.id}`}>
+              <Icon name={o.icon} size={24} />
+            </span>
+            {o.short}
+          </button>
+        ))}
+      </div>
     </Sheet>
   );
 }

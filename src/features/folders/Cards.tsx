@@ -24,13 +24,18 @@ export interface ItemCardProps {
   isNew?: boolean;
 }
 
-function ItemCard({ onClick, onEdit, onInfo, onLongPress, selecting, selected, thumb, children, label }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string }) {
+function ItemCard({ onClick, onEdit, onInfo, onLongPress, selecting, selected, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
   const press = useLongPress(onLongPress);
   return (
     <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}`}>
       <button className="item-main" onClick={onClick} {...press} aria-pressed={selecting ? !!selected : undefined}>
         {thumb}
         <div className="card-main">{children}</div>
+        {chevron && !selecting && !onEdit && !onInfo && (
+          <span className="item-chevron" aria-hidden="true">
+            <Icon name="chevron" size={18} />
+          </span>
+        )}
         {selecting && (
           <span className={`tick${selected ? ' on' : ''}`} aria-hidden="true">
             {selected && <Icon name="check" size={16} />}
@@ -96,7 +101,7 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
     </span>
   );
   return (
-    <ItemCard {...rest} thumb={thumb} label={folder.name}>
+    <ItemCard {...rest} thumb={thumb} label={folder.name} chevron>
       <strong className="wrap-text">{folder.name}</strong>
       {path && <span className="muted small wrap-text">{path}</span>}
       {folder.description && <span className="muted small wrap-text">{folder.description}</span>}

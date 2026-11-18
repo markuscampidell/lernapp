@@ -40,11 +40,18 @@ const KIND_ICON: Record<FileKind, IconName> = {
   other: 'file',
 };
 
-export function FolderThumb({ folder, size = 'md', expand }: { folder: Pick<Folder, 'imageId'> & { name?: string }; size?: 'md' | 'lg'; expand?: boolean }) {
+/** Feste Farbe pro Ordner (aus der ID bzw. dem Namen), damit man Ordner auf einen Blick unterscheidet. */
+const toneOf = (key: string) => {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h % 4;
+};
+
+export function FolderThumb({ folder, size = 'md', expand }: { folder: Pick<Folder, 'imageId'> & { name?: string; id?: string }; size?: 'md' | 'lg'; expand?: boolean }) {
   const url = useBlobUrl(folder.imageId);
   const zoom = expand && url ? zoomProps(() => openLightbox({ src: url, alt: folder.name }), 'Ordnerbild') : {};
   return (
-    <span className={`thumb folder-thumb ${size}${expand && url ? ' zoomable' : ''}`} {...zoom}>
+    <span className={`thumb folder-thumb tone-${toneOf(folder.id ?? folder.name ?? '')} ${size}${expand && url ? ' zoomable' : ''}`} {...zoom}>
       {url ? <img src={url} alt="" /> : <Icon name="folder" size={size === 'lg' ? 30 : 22} />}
     </span>
   );

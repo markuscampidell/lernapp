@@ -3979,3 +3979,214 @@ div.sticky-bar:has(> .view-header) {
     display: none !important;
   }
 }
+
+/* =====================================================================
+   Neuer Stil (Nov 2026): klarere Knöpfe, Rahmen statt Schatten, farbige Ordner,
+   ruhigere Überschriften. Alles hier – zum Zurücknehmen genügt dieser Block.
+   ===================================================================== */
+:root {
+  --bg: #f4f4f2;
+  --line: #e4e4e0;
+  --line-strong: #c9c9c3;
+  --tone-0: #1f5fae; --tone-0-bg: #e2edfb;
+  --tone-1: #b34a1c; --tone-1-bg: #fde7dc;
+  --tone-2: #1a7040; --tone-2-bg: #e3f3e8;
+  --tone-3: #6a3bb0; --tone-3-bg: #eee5fa;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #262625;
+    --line: #45453f;
+    --line-strong: #5e5d57;
+    --tone-0: #7fb0ef; --tone-0-bg: #22324a;
+    --tone-1: #f0a07a; --tone-1-bg: #45291c;
+    --tone-2: #74d39b; --tone-2-bg: #1d3727;
+    --tone-3: #c4a3f0; --tone-3-bg: #34274a;
+  }
+}
+/* Karten: dünner Rahmen statt Schatten */
+.card {
+  box-shadow: none;
+  border: 1px solid var(--line);
+}
+.sheet-body .card {
+  border-color: transparent;
+}
+.item-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.item-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.item-main {
+  min-height: 64px;
+  border-radius: 16px;
+}
+.item-chevron {
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-right: 4px;
+  color: var(--text-3);
+}
+.thumb {
+  width: 44px;
+  height: 44px;
+}
+/* Ordner: jede Farbe fest pro Ordner */
+.folder-thumb.tone-0 { color: var(--tone-0); background: var(--tone-0-bg); }
+.folder-thumb.tone-1 { color: var(--tone-1); background: var(--tone-1-bg); }
+.folder-thumb.tone-2 { color: var(--tone-2); background: var(--tone-2-bg); }
+.folder-thumb.tone-3 { color: var(--tone-3); background: var(--tone-3-bg); }
+.folder-thumb svg,
+.file-thumb svg,
+.add-icon svg {
+  stroke-width: 2;
+}
+/* Knöpfe: Hauptknopf dunkel, zweiter Knopf mit klarem Rahmen */
+.btn {
+  min-height: 48px;
+  font-weight: 650;
+  font-size: 1rem;
+}
+.btn svg {
+  stroke-width: 2.2;
+}
+.btn.ghost {
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+}
+.btn.ghost:disabled,
+.btn.primary:disabled {
+  opacity: 0.45;
+}
+.btn.small {
+  min-height: 36px;
+  font-size: 0.9rem;
+}
+/* Im Ordner: "Hinzufügen" und "Unterordner" gleich groß, eckiger */
+.action-row .btn {
+  min-height: 50px;
+  border-radius: 14px;
+}
+/* Überschriften der Bereiche: normal geschrieben, Anzahl daneben */
+.section-title {
+  margin: 8px 0 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.section-count {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-2);
+}
+/* Suche */
+.search {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  min-height: 48px;
+}
+/* Glocke */
+.bell-btn {
+  width: 48px;
+  height: 48px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+}
+.bell-btn svg {
+  stroke-width: 2;
+}
+.bell-btn .count-badge {
+  top: -3px;
+  right: -3px;
+  min-width: 20px;
+  height: 20px;
+  line-height: 20px;
+  font-size: 0.75rem;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+/* Untere Leiste (Handy): aktiver Bereich als dunkle Pille */
+.nav {
+  background: var(--surface);
+}
+@media (max-width: 899px) {
+  .nav-item {
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-2);
+  }
+  .nav-item.active {
+    font-weight: 700;
+  }
+  .nav-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 30px;
+    border-radius: 999px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .nav-item.active .nav-icon {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+}
+/* Schließen-Knopf in Dialogen gut sichtbar */
+.sheet-header .icon-btn,
+.viewer-header > .icon-btn:first-child {
+  background: var(--surface-2);
+  color: var(--text);
+}
+/* "Hinzufügen": Kacheln mit einem Wort */
+.add-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.add-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 96px;
+  padding: 10px 4px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  transition: transform 0.1s;
+}
+.add-tile:active {
+  transform: scale(0.97);
+}
+.add-tile .thumb {
+  width: 46px;
+  height: 46px;
+}
+.add-icon.add-files,
+.add-icon.add-camera { color: var(--tone-0); background: var(--tone-0-bg); }
+.add-icon.add-doc,
+.add-icon.add-note { color: var(--tone-1); background: var(--tone-1-bg); }
+.add-icon.add-cards,
+.add-icon.add-quiz,
+.add-icon.add-gaps { color: var(--tone-2); background: var(--tone-2-bg); }
+.add-icon.add-chart,
+.add-icon.add-wheel { color: var(--tone-3); background: var(--tone-3-bg); }
+@media (min-width: 640px) {
+  .add-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
