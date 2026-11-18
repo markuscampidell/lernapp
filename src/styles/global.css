@@ -4570,3 +4570,53 @@ div.sticky-bar:has(> .view-header) {
 .sheet-backdrop {
   touch-action: pan-y;
 }
+
+/* ---------- PDF mit eigenem Zoom (wie Text-Dokumente) ---------- */
+.viewer[data-kind='pdf'] {
+  touch-action: pan-x pan-y;
+}
+.viewer[data-kind='pdf'] .viewer-body {
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.viewer-body > .pdf-view {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  width: calc(100% + 32px);
+  margin: 0 -16px;
+  gap: 0;
+}
+.pdf-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px calc(80px + env(safe-area-inset-bottom));
+  touch-action: pan-x pan-y;
+}
+.pdf-count {
+  margin: 0 0 10px;
+  text-align: center;
+}
+.pdf-sizer {
+  position: relative;
+  margin: 0 auto;
+}
+.pdf-stack {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transform-origin: 0 0;
+}
+.pdf-stack .pdf-page {
+  display: block;
+  flex: none;
+}
+.viewer:has(> .comment-panel) .pdf-scroll {
+  padding-bottom: calc(34dvh + 16px);
+}
