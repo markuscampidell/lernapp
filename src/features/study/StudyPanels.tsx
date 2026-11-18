@@ -1,3 +1,4 @@
+import { SideRail, RailButton } from '../../components/SideRail';
 import { useMemo, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
@@ -44,12 +45,23 @@ export function CardsPanel({ file, text }: { file: FileItem; text: string }) {
             {n} {n === 1 ? 'Karte' : 'Karten'}
           </strong>
         </div>
-        {editable && (
-          <button className="btn ghost" onClick={() => setMode('edit')}>
-            <Icon name="edit" size={18} /> Bearbeiten
-          </button>
-        )}
       </div>
+      <SideRail>
+        {n > 0 && (
+          <RailButton
+            primary
+            icon="play"
+            label={due.length ? `Wiederholen (${due.length})` : 'Lernen'}
+            onClick={() => {
+              if (due.length) {
+                setReviewCards(due);
+                setMode('review');
+              } else setMode('study');
+            }}
+          />
+        )}
+        {editable && <RailButton icon="edit" label="Bearbeiten" onClick={() => setMode('edit')} />}
+      </SideRail>
       {n > 0 && (
         <div className="card review-card">
           <div className="review-stats">
@@ -148,15 +160,11 @@ export function QuizPanel({ file, text }: { file: FileItem; text: string }) {
             {n} {n === 1 ? 'Frage' : 'Fragen'}
           </strong>
         </div>
-        {editable && (
-          <button className="btn ghost" onClick={() => setMode('edit')}>
-            <Icon name="edit" size={18} /> Bearbeiten
-          </button>
-        )}
-        <button className="btn primary" onClick={() => setMode('play')} disabled={n === 0}>
-          Quiz starten
-        </button>
       </div>
+      <SideRail>
+        <RailButton primary icon="play" label="Quiz starten" onClick={() => setMode('play')} disabled={n === 0} />
+        {editable && <RailButton icon="edit" label="Bearbeiten" onClick={() => setMode('edit')} />}
+      </SideRail>
       {n > 0 && (
         <div className="toggle-row small-toggle">
           <span>Richtige Antworten anzeigen</span>

@@ -1,3 +1,4 @@
+import { SideRail, RailButton } from '../../components/SideRail';
 import { useMemo, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
@@ -37,12 +38,11 @@ export function GapsPanel({ file, text }: { file: FileItem; text: string }) {
             </span>
           )}
         </div>
-        {editable && (
-          <button className="btn ghost" onClick={() => setMode('edit')}>
-            <Icon name="edit" size={18} /> Bearbeiten
-          </button>
-        )}
       </div>
+      <SideRail>
+        <RailButton primary icon="play" label="Üben" onClick={() => setMode(doc.mode === 'type' ? 'type' : 'drag')} disabled={n === 0} />
+        {editable && <RailButton icon="edit" label="Bearbeiten" onClick={() => setMode('edit')} />}
+      </SideRail>
       <div className="input-row wrap">
         <button className={`btn grow ${doc.mode === 'drag' ? 'primary' : 'ghost'}`} onClick={() => setMode('drag')} disabled={n === 0}>
           <Icon name="gaps" size={18} /> Wörter einsetzen

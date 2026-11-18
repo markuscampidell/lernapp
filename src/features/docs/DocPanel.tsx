@@ -1,3 +1,4 @@
+import { SideRail, RailButton } from '../../components/SideRail';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
@@ -112,12 +113,10 @@ export function DocPanel({ file, text }: { file: FileItem; text: string }) {
   const editable = canModify(file) && (!file.shareId || online);
   return (
     <div className="doc-panel">
-      {editable && (
-        <div className="doc-panel-actions">
-          <button className="btn primary" onClick={() => setEditing('edit')}>
-            <Icon name="edit" size={18} /> Bearbeiten
-          </button>
-        </div>
+      {editable && !editing && (
+        <SideRail>
+          <RailButton primary icon="edit" label="Bearbeiten" onClick={() => setEditing('edit')} />
+        </SideRail>
       )}
       {checks.notReady && <p className="notice warning">Häkchen werden noch nicht synchronisiert: Bitte supabase/005_checklisten.sql im Supabase „SQL Editor“ ausführen.</p>}
       {/* Der Editor öffnet sich darüber (im selben Bereich) – dann gehören Zoom & Seitenanzeige ihm, nicht der Ansicht dahinter */}

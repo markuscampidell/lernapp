@@ -1,9 +1,9 @@
+import { SideRail, RailButton } from '../../components/SideRail';
 import { useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
 import { Sheet } from '../../components/Sheet';
 import { TextLine } from '../../components/TextLine';
-import { Icon } from '../../components/Icon';
 import { DescriptionField } from '../../components/DescriptionField';
 import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
@@ -136,11 +136,9 @@ export function NotePanel({ file, text }: { file: FileItem; text: string }) {
   return (
     <>
       {editable && (
-        <div className="note-actions">
-          <button className="btn ghost" onClick={() => setEdit(true)}>
-            <Icon name="edit" size={18} /> Bearbeiten
-          </button>
-        </div>
+        <SideRail>
+          <RailButton primary icon="edit" label="Bearbeiten" onClick={() => setEdit(true)} />
+        </SideRail>
       )}
       <pre className="viewer-text">{text}</pre>
       {edit && <NoteEditor file={file} initial={text} onClose={() => setEdit(false)} />}

@@ -1,3 +1,4 @@
+import { SideRail, RailButton } from '../../components/SideRail';
 import { useMemo, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
@@ -26,12 +27,12 @@ export function ChartPanel({ file, text }: { file: FileItem; text: string }) {
         <button className="btn ghost" onClick={copy.run} disabled={!copy.prepared}>
           <Icon name={copy.done ? 'check' : 'copy'} size={18} /> {copy.done ? 'Kopiert' : 'Kopieren'}
         </button>
-        {editable && (
-          <button className="btn primary" onClick={() => setEditing(true)}>
-            <Icon name="edit" size={18} /> Bearbeiten
-          </button>
-        )}
       </div>
+      {editable && (
+        <SideRail>
+          <RailButton primary icon="edit" label="Bearbeiten" onClick={() => setEditing(true)} />
+        </SideRail>
+      )}
       {copy.done && <p className="notice info">Kopiert – in einem Text-Dokument einfügen (Strg+V bzw. lange tippen → Einfügen) oder dort über „Diagramm“ in der Leiste.</p>}
       <div className="card chart-preview" dangerouslySetInnerHTML={{ __html: svg }} />
       {chart.points.length > 0 && (

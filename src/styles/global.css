@@ -4460,3 +4460,74 @@ div.sticky-bar:has(> .view-header) {
 :root[data-bg] .study-bar {
   background: transparent;
 }
+
+/* ---------- Feste Aktions-Knöpfe rechts in der Mitte (Quiz starten, Bearbeiten …) ---------- */
+.side-rail {
+  position: fixed;
+  z-index: 30;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+.rail-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 20px 0 16px;
+  border: 1.5px solid var(--line-strong, var(--border));
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 650;
+  white-space: nowrap;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  transition: transform 0.1s;
+}
+.rail-btn.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.rail-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.rail-btn:disabled {
+  opacity: 0.5;
+}
+.rail-btn svg {
+  stroke-width: 2.2;
+}
+/* Handy: kompakte Kacheln mit kleiner Beschriftung, damit wenig vom Inhalt verdeckt wird */
+@media (max-width: 699px) {
+  .side-rail {
+    right: 8px;
+  }
+  .rail-btn {
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    width: 68px;
+    height: 64px;
+    padding: 4px;
+    border-radius: 18px;
+    font-size: 0.68rem;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.1;
+  }
+}
+/* Text-Dokumente: rechts am Rand sitzt die Seitenanzeige */
+.viewer:has(.page-scrubber) .side-rail {
+  right: 52px;
+}
+/* Kein Strich unter der Kopfzeile von Dateien */
+.viewer-header {
+  border-bottom: none;
+}
