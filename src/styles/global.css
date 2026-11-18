@@ -3807,3 +3807,85 @@ button.avatar-edit-badge {
     max-height: calc(100dvh - 72px);
   }
 }
+
+/* ---------- Kommentare: runder Knopf rechts unten, Leiste von unten (max. 1/3 der Höhe) ---------- */
+.comment-fab {
+  position: absolute;
+  z-index: 55;
+  right: 16px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  width: 58px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.comment-fab .count-badge {
+  top: -2px;
+  right: -2px;
+  min-width: 20px;
+  height: 20px;
+  line-height: 20px;
+  font-size: 0.75rem;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+/* Im Text-Dokument sitzt rechts unten schon der Zoom – dann darüber. */
+.viewer:has(.zoom-ctl) .comment-fab {
+  bottom: calc(70px + env(safe-area-inset-bottom));
+}
+.comment-panel {
+  position: absolute;
+  z-index: 60;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 33.3dvh;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 900px;
+  gap: 8px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+  animation: rise 0.18s ease-out;
+}
+.comments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+.comments-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.comment-panel .comment-form {
+  flex: none;
+  flex-direction: row;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.comment-panel .comment-form textarea {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.comment-panel .comment-replying {
+  flex-basis: 100%;
+}
+/* Damit das Ende der Datei nicht unter der Leiste verschwindet. */
+.viewer.comments-open .viewer-body {
+  padding-bottom: calc(34dvh + 16px);
+}

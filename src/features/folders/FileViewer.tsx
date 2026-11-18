@@ -28,6 +28,8 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   // Immer die aktuelle Version (nach Umbenennen/Verschieben).
   const file = files.find((f) => f.id === initial.id);
   const [blob, setBlob] = useState<Blob | null>(null);
+  // Kommentare erscheinen nur nach Tippen auf den Knopf – als Leiste unten (max. 1/3 der Höhe).
+  const [showComments, setShowComments] = useState(false);
   const [url, setUrl] = useState<string>();
   const [text, setText] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -150,7 +152,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const where = pathOf(folders, file.folderId).map((p) => p.name).join(' / ');
 
   return (
-    <div className="viewer" role="dialog" aria-modal="true" aria-label={title}>
+    <div className={`viewer${showComments ? ' comments-open' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
       <header className="viewer-header">
         <button className="icon-btn" aria-label="Schließen" onClick={onClose}>
           <Icon name="back" />
@@ -164,17 +166,6 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
         {(kind === 'pdf' || kind === 'image' || kind === 'text' || kind === 'video' || kind === 'audio') && (
           <button className="icon-btn" aria-label="In neuem Tab öffnen" title="In neuem Tab öffnen" onClick={open} disabled={!url}>
             <Icon name="open" />
-          </button>
-        )}
-        {canComment && (
-          <button
-            className="icon-btn badge-btn"
-            aria-label="Kommentare"
-            title="Kommentare"
-            onClick={() => document.getElementById('kommentare')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          >
-            <Icon name="comment" />
-            {comments.count > 0 && <span className={`count-badge${comments.unread ? ' unread' : ''}`}>{comments.count}</span>}
           </button>
         )}
         {cloudEnabled && !isOrphan(file.folderId) && (
@@ -206,12 +197,16 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
         )}
         {file.shareId && <ChangesBanner file={file} />}
         {body}
-        {canComment && (
-          <div id="kommentare">
-            <Comments file={file} />
-          </div>
-        )}
       </div>
+      {canComment &&
+        (showComments ? (
+          <Comments file={file} onClose={() => setShowComments(false)} />
+        ) : (
+          <button className="comment-fab" aria-label="Kommentare" title="Kommentare" onClick={() => setShowComments(true)}>
+            <Icon name="comment" size={26} />
+            {comments.count > 0 && <span className={`count-badge${comments.unread ? ' unread' : ''}`}>{comments.count}</span>}
+          </button>
+        ))}
       {editing && <FileEditorSheet file={file} onClose={() => setEditing(false)} />}
       {sharing && <ShareSheet file={file} onClose={() => setSharing(false)} />}
     </div>

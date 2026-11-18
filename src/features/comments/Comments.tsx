@@ -5,6 +5,7 @@ import { Avatar } from '../../components/Avatar';
 import { Icon } from '../../components/Icon';
 import { supabase } from '../../cloud/supabase';
 import { addComment, deleteComment, fetchComments, type Comment } from '../../cloud/remote';
+import { useBackToClose } from '../../lib/router';
 
 const MAX = 4000;
 
@@ -24,7 +25,8 @@ function ago(iso: string): string {
  * Kommentare unter einer Datei (nur für Dateien auf dem Server: geteilt oder „Auf allen Geräten“).
  * Alle, die die Datei sehen, können kommentieren und antworten; löschen kann man eigene, der Besitzer alle.
  */
-export function Comments({ file }: { file: FileItem }) {
+export function Comments({ file, onClose }: { file: FileItem; onClose: () => void }) {
+  useBackToClose(onClose);
   const { me, userName, online, isOwner, markCommentsRead, refreshRemote } = useLibrary();
   const [list, setList] = useState<Comment[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -135,19 +137,26 @@ export function Comments({ file }: { file: FileItem }) {
 
   const count = list?.length ?? 0;
   return (
-    <section className="comments card" aria-label="Kommentare">
-      <h3 className="comments-title">
-        <Icon name="comment" size={18} /> Kommentare{count ? ` (${count})` : ''}
-      </h3>
-      {list === null && !err && <p className="muted small">Lädt …</p>}
-      {list && count === 0 && <p className="muted small">Noch keine Kommentare. Frag etwas oder schreib einen Hinweis – alle, die diese Datei sehen, können antworten.</p>}
-      {threads.map(({ c, replies }) => (
-        <div key={c.id} className="comment-thread">
-          {item(c)}
-          {replies.map((r) => item(r, true))}
-        </div>
-      ))}
-      {err && <p className="notice warning">{err}</p>}
+    <section className="comments comment-panel" aria-label="Kommentare">
+      <div className="comments-head">
+        <h3 className="comments-title">
+          <Icon name="comment" size={18} /> Kommentare{count ? ` (${count})` : ''}
+        </h3>
+        <button className="icon-btn" aria-label="Kommentare schließen" title="Schließen" onClick={onClose}>
+          <Icon name="close" />
+        </button>
+      </div>
+      <div className="comments-list">
+        {list === null && !err && <p className="muted small">Lädt …</p>}
+        {list && count === 0 && <p className="muted small">Noch keine Kommentare.</p>}
+        {threads.map(({ c, replies }) => (
+          <div key={c.id} className="comment-thread">
+            {item(c)}
+            {replies.map((r) => item(r, true))}
+          </div>
+        ))}
+        {err && <p className="notice warning">{err}</p>}
+      </div>
       <div className="comment-form">
         {replyTo && (
           <div className="comment-replying muted small">
