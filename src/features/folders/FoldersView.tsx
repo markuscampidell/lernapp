@@ -381,7 +381,7 @@ function FolderPage({
         )
       ) : (
         <>
-          {!folder && subfolders.length === 0 && sharedTops.length === 0 && (
+          {!folder && !cloudEnabled && subfolders.length === 0 && (
             <EmptyState title="Noch keine Ordner">
               Lege einen Ordner an, z. B. für ein Fach oder eine Vorlesung. Darin kannst du Unterordner und Dateien sammeln.
             </EmptyState>
@@ -396,7 +396,46 @@ function FolderPage({
           {folder && !orphan && subfolders.length === 0 && ownFiles.length === 0 && (
             <EmptyState title="Dieser Ordner ist leer">Füge Dateien hinzu (Text, Bilder, PDFs, Präsentationen …) oder lege Unterordner an.</EmptyState>
           )}
-          {folder && subfolders.length > 0 && ownFiles.length > 0 ? (
+          {!folder && cloudEnabled ? (
+            // Übersicht: „Meine Ordner“ und „Geteilt mit dir“ – am PC nebeneinander, am Handy untereinander.
+            <div className="split">
+              <section className="split-pane" aria-label="Meine Ordner">
+                <h3 className="section-title">Meine Ordner{subfolders.length > 0 && ` · ${subfolders.length}`}</h3>
+                {subfolders.length === 0 ? (
+                  <p className="muted small">Noch keine Ordner. Lege oben mit „Neuer Ordner“ einen an, z. B. für ein Fach.</p>
+                ) : (
+                  <ul className="list">
+                    {subfolders.map((f) => (
+                      <li key={f.id}>
+                        <FolderCard folder={f} {...newProp(f)} {...editProp(f)} {...itemProps('folders', f.id, () => openFolder(f.id))} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+              <section className={`split-pane${me && sharedTops.length === 0 ? ' pc-only' : ''}`} aria-label="Geteilt mit dir">
+                <h3 className="section-title">Geteilt mit dir{sharedTops.length > 0 && ` · ${sharedTops.length}`}</h3>
+                {!me ? (
+                  <p className="muted small">
+                    Melde dich in den <button className="link" onClick={() => navigate('#einstellungen')}>Einstellungen</button> an, um Ordner mit anderen zu teilen.
+                  </p>
+                ) : sharedTops.length === 0 ? (
+                  <p className="muted small">Noch nichts mit dir geteilt.</p>
+                ) : (
+                  <>
+                    {!lib.online && <p className="notice warning">Offline – geteilte Ordner sind gerade nur lesbar.</p>}
+                    <ul className="list">
+                      {sharedTops.map((f) => (
+                        <li key={f.id}>
+                          <FolderCard folder={f} {...newProp(f)} {...editProp(f)} {...itemProps('folders', f.id, () => openFolder(f.id))} />
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </section>
+            </div>
+          ) : folder && subfolders.length > 0 && ownFiles.length > 0 ? (
             // Beides vorhanden: zwei Bereiche, die jeweils für sich scrollen (Handy: oben/unten, PC: nebeneinander).
             <div className="split">
               <section className="split-pane" aria-label="Unterordner">
@@ -424,7 +463,7 @@ function FolderPage({
           <>
           {subfolders.length > 0 && (
             <>
-              {folder ? <h3 className="section-title">Unterordner</h3> : sharedTops.length > 0 && <h3 className="section-title">Meine Ordner</h3>}
+              {folder && <h3 className="section-title">Unterordner</h3>}
               <ul className="list">
                 {subfolders.map((f) => (
                   <li key={f.id}>
@@ -444,26 +483,6 @@ function FolderPage({
                   </li>
                 ))}
               </ul>
-            </>
-          )}
-          {!folder && cloudEnabled && (sharedTops.length > 0 || !me) && (
-            <>
-              <h3 className="section-title">Geteilt mit dir</h3>
-              {!me && (
-                <p className="muted small">
-                  Melde dich in den <button className="link" onClick={() => navigate('#einstellungen')}>Einstellungen</button> an, um Ordner mit anderen zu teilen.
-                </p>
-              )}
-              {me && !lib.online && <p className="notice warning">Offline – geteilte Ordner sind gerade nur lesbar.</p>}
-              {sharedTops.length > 0 && (
-                <ul className="list">
-                  {sharedTops.map((f) => (
-                    <li key={f.id}>
-                      <FolderCard folder={f} {...newProp(f)} {...editProp(f)} {...itemProps('folders', f.id, () => openFolder(f.id))} />
-                    </li>
-                  ))}
-                </ul>
-              )}
             </>
           )}
           </>
