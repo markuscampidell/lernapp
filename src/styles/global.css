@@ -4273,6 +4273,8 @@ div.sticky-bar:has(> .view-header) {
   --bg: #f6f6f4;
 }
 :root[data-bg='punkte'] body::before,
+:root[data-bg='punkte'] .sticky-bar::before,
+:root[data-bg='punkte'] .viewer::before,
 .bgp-punkte {
   background: radial-gradient(circle, #cfcfc8 1.3px, transparent 1.8px) 0 0 / 22px 22px, #f6f6f4;
 }
@@ -4280,6 +4282,8 @@ div.sticky-bar:has(> .view-header) {
   --bg: #1b1b1a;
 }
 :root[data-bg='dunkel'] body::before,
+:root[data-bg='dunkel'] .sticky-bar::before,
+:root[data-bg='dunkel'] .viewer::before,
 .bgp-dunkel {
   background: radial-gradient(circle, #3b3b38 1.3px, transparent 1.8px) 0 0 / 22px 22px, radial-gradient(ellipse at 50% 0%, #2a2a28, #1b1b1a 70%);
 }
@@ -4287,6 +4291,8 @@ div.sticky-bar:has(> .view-header) {
   --bg: #fbfbf8;
 }
 :root[data-bg='karo'] body::before,
+:root[data-bg='karo'] .sticky-bar::before,
+:root[data-bg='karo'] .viewer::before,
 .bgp-karo {
   background: linear-gradient(#cfdcec 1px, transparent 1px) 0 0 / 100px 100px, linear-gradient(90deg, #cfdcec 1px, transparent 1px) 0 0 / 100px 100px, linear-gradient(#e6edf6 1px, transparent 1px) 0 0 / 20px 20px, linear-gradient(90deg, #e6edf6 1px, transparent 1px) 0 0 / 20px 20px, #fbfbf8;
 }
@@ -4294,50 +4300,64 @@ div.sticky-bar:has(> .view-header) {
   --bg: #1e3a2f;
 }
 :root[data-bg='tafel'] body::before,
+:root[data-bg='tafel'] .sticky-bar::before,
+:root[data-bg='tafel'] .viewer::before,
 .bgp-tafel {
   background: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px) 0 0 / 100% 34px, radial-gradient(ellipse at 50% 30%, #2a4b3e, #1a3329 75%);
 }
 :root[data-bg='strand'] {
-  --bg: #e8f3f3;
+  --bg: #e9f6fb;
 }
 :root[data-bg='strand'] body::before,
+:root[data-bg='strand'] .sticky-bar::before,
+:root[data-bg='strand'] .viewer::before,
 .bgp-strand {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='28'%3E%3Cpath d='M0 14 Q30 2 60 14 T120 14' fill='none' stroke='%23ffffff' stroke-opacity='0.55' stroke-width='2'/%3E%3C/svg%3E") 0 0 / 120px 28px, linear-gradient(180deg, #a9dbef 0%, #d4eef4 40%, #f3ead2 72%, #ead6a8 100%);
+  background: url('../assets/backgrounds/strand.svg') center bottom / cover no-repeat, #e9f6fb;
 }
 :root[data-bg='weltall'] {
   --bg: #0b1020;
 }
 :root[data-bg='weltall'] body::before,
+:root[data-bg='weltall'] .sticky-bar::before,
+:root[data-bg='weltall'] .viewer::before,
 .bgp-weltall {
-  background: radial-gradient(1px 1px at 10px 12px, rgba(255,255,255,0.9), transparent) 0 0 / 41px 41px, radial-gradient(1px 1px at 30px 5px, rgba(255,255,255,0.6), transparent) 0 0 / 53px 53px, radial-gradient(1px 1px at 22px 40px, rgba(255,255,255,0.7), transparent) 0 0 / 67px 67px, radial-gradient(1px 1px at 20px 30px, #ffffff, transparent) 0 0 / 97px 97px, radial-gradient(1px 1px at 60px 80px, rgba(255,255,255,0.8), transparent) 0 0 / 131px 131px, radial-gradient(1.5px 1.5px at 90px 40px, #ffffff, transparent) 0 0 / 173px 173px, radial-gradient(2px 2px at 120px 150px, rgba(200,220,255,0.9), transparent) 0 0 / 257px 257px, radial-gradient(ellipse at 80% 10%, rgba(120,80,200,0.35), transparent 55%), radial-gradient(ellipse at 10% 90%, rgba(40,110,200,0.3), transparent 55%), #0b1020;
+  background: url('../assets/backgrounds/weltall.svg') center bottom / cover no-repeat, #0b1020;
 }
 :root[data-bg='sonnenuntergang'] {
   --bg: #fbd5bd;
 }
 :root[data-bg='sonnenuntergang'] body::before,
+:root[data-bg='sonnenuntergang'] .sticky-bar::before,
+:root[data-bg='sonnenuntergang'] .viewer::before,
 .bgp-sonnenuntergang {
-  background: linear-gradient(180deg, #ffe2b3 0%, #ffc3a6 40%, #f2b2cc 75%, #cdb6ea 100%);
+  background: url('../assets/backgrounds/sonnenuntergang.svg') center bottom / cover no-repeat, #fbd5bd;
 }
 :root[data-bg='berge'] {
   --bg: #eef4fa;
 }
 :root[data-bg='berge'] body::before,
+:root[data-bg='berge'] .sticky-bar::before,
+:root[data-bg='berge'] .viewer::before,
 .bgp-berge {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320' preserveAspectRatio='none'%3E%3Cpath fill='%23c3d2e2' d='M0 200 L170 110 L320 190 L520 60 L700 180 L860 100 L1040 200 L1230 80 L1440 170 V320 H0Z'/%3E%3Cpath fill='%23a3b7cc' d='M0 260 L150 190 L300 250 L470 160 L640 240 L820 170 L990 250 L1160 180 L1320 240 L1440 210 V320 H0Z'/%3E%3Cpath fill='%2386a0ba' d='M0 300 L200 250 L420 290 L640 240 L900 295 L1120 250 L1440 290 V320 H0Z'/%3E%3C/svg%3E") bottom / 100% 38vh no-repeat, linear-gradient(180deg, #d9e9f7 0%, #eef4fa 60%);
+  background: url('../assets/backgrounds/berge.svg') center bottom / cover no-repeat, #eef4fa;
 }
 :root[data-bg='wald'] {
-  --bg: #13261b;
+  --bg: #0b1a15;
 }
 :root[data-bg='wald'] body::before,
+:root[data-bg='wald'] .sticky-bar::before,
+:root[data-bg='wald'] .viewer::before,
 .bgp-wald {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath d='M14 6 L22 22 H6Z M14 14 L24 30 H4Z M42 30 L50 46 H34Z M42 38 L52 54 H32Z' fill='%23bfe5c8' fill-opacity='0.07'/%3E%3C/svg%3E") 0 0 / 56px 56px, radial-gradient(ellipse at 50% 0%, #1f3d2b, #10211a 75%);
+  background: url('../assets/backgrounds/wald.svg') center bottom / cover no-repeat, #0b1a15;
 }
 :root[data-bg='konfetti'] {
-  --bg: #fdfbf6;
+  --bg: #fdfaf3;
 }
 :root[data-bg='konfetti'] body::before,
+:root[data-bg='konfetti'] .sticky-bar::before,
+:root[data-bg='konfetti'] .viewer::before,
 .bgp-konfetti {
-  background: radial-gradient(circle, #f2a7a7 3px, transparent 3.6px) 0 0 / 61px 61px, radial-gradient(circle, #a7c8f2 3px, transparent 3.6px) 23px 31px / 73px 73px, radial-gradient(circle, #f2d98a 3px, transparent 3.6px) 41px 11px / 89px 89px, radial-gradient(circle, #a9e0bd 3px, transparent 3.6px) 7px 53px / 97px 97px, #fdfbf6;
+  background: url('../assets/backgrounds/konfetti.svg') center bottom / cover no-repeat, #fdfaf3;
 }
 /* Mit Muster: feste Leisten halb durchsichtig, Überschriften auf dem Muster gut lesbar */
 .main {
@@ -4349,13 +4369,29 @@ div.sticky-bar:has(> .view-header) {
   }
 }
 :root[data-bg] .sticky-bar {
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  /* Kein Kasten: die Leiste zeigt genau den Hintergrund dahinter (fest, an der Seite ausgerichtet). */
+  background: transparent;
   box-shadow: none;
-  clip-path: none;
+  clip-path: inset(0);
   margin-inline: calc(-1 * var(--main-px));
   padding-inline: var(--main-px);
+}
+:root[data-bg] .sticky-bar::before,
+:root[data-bg] .viewer::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+/* In Dateien und Editoren: derselbe Hintergrund statt einfarbig */
+:root[data-bg] .viewer {
+  background: transparent;
+}
+:root[data-bg] .viewer-header {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 :root[data-bg] .view-header h1,
 :root[data-bg] .section-title,
@@ -4419,5 +4455,8 @@ div.sticky-bar:has(> .view-header) {
 }
 /* Damit das Muster (hinter body) nicht vom Seitenhintergrund verdeckt wird. */
 :root[data-bg] body {
+  background: transparent;
+}
+:root[data-bg] .study-bar {
   background: transparent;
 }
