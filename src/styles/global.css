@@ -3885,7 +3885,11 @@ button.avatar-edit-badge {
 .comment-panel .comment-replying {
   flex-basis: 100%;
 }
+/* Editoren mit Leiste unten: Knopf darüber. */
+.viewer:has(.study-footer) .comment-fab {
+  bottom: calc(86px + env(safe-area-inset-bottom));
+}
 /* Damit das Ende der Datei nicht unter der Leiste verschwindet. */
-.viewer.comments-open .viewer-body {
+.viewer:has(> .comment-panel) .viewer-body {
   padding-bottom: calc(34dvh + 16px);
 }

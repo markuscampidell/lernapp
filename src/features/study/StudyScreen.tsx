@@ -4,6 +4,7 @@ import type { FileItem } from '../../domain/types';
 import { useBackToClose } from '../../lib/router';
 import { Icon } from '../../components/Icon';
 import { EditingLock, EditingNotice, useEditors } from '../../cloud/editing';
+import { CommentsToggle, EDIT_START } from '../comments/Comments';
 
 /** Vollbild-Ansicht für Editoren und Lernmodi (Zurück-Taste schließt). */
 export function StudyScreen({
@@ -30,6 +31,10 @@ export function StudyScreen({
   footer?: ReactNode;
 }) {
   useBackToClose(onClose);
+  // Bearbeiten beginnt: offene Kommentare (z. B. in der Datei-Ansicht dahinter) schließen.
+  useEffect(() => {
+    if (editing) window.dispatchEvent(new Event(EDIT_START));
+  }, [!!editing]);
   const { others, mine } = useEditors(editing);
   // Wer zuerst da war, wird nicht blockiert – nur wer später dazukommt.
   const earlier = others.filter((o) => o.since <= mine);
@@ -113,6 +118,7 @@ export function StudyScreen({
         {children}
       </div>
       {footer && <footer className="study-footer">{footer}</footer>}
+      {editing && !locked && <CommentsToggle file={editing} />}
       {locked && <EditingLock others={earlier} onClose={onClose} />}
     </div>,
     document.body,

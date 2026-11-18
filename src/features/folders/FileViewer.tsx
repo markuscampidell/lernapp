@@ -11,7 +11,7 @@ import { FileEditorSheet } from './FileEditorSheet';
 import { CardsPanel, QuizPanel } from '../study/StudyPanels';
 import { DocPanel } from '../docs/DocPanel';
 import { ShareSheet } from '../share/ShareSheet';
-import { Comments } from '../comments/Comments';
+import { CommentsToggle } from '../comments/Comments';
 import { ChangesBanner } from '../changes/ChangesBanner';
 import { cloudEnabled } from '../../cloud/supabase';
 import { ChartPanel } from '../charts/ChartPanel';
@@ -24,12 +24,10 @@ const MAX_TEXT = 2 * 1024 * 1024;
 
 /** Vollbild-Ansicht einer Datei mit Vorschau und Aktionen. */
 export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose: () => void }) {
-  const { files, folders, me, userName, isOrphan, commentInfo } = useLibrary();
+  const { files, folders, me, userName, isOrphan } = useLibrary();
   // Immer die aktuelle Version (nach Umbenennen/Verschieben).
   const file = files.find((f) => f.id === initial.id);
   const [blob, setBlob] = useState<Blob | null>(null);
-  // Kommentare erscheinen nur nach Tippen auf den Knopf – als Leiste unten (max. 1/3 der Höhe).
-  const [showComments, setShowComments] = useState(false);
   const [url, setUrl] = useState<string>();
   const [text, setText] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -79,7 +77,6 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const title = shownName(file);
   // Kommentare gibt es für Dateien auf dem Server (geteilt oder „Auf allen Geräten“).
   const canComment = cloudEnabled && !!file.shareId && !!me && !isOrphan(file.folderId);
-  const comments = commentInfo(file.id);
   // „Senden“ = an eine andere App übergeben (System-Teilen-Menü, z. B. WhatsApp, Mail). Nur auf Handys/Tablets –
   // am PC ist das Menü oft nicht vorhanden oder tut nichts. Mit Personen teilt man über den Ordner.
   const shareable = (() => {
@@ -152,7 +149,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
   const where = pathOf(folders, file.folderId).map((p) => p.name).join(' / ');
 
   return (
-    <div className={`viewer${showComments ? ' comments-open' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+    <div className="viewer" role="dialog" aria-modal="true" aria-label={title}>
       <header className="viewer-header">
         <button className="icon-btn" aria-label="Schließen" onClick={onClose}>
           <Icon name="back" />
@@ -198,15 +195,7 @@ export function FileViewer({ file: initial, onClose }: { file: FileItem; onClose
         {file.shareId && <ChangesBanner file={file} />}
         {body}
       </div>
-      {canComment &&
-        (showComments ? (
-          <Comments file={file} onClose={() => setShowComments(false)} />
-        ) : (
-          <button className="comment-fab" aria-label="Kommentare" title="Kommentare" onClick={() => setShowComments(true)}>
-            <Icon name="comment" size={26} />
-            {comments.count > 0 && <span className={`count-badge${comments.unread ? ' unread' : ''}`}>{comments.count}</span>}
-          </button>
-        ))}
+      {canComment && <CommentsToggle file={file} />}
       {editing && <FileEditorSheet file={file} onClose={() => setEditing(false)} />}
       {sharing && <ShareSheet file={file} onClose={() => setSharing(false)} />}
     </div>

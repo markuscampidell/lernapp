@@ -6,6 +6,7 @@ import { Icon } from '../../components/Icon';
 import { supabase } from '../../cloud/supabase';
 import { addComment, deleteComment, fetchComments, type Comment } from '../../cloud/remote';
 import { useBackToClose } from '../../lib/router';
+import { cloudEnabled } from '../../cloud/supabase';
 
 const MAX = 4000;
 
@@ -186,5 +187,31 @@ export function Comments({ file, onClose }: { file: FileItem; onClose: () => voi
         </button>
       </div>
     </section>
+  );
+}
+
+/** Wird gesendet, sobald ein Editor aufgeht – eine offene Kommentar-Leiste schließt sich dann. */
+export const EDIT_START = 'lernapp:edit-start';
+
+/**
+ * Runder Kommentar-Knopf rechts unten; öffnet die Kommentare als Leiste von unten (max. 1/3 der Höhe).
+ * Nie automatisch offen. Beim Start des Bearbeitens schließt sie sich (der Knopf bleibt im Editor verfügbar).
+ */
+export function CommentsToggle({ file }: { file: FileItem }) {
+  const { me, isOrphan, commentInfo } = useLibrary();
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const close = () => setOpen(false);
+    window.addEventListener(EDIT_START, close);
+    return () => window.removeEventListener(EDIT_START, close);
+  }, []);
+  if (!cloudEnabled || !file.shareId || !me || isOrphan(file.folderId)) return null;
+  if (open) return <Comments file={file} onClose={() => setOpen(false)} />;
+  const info = commentInfo(file.id);
+  return (
+    <button className="comment-fab" aria-label="Kommentare" title="Kommentare" onClick={() => setOpen(true)}>
+      <Icon name="comment" size={26} />
+      {info.count > 0 && <span className={`count-badge${info.unread ? ' unread' : ''}`}>{info.count}</span>}
+    </button>
   );
 }
