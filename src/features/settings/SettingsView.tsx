@@ -106,6 +106,8 @@ export function SettingsView() {
 
       <h3 className="section-title">Speicher</h3>
       <div className="card stack">
+        {/* Nur nur-lokale Ordner (ohne Konto). Eigene Ordner mit Konto liegen auf dem Server und zählen hier nicht. */}
+        {folders.length + files.length > 0 && (
         <div className="tiles">
           <div className="tile">
             <span className="muted small">Ordner</span>
@@ -120,25 +122,21 @@ export function SettingsView() {
             <strong>{formatSize(totalSize)}</strong>
           </div>
         </div>
+        )}
         {usage && usage.quota > 0 && (
           <div>
             <div className="meter wide">
               <div className="meter-fill" style={{ width: `${Math.min(100, (usage.used / usage.quota) * 100).toFixed(1)}%` }} />
             </div>
             <p className="muted small">
-              {formatSize(usage.used)} von ca. {formatSize(usage.quota)} verfügbarem Browser-Speicher belegt
+              {formatSize(usage.used)} von ca. {formatSize(usage.quota)} auf diesem Gerät belegt
             </p>
           </div>
         )}
-        <p className="muted small">
-          „Meine Ordner“ werden nur auf diesem Gerät gespeichert (im Browser) – nutze das Backup, um sie auf ein anderes Gerät zu
-          übertragen. Geteilte Ordner liegen auf dem Server; geöffnete Dateien daraus werden hier zwischengespeichert, damit du sie
-          auch offline ansehen kannst – aber nur begrenzt: Wird es zu viel, werden die am längsten nicht geöffneten wieder
-          entfernt (sie bleiben auf dem Server). „Meine Ordner“ sind davon nie betroffen.
-        </p>
         {cache && cache.size > 0 && (
           <p className="muted small">
-            Zwischengespeicherte geteilte Dateien: {formatSize(cache.size)} von höchstens {formatSize(cache.limit)}
+            Davon für offline geöffnete Dateien: {formatSize(cache.size)} (höchstens {formatSize(cache.limit)}, Älteres wird
+            automatisch entfernt – auf dem Server bleibt alles)
           </p>
         )}
         {persisted === false && (
@@ -149,7 +147,6 @@ export function SettingsView() {
             </button>
           </div>
         )}
-        {persisted && <p className="muted small">✓ Daten sind als dauerhaft markiert.</p>}
       </div>
 
       <h3 className="section-title">Backup</h3>
