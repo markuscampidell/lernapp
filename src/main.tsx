@@ -6,9 +6,12 @@ import { AuthProvider } from './cloud/auth';
 import { navigate } from './lib/router';
 import './styles/global.css';
 import { applyBackground, loadBackground } from './lib/background';
+import { initUiHelpers } from './lib/ui-helpers';
 
 // Gewählten Hintergrund sofort setzen (kein Aufblitzen des Standard-Hintergrunds).
 applyBackground(loadBackground());
+// Kein App-Zoom mit Strg+Mausrad, schnellere Tooltips, Hinweis bei seitlich scrollbaren Bereichen.
+initUiHelpers();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

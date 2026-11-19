@@ -89,6 +89,7 @@ function FolderPage({
   // Ergebnis von „Mit KI erstellen“ – öffnet den passenden Editor mit dem Inhalt.
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
+  const videoInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
   // Datei, die mit offenen Kommentaren aufgeht (aus den Neuigkeiten).
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
@@ -506,21 +507,27 @@ function FolderPage({
         }}
       />
 
-      <input
-        ref={cameraInput}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        hidden
-        onChange={(e) => {
-          const list = e.target.files;
-          if (list && list.length) {
-            setStaged(stage(list));
-            setSheet('add');
-          }
-          e.target.value = '';
-        }}
-      />
+      {([
+        [cameraInput, 'image/*'],
+        [videoInput, 'video/*'],
+      ] as const).map(([ref, accept]) => (
+        <input
+          key={accept}
+          ref={ref}
+          type="file"
+          accept={accept}
+          capture="environment"
+          hidden
+          onChange={(e) => {
+            const list = e.target.files;
+            if (list && list.length) {
+              setStaged(stage(list));
+              setSheet('add');
+            }
+            e.target.value = '';
+          }}
+        />
+      ))}
 
       {sheet === 'menu' && folder && (
         <AddMenu
@@ -529,8 +536,9 @@ function FolderPage({
             // Dateiauswahl muss direkt im Klick geöffnet werden (sonst blockiert der Browser sie).
             if (choice === 'files') pickFiles();
             if (choice === 'camera') cameraInput.current?.click();
+            if (choice === 'video') videoInput.current?.click();
             setSheet(null);
-            if (choice !== 'files' && choice !== 'camera') afterBack(() => setSheet(choice));
+            if (choice !== 'files' && choice !== 'camera' && choice !== 'video') afterBack(() => setSheet(choice));
           }}
         />
       )}
@@ -756,10 +764,11 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
   );
 }
 
-type AddChoice = 'files' | 'camera' | 'doc' | 'note' | 'cards' | 'quiz' | 'gaps' | 'chart' | 'wheel' | 'ai';
+type AddChoice = 'files' | 'camera' | 'video' | 'doc' | 'note' | 'cards' | 'quiz' | 'gaps' | 'chart' | 'wheel' | 'ai';
 const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; short: string; text: string; touchOnly?: boolean }[] = [
   { id: 'files', icon: 'upload', title: 'Dateien durchsuchen', short: 'Datei', text: 'PDFs, Bilder, Präsentationen, Videos … von deinem Gerät' },
-  { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', short: 'Foto', text: 'Direkt mit der Kamera', touchOnly: true },
+  { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', short: 'Foto aufnehmen', text: 'Direkt mit der Kamera', touchOnly: true },
+  { id: 'video', icon: 'video', title: 'Video aufnehmen', short: 'Video aufnehmen', text: 'Direkt mit der Kamera filmen', touchOnly: true },
   { id: 'doc', icon: 'richdoc', title: 'Text-Dokument', short: 'Dokument', text: 'Formatierter Text mit Überschriften, Listen, Checklisten und Bildern' },
   { id: 'note', icon: 'text', title: 'Notiz', short: 'Notiz', text: 'Schnell ein paar Zeilen reiner Text' },
   { id: 'cards', icon: 'cards', title: 'Karteikarten', short: 'Karteikarten', text: 'Vorder- und Rückseite, mit Lernmodus' },

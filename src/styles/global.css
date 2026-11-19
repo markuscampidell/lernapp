@@ -1914,7 +1914,8 @@ span.gloss.selected {
   max-width: 100%;
 }
 .add-icon.add-files,
-.add-icon.add-camera { color: var(--good); background: var(--good-bg); }
+.add-icon.add-camera,
+.add-icon.add-video { color: var(--good); background: var(--good-bg); }
 .add-icon.add-doc,
 .add-icon.add-note { color: var(--info); background: var(--info-bg); }
 .add-icon.add-cards { color: var(--series-2); background: color-mix(in srgb, var(--series-2) 14%, var(--surface)); }
@@ -4177,7 +4178,8 @@ div.sticky-bar:has(> .view-header) {
   height: 46px;
 }
 .add-icon.add-files,
-.add-icon.add-camera { color: var(--tone-0); background: var(--tone-0-bg); }
+.add-icon.add-camera,
+.add-icon.add-video { color: var(--tone-0); background: var(--tone-0-bg); }
 .add-icon.add-doc,
 .add-icon.add-note { color: var(--tone-1); background: var(--tone-1-bg); }
 .add-icon.add-cards,
@@ -4635,4 +4637,29 @@ div.sticky-bar:has(> .view-header) {
 }
 :root[data-bg] .nav-item:not(.active) svg {
   filter: drop-shadow(0 0 2px var(--bg)) drop-shadow(0 0 6px var(--bg));
+}
+
+/* ---------- Eigene Tooltips (siehe lib/ui-helpers.ts) ---------- */
+.app-tip {
+  position: fixed;
+  z-index: 10000;
+  max-width: 260px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: rgba(28, 28, 27, 0.94);
+  color: #fff;
+  font: 500 0.8rem/1.3 var(--font);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.app-tip.show { opacity: 1; }
+
+/* ---------- Seitlich scrollbar: Verlauf am Rand zeigt, dass es weitergeht ---------- */
+.more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.more-left { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+.more-left.more-right {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
 }
