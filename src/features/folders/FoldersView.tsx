@@ -260,8 +260,36 @@ function FolderPage({
     return () => ro.disconnect();
   }, [!!folder]);
 
+  // PC: die zwei Bereiche (Meine Ordner/Geteilt mit dir bzw. Unterordner/Dateien) genau bis zum unteren
+  // Bildschirmrand hoch machen – dann scrollt nur noch der jeweilige Bereich, nie zusätzlich die ganze Seite.
+  const viewRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const split = view.querySelector<HTMLElement>('.split');
+        if (!split) return;
+        const top = split.getBoundingClientRect().top + window.scrollY;
+        const bottomGap = parseFloat(getComputedStyle(view.closest('.main') ?? view).paddingBottom) || 0;
+        split.style.setProperty('--split-h', `${Math.max(240, Math.floor(window.innerHeight - top - bottomGap))}px`);
+      });
+    };
+    const ro = new ResizeObserver(fit);
+    ro.observe(view);
+    window.addEventListener('resize', fit);
+    fit();
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+      window.removeEventListener('resize', fit);
+    };
+  }, []);
+
   return (
-    <section className="view" style={{ '--sticky-top': `${topH}px` } as React.CSSProperties}>
+    <section ref={viewRef} className="view" style={{ '--sticky-top': `${topH}px` } as React.CSSProperties}>
       {sel && (
         <SelectionBar
           count={sel.folders.size + sel.files.size}

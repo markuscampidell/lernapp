@@ -134,7 +134,27 @@ function scrollHints() {
   scan();
 }
 
+/** Uhr, die überall in der App zu sehen ist (auch in geöffneten Dateien). Klicks gehen durch sie hindurch. */
+function clock() {
+  const el = document.createElement('div');
+  el.className = 'app-clock';
+  el.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(el);
+  const fmt = new Intl.DateTimeFormat('de-AT', { hour: '2-digit', minute: '2-digit' });
+  const tick = () => {
+    el.textContent = fmt.format(new Date());
+    // Genau zum nächsten Minutenwechsel wieder aktualisieren.
+    window.setTimeout(tick, 60_000 - (Date.now() % 60_000) + 50);
+  };
+  tick();
+  // Nach dem Aufwachen des Geräts sofort die richtige Zeit zeigen.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) el.textContent = fmt.format(new Date());
+  });
+}
+
 export function initUiHelpers() {
+  clock();
   blockAppZoom();
   quickTooltips();
   scrollHints();

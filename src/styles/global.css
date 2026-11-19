@@ -3789,7 +3789,7 @@ button.avatar-edit-badge {
   .split-pane {
     flex: 1 1 0;
     min-width: 0;
-    max-height: calc(100dvh - var(--sticky-top, 0px) - 120px);
+    max-height: var(--split-h, calc(100dvh - var(--sticky-top, 0px) - 120px));
     padding: 10px;
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -4662,4 +4662,31 @@ div.sticky-bar:has(> .view-header) {
 .more-left.more-right {
   -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
   mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+}
+
+/* ---------- Uhr (immer sichtbar, siehe lib/ui-helpers.ts) ---------- */
+.app-clock {
+  position: fixed;
+  z-index: 9999;
+  left: 12px;
+  bottom: calc(var(--nav-h) + 10px + env(safe-area-inset-bottom));
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  color: var(--text);
+  font: 700 1rem/1.2 var(--font);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
+}
+@media (min-width: 900px) {
+  .app-clock {
+    left: 16px;
+    bottom: 16px;
+    font-size: 1.15rem;
+  }
 }
