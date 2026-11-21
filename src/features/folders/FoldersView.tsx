@@ -277,6 +277,11 @@ function FolderPage({
   }, [!!folder]);
 
 
+  // Suchfeld: bleibt beim Scrollen oben (in der festen Leiste).
+  const searchBox = (subfolders.length > 0 || sharedTops.length > 0 || ownFiles.length > 0 || query) && (
+    <SearchBox value={query} onChange={setQuery} placeholder="Suchen" />
+  );
+
   return (
     <section className="view" style={{ '--sticky-top': `${topH}px` } as React.CSSProperties}>
       {sel && (
@@ -332,7 +337,8 @@ function FolderPage({
             </div>
           </header>
           <SharedInfo folder={folder} onPeople={() => setSheet('share')} />
-          <div className="action-row sticky-bar sticky-second">
+          <div className="sticky-bar sticky-second sticky-stack">
+          <div className="action-row">
             <button className="btn primary add-btn" onClick={() => setSheet('menu')} disabled={!canAdd}>
               <Icon name="plus" size={18} />
               <span className="add-btn-text">
@@ -344,6 +350,8 @@ function FolderPage({
             <button className="btn ghost" onClick={() => setSheet('newFolder')} disabled={!canAdd || !canSub} title={canSub ? undefined : 'Maximale Tiefe erreicht'}>
               <Icon name="folderPlus" size={18} /> Unterordner
             </button>
+          </div>
+          {searchBox}
           </div>
           {!canSub && <p className="muted small">Maximale Ordnertiefe ({MAX_DEPTH} Ebenen) erreicht – hier sind keine weiteren Unterordner möglich.</p>}
         </>
@@ -359,11 +367,9 @@ function FolderPage({
               </button>
             </div>
           </header>
+          {searchBox}
           </div>
         </>
-      )}
-      {(subfolders.length > 0 || sharedTops.length > 0 || ownFiles.length > 0 || query) && (
-        <SearchBox value={query} onChange={setQuery} placeholder="Suchen" />
       )}
 
       {results ? (

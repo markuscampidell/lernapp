@@ -3914,16 +3914,16 @@ div.sticky-bar:has(> .view-header) {
 }
 /* Handy: beide Knöpfe nebeneinander, ohne Untertitel – damit die feste Leiste schmal bleibt. */
 @media (max-width: 600px) {
-  .action-row.sticky-bar {
+  .sticky-stack > .action-row {
     flex-wrap: nowrap;
   }
-  .action-row.sticky-bar .btn {
+  .sticky-stack > .action-row .btn {
     flex: 1 1 0;
     min-width: 0;
     justify-content: center;
   }
-  .action-row.sticky-bar .add-btn-text small,
-  .action-row.sticky-bar .add-btn > svg:last-child {
+  .sticky-stack > .action-row .add-btn-text small,
+  .sticky-stack > .action-row .add-btn > svg:last-child {
     display: none;
   }
 }
@@ -4847,4 +4847,11 @@ div.sticky-bar:has(> .view-header) {
 :root[data-bg] .main .card .card-main > :is(strong, span, p),
 :root[data-bg] .main .card .card-main .muted {
   text-shadow: 0 0 2px var(--bg), 0 0 6px var(--bg);
+}
+
+/* Feste Leiste im Ordner: Knöpfe und darunter das Suchfeld */
+.sticky-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
