@@ -71,7 +71,7 @@ export function SettingsView() {
   };
 
   const wipe = async () => {
-    if (!confirm('Wirklich ALLE Ordner und Dateien auf diesem Gerät löschen? Das kann nicht rückgängig gemacht werden. (Geteilte Ordner auf dem Server bleiben erhalten.)')) return;
+    if (!confirm('Alle Ordner und Dateien auf diesem Gerät löschen? Das kann nicht rückgängig gemacht werden. Konto und geteilte Ordner bleiben.')) return;
     await db.clearAll();
     await reload();
     setStatus({ kind: 'good', text: 'Alle Daten wurden gelöscht.' });
@@ -91,14 +91,12 @@ export function SettingsView() {
       {cloudEnabled && (
         <>
           <h2 className="settings-group">Konto</h2>
-          <p className="muted small">Gilt auf allen Geräten, auf denen du angemeldet bist. Ein Konto brauchst du nur, um Ordner mit anderen zu teilen.</p>
           <AccountCard />
           <ServerStorage />
         </>
       )}
 
       <h2 className="settings-group">Auf diesem Gerät</h2>
-      <p className="muted small">Gilt nur für dieses Gerät – nicht für dein Konto.</p>
 
       <BackgroundPicker />
 
@@ -135,8 +133,7 @@ export function SettingsView() {
         )}
         {cache && cache.size > 0 && (
           <p className="muted small">
-            Davon für offline geöffnete Dateien: {formatSize(cache.size)} (höchstens {formatSize(cache.limit)}, Älteres wird
-            automatisch entfernt – auf dem Server bleibt alles)
+            Davon offline gespeichert: {formatSize(cache.size)} (max. {formatSize(cache.limit)})
           </p>
         )}
         {persisted === false && (
@@ -151,10 +148,7 @@ export function SettingsView() {
 
       <h3 className="section-title">Backup</h3>
       <div className="card stack">
-        <p className="muted small">
-          Das Backup ist eine ZIP-Datei mit all deinen Dateien in ihrer Ordnerstruktur. Damit kannst du alles auf einem
-          anderen Gerät wiederherstellen. Geteilte Ordner sind nicht enthalten (die liegen auf dem Server).
-        </p>
+        <p className="muted small">ZIP-Datei mit deinen Ordnern auf diesem Gerät (ohne geteilte Ordner).</p>
         <div className="input-row wrap">
           <button className="btn primary" onClick={doExport} disabled={busy || files.length + folders.length === 0}>
             <Icon name="download" size={18} /> Backup exportieren
@@ -179,13 +173,12 @@ export function SettingsView() {
 
       <h3 className="section-title">Gefahrenzone</h3>
       <div className="card stack">
-        <p className="muted small">Löscht „Meine Ordner“ und alles Zwischengespeicherte auf diesem Gerät. Dein Konto und geteilte Ordner bleiben bestehen.</p>
         <button className="btn ghost danger" onClick={wipe} disabled={busy}>
           <Icon name="trash" size={18} /> Alle Daten auf diesem Gerät löschen
         </button>
       </div>
 
-      <p className="muted small center-text">Lernapp · Version 0.12</p>
+      <p className="muted small center-text">Lernapp · Version {__APP_VERSION__}</p>
 
       {pendingImport && (
         <Sheet title="Backup importieren" onClose={() => setPendingImport(null)}>
@@ -231,7 +224,6 @@ function ServerStorage() {
   if (!user || used == null) return null;
   const pct = Math.min(100, (used / SERVER_LIMIT) * 100);
   const level = pct >= 95 ? 'critical' : pct >= 80 ? 'warning' : 'good';
-  const free = Math.max(0, SERVER_LIMIT - used);
 
   return (
     <>
@@ -242,17 +234,13 @@ function ServerStorage() {
             <div className={`meter-fill ${level === 'good' ? '' : level}`} style={{ width: `${pct.toFixed(1)}%` }} />
           </div>
           <p className="muted small">
-            ca. {formatSize(used)} von {formatSize(SERVER_LIMIT)} belegt · noch ca. {formatSize(free)} frei
+            ca. {formatSize(used)} von {formatSize(SERVER_LIMIT)} belegt (alle Konten zusammen)
           </p>
         </div>
-        {level === 'warning' && <p className="notice warning">Der Server wird langsam voll. Große Uploads klappen evtl. bald nicht mehr.</p>}
+        {level === 'warning' && <p className="notice warning">Der Server wird langsam voll.</p>}
         {level === 'critical' && (
-          <p className="notice critical">Der Server ist fast voll. Lösche nicht mehr gebrauchte Dateien in geteilten Ordnern, damit wieder Platz ist.</p>
+          <p className="notice critical">Der Server ist fast voll – lösche nicht mehr gebrauchte Dateien.</p>
         )}
-        <p className="muted small">
-          Gilt für alle Konten zusammen (geteilte Ordner, „Meine Ordner auf allen Geräten“ und Profilbilder). Der Wert ist ein
-          ungefährer Richtwert und kann etwas nachhinken.
-        </p>
       </div>
     </>
   );

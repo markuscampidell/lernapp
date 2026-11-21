@@ -13,6 +13,7 @@ import { FileStager, stage, type StagedFile } from '../../components/FileStager'
 import { Sheet } from '../../components/Sheet';
 import { FolderPicker } from '../../components/FolderPicker';
 import { FileCard, FolderCard } from './Cards';
+import { AudioRecorder } from '../upload/AudioRecorder';
 import { FolderEditorSheet } from './FolderEditorSheet';
 import { FileViewer } from './FileViewer';
 import { MAX_NOTE_EDIT, NoteEditor, NoteSheet } from './NoteSheet';
@@ -85,7 +86,7 @@ function FolderPage({
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
-  const [sheet, setSheet] = useState<'menu' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps' | 'ai' | null>(null);
+  const [sheet, setSheet] = useState<'menu' | 'audio' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps' | 'ai' | null>(null);
   // Ergebnis von „Mit KI erstellen“ – öffnet den passenden Editor mit dem Inhalt.
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -213,7 +214,13 @@ function FolderPage({
     selecting: !!sel,
     selected: !!sel?.[kind].has(itemId),
     onClick: sel ? () => toggle(kind, itemId) : open,
-    onLongPress: isTouchDevice ? () => toggle(kind, itemId) : undefined,
+    onLongPress: () => toggle(kind, itemId),
+    onMove: (() => {
+      const ids: [string[], string[]] = kind === 'folders' ? [[itemId], []] : [[], [itemId]];
+      // Nur anzeigen, wenn man den Eintrag überhaupt verschieben darf (Probe-Ziel: aktueller Ordner).
+      if (moveProblem(ids[0], ids[1], folder?.id ?? null)) return undefined;
+      return () => setMoving({ folders: ids[0], files: ids[1], fromSelection: false });
+    })(),
     onInfo: () => {
       const item = kind === 'folders' ? folders.find((f) => f.id === itemId) : files.find((f) => f.id === itemId);
       if (!item) return;
@@ -578,6 +585,18 @@ function FolderPage({
       {sheet === 'edit' && folder && (
         <FolderEditorSheet folder={folder} onClose={() => setSheet(null)} onDeleted={() => afterBack(() => replace(folderHash(folder.parentId)))} />
       )}
+      {sheet === 'audio' && folder && (
+        <AudioRecorder
+          onClose={() => setSheet(null)}
+          onDone={(file) => {
+            setSheet(null);
+            afterBack(() => {
+              setStaged(stage([file]));
+              setSheet('add');
+            });
+          }}
+        />
+      )}
       {sheet === 'note' && folder && <NoteSheet folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'cards' && folder && <CardsEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'quiz' && folder && <QuizEditor folderId={folder.id} onClose={() => setSheet(null)} />}
@@ -792,11 +811,12 @@ function SharedInfo({ folder, onPeople }: { folder: Folder; onPeople: () => void
   );
 }
 
-type AddChoice = 'files' | 'camera' | 'video' | 'doc' | 'note' | 'cards' | 'quiz' | 'gaps' | 'chart' | 'wheel' | 'ai';
+type AddChoice = 'files' | 'camera' | 'video' | 'audio' | 'doc' | 'note' | 'cards' | 'quiz' | 'gaps' | 'chart' | 'wheel' | 'ai';
 const ADD_OPTIONS: { id: AddChoice; icon: IconName; title: string; short: string; text: string; touchOnly?: boolean }[] = [
   { id: 'files', icon: 'upload', title: 'Dateien durchsuchen', short: 'Datei', text: 'PDFs, Bilder, Präsentationen, Videos … von deinem Gerät' },
   { id: 'camera', icon: 'camera', title: 'Foto aufnehmen', short: 'Foto aufnehmen', text: 'Direkt mit der Kamera', touchOnly: true },
   { id: 'video', icon: 'video', title: 'Video aufnehmen', short: 'Video aufnehmen', text: 'Direkt mit der Kamera filmen', touchOnly: true },
+  { id: 'audio', icon: 'mic', title: 'Audio aufnehmen', short: 'Audio aufnehmen', text: 'Mit dem Mikrofon aufnehmen' },
   { id: 'doc', icon: 'richdoc', title: 'Text-Dokument', short: 'Dokument', text: 'Formatierter Text mit Überschriften, Listen, Checklisten und Bildern' },
   { id: 'note', icon: 'text', title: 'Notiz', short: 'Notiz', text: 'Schnell ein paar Zeilen reiner Text' },
   { id: 'cards', icon: 'cards', title: 'Karteikarten', short: 'Karteikarten', text: 'Vorder- und Rückseite, mit Lernmodus' },

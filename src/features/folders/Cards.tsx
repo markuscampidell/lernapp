@@ -15,7 +15,9 @@ export interface ItemCardProps {
   onEdit?: () => void;
   /** ⓘ Details: Name, Beschreibung, Ort, Rechte, Löschen. */
   onInfo?: () => void;
-  /** Langes Drücken (startet den Auswahlmodus, nur auf Touch-Geräten). */
+  /** Verschieben (nur wenn erlaubt). */
+  onMove?: () => void;
+  /** Langes Drücken – mit Finger oder gedrückter Maustaste (startet den Auswahlmodus). */
   onLongPress?: () => void;
   selecting?: boolean;
   selected?: boolean;
@@ -24,14 +26,14 @@ export interface ItemCardProps {
   isNew?: boolean;
 }
 
-function ItemCard({ onClick, onEdit, onInfo, onLongPress, selecting, selected, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
+function ItemCard({ onClick, onEdit, onInfo, onMove, onLongPress, selecting, selected, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
   const press = useLongPress(onLongPress);
   return (
     <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}`}>
       <button className="item-main" onClick={onClick} {...press} aria-pressed={selecting ? !!selected : undefined}>
         {thumb}
         <div className="card-main">{children}</div>
-        {chevron && !selecting && !onEdit && !onInfo && (
+        {chevron && !selecting && !onEdit && !onInfo && !onMove && (
           <span className="item-chevron" aria-hidden="true">
             <Icon name="chevron" size={18} />
           </span>
@@ -45,6 +47,11 @@ function ItemCard({ onClick, onEdit, onInfo, onLongPress, selecting, selected, t
       {!selecting && onEdit && (
         <button className="icon-btn item-action item-edit" aria-label={`„${label}“ bearbeiten`} title="Bearbeiten" onClick={onEdit}>
           <Icon name="edit" size={19} />
+        </button>
+      )}
+      {!selecting && onMove && (
+        <button className="icon-btn item-action item-move" aria-label={`„${label}“ verschieben`} title="Verschieben" onClick={onMove}>
+          <Icon name="move" size={19} />
         </button>
       )}
       {!selecting && onInfo && (

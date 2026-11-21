@@ -36,7 +36,7 @@ const EXT: Record<string, FileKind> = {
   log: 'text', yml: 'text', yaml: 'text', ini: 'text', sql: 'text', sh: 'text',
   jpg: 'image', jpeg: 'image', png: 'image', gif: 'image', webp: 'image', bmp: 'image', svg: 'image', heic: 'image', heif: 'image', avif: 'image',
   mp4: 'video', mov: 'video', webm: 'video', mkv: 'video', avi: 'video', m4v: 'video',
-  mp3: 'audio', wav: 'audio', m4a: 'audio', ogg: 'audio', flac: 'audio', aac: 'audio', opus: 'audio',
+  mp3: 'audio', wav: 'audio', m4a: 'audio', weba: 'audio', ogg: 'audio', flac: 'audio', aac: 'audio', opus: 'audio',
 };
 
 export function kindOf(mime: string, ext: string): FileKind {

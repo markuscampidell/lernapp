@@ -20,7 +20,7 @@ function swallowNextClick() {
 }
 
 /**
- * Langes Drücken (Handy). Gibt Event-Handler für ein Element zurück.
+ * Langes Drücken (Finger, Stift oder gedrückte linke Maustaste). Gibt Event-Handler für ein Element zurück.
  * Nach einem langen Druck wird der darauffolgende Klick unterdrückt.
  */
 export function useLongPress(onLongPress: (() => void) | undefined, ms = 480) {
@@ -38,7 +38,7 @@ export function useLongPress(onLongPress: (() => void) | undefined, ms = 480) {
 
   return {
     onPointerDown: (e: React.PointerEvent) => {
-      if (e.pointerType === 'mouse') return; // nur Touch/Stift
+      if (e.pointerType === 'mouse' && e.button !== 0) return; // Maus: nur linke Taste
       fired.current = false;
       start.current = { x: e.clientX, y: e.clientY };
       timer.current = window.setTimeout(() => {

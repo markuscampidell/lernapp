@@ -1918,7 +1918,8 @@ span.gloss.selected {
 }
 .add-icon.add-files,
 .add-icon.add-camera,
-.add-icon.add-video { color: var(--good); background: var(--good-bg); }
+.add-icon.add-video,
+.add-icon.add-audio { color: var(--good); background: var(--good-bg); }
 .add-icon.add-doc,
 .add-icon.add-note { color: var(--info); background: var(--info-bg); }
 .add-icon.add-cards { color: var(--series-2); background: color-mix(in srgb, var(--series-2) 14%, var(--surface)); }
@@ -4692,4 +4693,71 @@ div.sticky-bar:has(> .view-header) {
     bottom: 16px;
     font-size: 1.15rem;
   }
+}
+
+/* Mehrere Knöpfe rechts an einer Karte (Bearbeiten, Verschieben, Details) eng beieinander */
+.item-action + .item-action {
+  margin-left: -6px;
+}
+
+/* ---------- Mit Hintergrund: Knöpfe klar vom Hintergrund abheben ----------
+   (:where hält die Spezifität niedrig, damit „gewählt“-, Hover- und Gefahr-Zustände weiter greifen.) */
+:where(:root[data-bg]) .btn.ghost {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line), 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+:where(:root[data-bg]) .icon-btn {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+:where(:root[data-bg]) .icon-btn:not(.danger-icon, .item-action) {
+  color: var(--text);
+}
+:where(:root[data-bg]) .item-action {
+  color: var(--text-2);
+}
+:where(:root[data-bg]) .main .link,
+:where(:root[data-bg]) .viewer .link {
+  text-shadow: 0 0 2px var(--bg), 0 0 6px var(--bg);
+}
+
+/* ---------- Audio aufnehmen ---------- */
+.recorder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0 8px;
+}
+.recorder-time {
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.recorder-time.on {
+  color: var(--critical);
+}
+.recorder-btn {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--critical);
+  color: #fff;
+  transition: transform 0.1s;
+}
+.recorder-btn:active {
+  transform: scale(0.95);
+}
+.recorder-btn.stop {
+  animation: rec-pulse 1.4s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--critical) 25%, transparent); }
+}
+.recorder-audio {
+  width: 100%;
 }

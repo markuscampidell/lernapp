@@ -71,7 +71,7 @@ function LoginForm() {
           maxLength={20}
           required
         />
-        {mode === 'register' && <span className="muted small">3–20 Zeichen: Buchstaben, Ziffern, „-“ und „_“. Alle angemeldeten Personen sehen deinen Benutzernamen.</span>}
+        {mode === 'register' && <span className="muted small">3–20 Zeichen: Buchstaben, Ziffern, „-“, „_“</span>}
       </label>
       <label className="field">
         <span className="field-label">Passwort</span>
@@ -223,7 +223,7 @@ function AccountInfo() {
 
 /** „Meine Ordner“ auf allen Geräten: eigene Ordner automatisch hochladen (mit niemandem geteilt). */
 function SyncSetting() {
-  const { user, setSync } = useAuth();
+  const { setSync } = useAuth();
   const { sync, retrySync, folders, files, online } = useLibrary();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -260,9 +260,7 @@ function SyncSetting() {
       <div className="toggle-row">
         <span>
           „Meine Ordner“ auf allen Geräten
-          <span className="muted small block">
-            Eigene Ordner werden automatisch hochgeladen und erscheinen überall, wo du als {user?.username} angemeldet bist. Nur du siehst sie.
-          </span>
+          <span className="muted small block">Nur du siehst sie.</span>
         </span>
         <input type="checkbox" className="switch" checked={sync.on} disabled={busy || !online} onChange={(e) => toggle(e.target.checked)} />
       </div>

@@ -63,10 +63,7 @@ export function NotificationSetting() {
         <div className="toggle-row">
           <span>
             Benachrichtigungen auf diesem Gerät
-            <span className="muted small block">
-              Wenn jemand deine Dateien kommentiert oder dir antwortet, einen Ordner mit dir teilt oder dir Ordner übergibt – auch wenn
-              die App geschlossen ist. Für {user.username}.
-            </span>
+            <span className="muted small block">Kommentare, Antworten, geteilte Ordner – auch bei geschlossener App.</span>
           </span>
           <input
             type="checkbox"
