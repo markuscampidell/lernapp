@@ -4876,3 +4876,15 @@ div.sticky-bar:has(> .view-header) {
 :root[data-bg] .sticky-bar.stuck::before {
   display: block;
 }
+
+/* ---------- Kein versehentliches Markieren von Text ----------
+   In Listen, Leisten und Einstellungen markiert ein Tippen/Halten zwischen den Ordnern sonst Überschriften.
+   In geöffneten Dateien, Pop-ups und Eingabefeldern bleibt Text markier- und kopierbar. */
+.app {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.app :is(.viewer, .study-screen, input, textarea, [contenteditable='true']) {
+  -webkit-user-select: text;
+  user-select: text;
+}
