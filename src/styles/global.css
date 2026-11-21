@@ -4836,3 +4836,43 @@ div.sticky-bar:has(> .view-header) {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+
+/* =====================================================================
+   „Glas“ ohne Weichzeichner (Nov 2026)
+   backdrop-filter rechnet bei jedem Scroll-Bild für jedes Element neu – am Handy ruckelt das.
+   Stattdessen: leicht getönte, durchscheinende Flächen (runde Ecken bleiben), ohne Rand-Linie.
+   Lesbarkeit kommt vom Schein in der Hintergrundfarbe hinter dem Text – der wird nur einmal gezeichnet
+   und kostet beim Scrollen nichts.
+   ===================================================================== */
+:root[data-bg] .main .card,
+:root[data-bg] .main .search,
+:root[data-bg] .split-pane,
+:root[data-bg] .nav,
+:root[data-bg] .app-clock {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-bg] .main .card,
+:root[data-bg] .main .search {
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
+}
+:root[data-bg] .main .card:not(.selected),
+:root[data-bg] .main .search:not(:focus-within) {
+  border-color: transparent;
+}
+:root[data-bg] .split-pane {
+  background: color-mix(in srgb, var(--surface) 22%, transparent);
+  border-color: transparent;
+}
+/* Feste Leisten liegen über dem scrollenden Inhalt: etwas deckender statt weichgezeichnet. */
+:root[data-bg] .nav {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+:root[data-bg] .app-clock {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+/* Texte in den Kästen (Namen, Größe, Beschreibung …) mit Schein – so bleiben sie auch ohne Weichzeichner lesbar. */
+:root[data-bg] .main .card .card-main > :is(strong, span, p),
+:root[data-bg] .main .card .card-main .muted {
+  text-shadow: 0 0 2px var(--bg), 0 0 6px var(--bg);
+}
