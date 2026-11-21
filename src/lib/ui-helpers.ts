@@ -161,9 +161,73 @@ function clock() {
   });
 }
 
+/**
+ * Hintergrund hinter den festen Leisten (nur mit eigenem Hintergrund).
+ * Früher: ein bildschirmgroßes, festes (position: fixed) Bild in jeder Leiste, auf die Leiste zugeschnitten (clip-path).
+ * Das zeichnen manche Handys beim Ändern der Liste fehlerhaft (Bildfehler rund um die Stelle).
+ * Jetzt: die Leiste zeigt ihr Bild nur, solange sie oben „klebt“ – dann ist ihre Lage auf dem Bildschirm fest,
+ * und das Bild wird einmal passend zum Hintergrund verschoben (--bar-x/--bar-y). Klebt sie nicht, ist sie durchsichtig
+ * (darunter liegt ohnehin nichts). Kein Rechnen beim Scrollen: nur IntersectionObserver beim An-/Ablösen.
+ */
+function stickyBackgrounds() {
+  const known = new Map<HTMLElement, { io: IntersectionObserver; top: number }>();
+  const setViewport = () => {
+    document.documentElement.style.setProperty('--vw', `${window.innerWidth}px`);
+    document.documentElement.style.setProperty('--vh', `${window.innerHeight}px`);
+  };
+  const place = (bar: HTMLElement) => {
+    const r = bar.getBoundingClientRect();
+    bar.style.setProperty('--bar-x', `${r.left}px`);
+    bar.style.setProperty('--bar-y', `${r.top}px`);
+  };
+  const watch = (bar: HTMLElement) => {
+    known.get(bar)?.io.disconnect();
+    const top = parseFloat(getComputedStyle(bar).top) || 0;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        const stuck = e.intersectionRatio < 1 && e.boundingClientRect.top <= top + 1.5;
+        if (stuck) place(bar);
+        bar.classList.toggle('stuck', stuck);
+      },
+      { rootMargin: `${-(top + 1)}px 0px 0px 0px`, threshold: [0, 1] },
+    );
+    io.observe(bar);
+    if (!known.has(bar)) ro.observe(bar);
+    known.set(bar, { io, top });
+  };
+  const scan = () => {
+    for (const [bar, w] of known) if (!bar.isConnected) (w.io.disconnect(), ro.unobserve(bar), known.delete(bar));
+    document.querySelectorAll<HTMLElement>('.sticky-bar').forEach((bar) => {
+      const w = known.get(bar);
+      // Neu, oder ihr Abstand nach oben hat sich geändert (z. B. Höhe der Leiste darüber): neu einrichten.
+      if (!w || w.top !== (parseFloat(getComputedStyle(bar).top) || 0)) watch(bar);
+    });
+  };
+  // Größe/Höhe der Leisten darüber ändert sich (z. B. --sticky-top): neu einrichten.
+  const refresh = () => {
+    setViewport();
+    for (const bar of known.keys()) watch(bar);
+  };
+  let pending = 0;
+  const later = () => {
+    if (pending) return;
+    pending = requestAnimationFrame(() => {
+      pending = 0;
+      scan();
+    });
+  };
+  new MutationObserver(later).observe(document.body, { childList: true, subtree: true });
+  // Ändert sich die Höhe einer Leiste, ändert sich der Abstand der Leiste darunter (--sticky-top).
+  const ro = new ResizeObserver(later);
+  window.addEventListener('resize', refresh);
+  setViewport();
+  scan();
+}
+
 export function initUiHelpers() {
   clock();
   blockAppZoom();
   quickTooltips();
   scrollHints();
+  stickyBackgrounds();
 }

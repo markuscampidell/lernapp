@@ -4855,3 +4855,22 @@ div.sticky-bar:has(> .view-header) {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ---------- Hintergrund hinter den festen Leisten ohne „fixed + clip-path“ (siehe stickyBackgrounds in lib/ui-helpers.ts) ----------
+   Das alte Verfahren erzeugte auf manchen Handys Bildfehler, wenn sich beim Scrollen etwas änderte (z. B. Auswahl). */
+:root[data-bg] .sticky-bar {
+  clip-path: none;
+  overflow: hidden;
+}
+:root[data-bg] .sticky-bar::before {
+  position: absolute;
+  inset: auto;
+  left: calc(-1 * var(--bar-x, 0px));
+  top: calc(-1 * var(--bar-y, 0px));
+  width: var(--vw, 100vw);
+  height: var(--vh, 100vh);
+  display: none;
+}
+:root[data-bg] .sticky-bar.stuck::before {
+  display: block;
+}
