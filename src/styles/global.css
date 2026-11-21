@@ -916,7 +916,7 @@ input.narrow {
 .folder-top {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   margin: -6px 0 -4px -8px;
 }
 .crumbs {
@@ -1059,7 +1059,7 @@ input.narrow {
 .viewer-header {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   padding: calc(8px + env(safe-area-inset-top)) 8px 8px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg) 85%, transparent);
@@ -3463,7 +3463,7 @@ button.avatar-edit-badge {
   z-index: 4;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   height: 32px;
   padding: 0 4px;
   transform: translateX(-50%);
@@ -3518,7 +3518,7 @@ button.avatar-edit-badge {
   z-index: 50;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   padding: 3px;
   border-radius: 999px;
   background: var(--surface);
@@ -4828,4 +4828,12 @@ div.sticky-bar:has(> .view-header) {
 }
 .sheet-pinned > .people-group {
   margin-top: 0;
+}
+/* Leisten mit eigenem Hintergrund (Text-Werkzeuge, Stift, Zoom, Seiten-Knöpfe): dort brauchen Knöpfe keinen eigenen Kasten –
+   sonst kleben die Kästen aneinander. */
+:where(:root[data-bg]) :is(.doc-toolbar, .zoom-ctl, .page-bar) .icon-btn:not(.on, :hover) {
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
