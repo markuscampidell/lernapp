@@ -5,6 +5,9 @@ import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { Pager, StudyScreen } from './StudyScreen';
 import { newAnswer, newQuestion, questionProblem, QUIZ_EXT, QUIZ_MIME, quizBlob, type Answer, type Question } from './format';
+import { useDraft } from '../drafts/useDraft';
+import { DraftNotice } from '../drafts/DraftNotice';
+import type { Draft } from '../../storage/drafts';
 import { useStudySave } from './useStudySave';
 import { DetailsButton } from './DetailsButton';
 import { MathPreview } from '../../components/MathText';
@@ -13,18 +16,19 @@ const MAX_ANSWERS = 6;
 const LETTERS = 'ABCDEF';
 
 /** Multiple-Choice-Quiz anlegen/bearbeiten: eine Frage pro Seite. */
-export function QuizEditor({ file, folderId, initial, initialName, initialDescription, onClose }: { file?: FileItem; folderId?: string; initial?: Question[]; initialName?: string; initialDescription?: string; onClose: () => void }) {
-  const [name, setName] = useState(file?.name ?? initialName ?? '');
-  const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
+export function QuizEditor({ file, folderId, initial, initialName, initialDescription, restore, onClose }: { file?: FileItem; folderId?: string; initial?: Question[]; initialName?: string; initialDescription?: string; restore?: Draft; onClose: () => void }) {
+  const [name, setName] = useState(initialName ?? file?.name ?? '');
+  const [description, setDescription] = useState(initialDescription ?? file?.description ?? '');
   const [questions, setQuestions] = useState<Question[]>(() => (initial?.length ? initial : [newQuestion()]));
   const [index, setIndex] = useState(0);
   const start = useRef(JSON.stringify({ name, description, questions }));
-  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: QUIZ_EXT, mime: QUIZ_MIME });
+  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: QUIZ_EXT, mime: QUIZ_MIME, base: restore ? restore.base ?? null : undefined, askOverwrite: !!restore });
   const questionRef = useRef<HTMLTextAreaElement>(null);
 
   const q = questions[Math.min(index, questions.length - 1)];
   const filled = questions.filter((x) => x.text.trim()).length;
-  const dirty = JSON.stringify({ name, description, questions }) !== start.current;
+  const dirty = !!restore || JSON.stringify({ name, description, questions }) !== start.current;
+  const draft = useDraft({ kind: 'quiz', file, folderId, restore, dirty, snapshot: () => ({ name, description, data: questions }) });
   const bad = useMemo(() => new Set(questions.map((x, i) => (questionProblem(x) ? i : -1)).filter((i) => i >= 0)), [questions]);
   const problem = questionProblem(q);
 
@@ -48,6 +52,7 @@ export function QuizEditor({ file, folderId, initial, initialName, initialDescri
   };
   const close = () => {
     if (dirty && !busy && !confirm('Änderungen verwerfen?')) return;
+    draft.discard();
     onClose();
   };
   const submit = async () => {
@@ -58,11 +63,13 @@ export function QuizEditor({ file, folderId, initial, initialName, initialDescri
       setIndex(first);
       return setErr(`Frage ${first + 1}: ${questionProblem(questions[first])}`);
     }
-    if (await save(name, quizBlob(questions), description)) onClose();
+    if (await save(name, quizBlob(questions), description)) (draft.saved(), onClose());
   };
 
   return (
     <StudyScreen
+      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      onLockClose={onClose}
       editing={file}
       title={file ? 'Quiz bearbeiten' : 'Neues Quiz'}
       subtitle={`${filled} ${filled === 1 ? 'Frage' : 'Fragen'}`}

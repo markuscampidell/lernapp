@@ -4939,3 +4939,12 @@ div.sticky-bar:has(> .view-header) {
     outline-offset: 2px;
   }
 }
+
+/* Entwürfe: Hinweis im Editor und Leiste in der Datei-Ansicht */
+.draft-notice,
+.draft-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

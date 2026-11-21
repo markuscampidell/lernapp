@@ -4,6 +4,9 @@ import { TextLine } from '../../components/TextLine';
 import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { StudyScreen } from '../study/StudyScreen';
+import { useDraft } from '../drafts/useDraft';
+import { DraftNotice } from '../drafts/DraftNotice';
+import type { Draft } from '../../storage/drafts';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
 import { WheelSpinner } from './WheelSpinner';
@@ -32,7 +35,7 @@ export function WheelEditor({
   initial,
   initialName,
   initialDescription,
-  onClose,
+  restore, onClose,
   onDone,
 }: {
   file?: FileItem;
@@ -41,20 +44,21 @@ export function WheelEditor({
   /** Startname einer neuen Datei (z. B. von „Mit KI erstellen“) */
   initialName?: string;
   initialDescription?: string;
-  onClose: () => void;
+  restore?: Draft; onClose: () => void;
   onDone?: (w: Wheel) => void;
 }) {
   const embedded = !!onDone;
-  const [name, setName] = useState(file?.name ?? initialName ?? '');
-  const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
+  const [name, setName] = useState(initialName ?? file?.name ?? '');
+  const [description, setDescription] = useState(initialDescription ?? file?.description ?? '');
   const [wheel, setWheel] = useState<Wheel>(() => (initial ? { ...initial, entries: initial.entries.length ? initial.entries : [newEntry()] } : emptyWheel()));
   const [mode, setMode] = useState<'list' | 'text'>('list');
   const [text, setText] = useState('');
   const start = useRef(JSON.stringify({ name, description, wheel }));
-  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: WHEEL_EXT, mime: WHEEL_MIME });
+  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: WHEEL_EXT, mime: WHEEL_MIME, base: restore ? restore.base ?? null : undefined, askOverwrite: !!restore });
   const rows = useRef<HTMLDivElement>(null);
 
-  const dirty = JSON.stringify({ name, description, wheel }) !== start.current;
+  const dirty = !!restore || JSON.stringify({ name, description, wheel }) !== start.current;
+  const draft = useDraft({ kind: 'wheel', file, folderId, restore, dirty, snapshot: () => ({ name, description, data: wheel }) });
   const colors = new Map(slices(wheel.entries.filter((e) => e.label.trim())).map((s) => [s.entry.id, s.color]));
   const set = (patch: Partial<Wheel>) => setWheel((w) => ({ ...w, ...patch }));
   const setEntry = (id: string, patch: Partial<WheelEntry>) => set({ entries: wheel.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
@@ -71,6 +75,7 @@ export function WheelEditor({
 
   const close = () => {
     if (dirty && !busy && !confirm('Änderungen verwerfen?')) return;
+    draft.discard();
     onClose();
   };
   const submit = async () => {
@@ -78,11 +83,13 @@ export function WheelEditor({
     if (w.entries.length < 2) return setErr('Gib mindestens zwei Einträge ein.');
     if (embedded) return onDone!(w);
     if (!name.trim()) return setErr('Gib dem Glücksrad einen Namen.');
-    if (await save(name, wheelBlob(w), description)) onClose();
+    if (await save(name, wheelBlob(w), description)) (draft.saved(), onClose());
   };
 
   return (
     <StudyScreen
+      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      onLockClose={onClose}
       editing={file}
       title={embedded ? 'Glücksrad im Dokument' : file ? 'Glücksrad bearbeiten' : 'Neues Glücksrad'}
       onClose={close}

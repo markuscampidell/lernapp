@@ -5,23 +5,27 @@ import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { Pager, StudyScreen } from './StudyScreen';
 import { CARDS_EXT, CARDS_MIME, cardsBlob, newCard, type Card } from './format';
+import { useDraft } from '../drafts/useDraft';
+import { DraftNotice } from '../drafts/DraftNotice';
+import type { Draft } from '../../storage/drafts';
 import { useStudySave } from './useStudySave';
 import { DetailsButton } from './DetailsButton';
 import { MathPreview } from '../../components/MathText';
 
 /** Karteikarten anlegen/bearbeiten: eine Karte pro Seite (Vorder- und Rückseite). */
-export function CardsEditor({ file, folderId, initial, initialName, initialDescription, onClose }: { file?: FileItem; folderId?: string; initial?: Card[]; initialName?: string; initialDescription?: string; onClose: () => void }) {
-  const [name, setName] = useState(file?.name ?? initialName ?? '');
-  const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
+export function CardsEditor({ file, folderId, initial, initialName, initialDescription, restore, onClose }: { file?: FileItem; folderId?: string; initial?: Card[]; initialName?: string; initialDescription?: string; restore?: Draft; onClose: () => void }) {
+  const [name, setName] = useState(initialName ?? file?.name ?? '');
+  const [description, setDescription] = useState(initialDescription ?? file?.description ?? '');
   const [cards, setCards] = useState<Card[]>(() => (initial?.length ? initial : [newCard()]));
   const [index, setIndex] = useState(0);
   const start = useRef(JSON.stringify({ name, description, cards }));
-  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: CARDS_EXT, mime: CARDS_MIME });
+  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: CARDS_EXT, mime: CARDS_MIME, base: restore ? restore.base ?? null : undefined, askOverwrite: !!restore });
   const frontRef = useRef<HTMLTextAreaElement>(null);
 
   const card = cards[Math.min(index, cards.length - 1)];
   const filled = useMemo(() => cards.filter((c) => c.front.trim() || c.back.trim()).length, [cards]);
-  const dirty = JSON.stringify({ name, description, cards }) !== start.current;
+  const dirty = !!restore || JSON.stringify({ name, description, cards }) !== start.current;
+  const draft = useDraft({ kind: 'cards', file, folderId, restore, dirty, snapshot: () => ({ name, description, data: cards }) });
 
   const update = (patch: Partial<Card>) => setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, ...patch } : c)));
   const go = (i: number) => {
@@ -42,16 +46,19 @@ export function CardsEditor({ file, folderId, initial, initialName, initialDescr
   };
   const close = () => {
     if (dirty && !busy && !confirm('Änderungen verwerfen?')) return;
+    draft.discard();
     onClose();
   };
   const submit = async () => {
     if (!name.trim()) return setErr('Gib den Karteikarten einen Namen.');
     if (filled === 0) return setErr('Füge mindestens eine Karte hinzu.');
-    if (await save(name, cardsBlob(cards), description)) onClose();
+    if (await save(name, cardsBlob(cards), description)) (draft.saved(), onClose());
   };
 
   return (
     <StudyScreen
+      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      onLockClose={onClose}
       editing={file}
       title={file ? 'Karteikarten bearbeiten' : 'Neue Karteikarten'}
       subtitle={`${filled} ${filled === 1 ? 'Karte' : 'Karten'}`}

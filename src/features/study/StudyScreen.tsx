@@ -17,7 +17,13 @@ export function StudyScreen({
   editing,
   bar,
   bodyClass,
+  notice,
+  onLockClose,
 }: {
+  /** Hinweis ganz oben im Inhalt (z. B. „Ungespeicherte Änderungen wiederhergestellt“). */
+  notice?: ReactNode;
+  /** Schließen aus der Sperre („wird gerade bearbeitet“) – ohne Nachfrage, ein Entwurf bleibt erhalten. */
+  onLockClose?: () => void;
   /** Feste Leiste zwischen Kopfzeile und Inhalt (scrollt nicht mit). */
   bar?: ReactNode;
   bodyClass?: string;
@@ -114,12 +120,13 @@ export function StudyScreen({
       </header>
       {bar && <div className="study-bar">{bar}</div>}
       <div className={`viewer-body study-body${bodyClass ? ` ${bodyClass}` : ''}`}>
+        {notice}
         <EditingNotice others={others} />
         {children}
       </div>
       {footer && <footer className="study-footer">{footer}</footer>}
       {editing && !locked && <CommentsToggle file={editing} />}
-      {locked && <EditingLock others={earlier} onClose={onClose} />}
+      {locked && <EditingLock others={earlier} onClose={onLockClose ?? onClose} />}
     </div>,
     document.body,
   );

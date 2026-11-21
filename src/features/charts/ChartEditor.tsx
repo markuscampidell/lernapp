@@ -4,6 +4,9 @@ import { TextLine } from '../../components/TextLine';
 import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { StudyScreen } from '../study/StudyScreen';
+import { useDraft } from '../drafts/useDraft';
+import { DraftNotice } from '../drafts/DraftNotice';
+import type { Draft } from '../../storage/drafts';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
 import {
@@ -40,7 +43,7 @@ export function ChartEditor({
   initial,
   initialName,
   initialDescription,
-  onClose,
+  restore, onClose,
   onDone,
 }: {
   file?: FileItem;
@@ -49,22 +52,23 @@ export function ChartEditor({
   /** Startname einer neuen Datei (z. B. von „Mit KI erstellen“) */
   initialName?: string;
   initialDescription?: string;
-  onClose: () => void;
+  restore?: Draft; onClose: () => void;
   onDone?: (c: Chart) => void;
 }) {
   const embedded = !!onDone;
-  const [name, setName] = useState(file?.name ?? initialName ?? '');
-  const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
+  const [name, setName] = useState(initialName ?? file?.name ?? '');
+  const [description, setDescription] = useState(initialDescription ?? file?.description ?? '');
   const [chart, setChart] = useState<Chart>(() => (initial ? { ...initial, points: initial.points.length ? initial.points : [newPoint()] } : emptyChart()));
   const [mode, setMode] = useState<'table' | 'text'>('table');
   const [text, setText] = useState('');
   // Rohtext der Zahlenfelder (damit "1," oder "-" beim Tippen stehen bleiben).
   const [raw, setRaw] = useState<Record<string, string>>({});
   const start = useRef(JSON.stringify({ name, description, chart }));
-  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: CHART_EXT, mime: CHART_MIME });
+  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: CHART_EXT, mime: CHART_MIME, base: restore ? restore.base ?? null : undefined, askOverwrite: !!restore });
   const lastLabel = useRef<HTMLDivElement>(null);
 
-  const dirty = JSON.stringify({ name, description, chart }) !== start.current;
+  const dirty = !!restore || JSON.stringify({ name, description, chart }) !== start.current;
+  const draft = useDraft({ kind: 'chart', file, folderId, restore, dirty, snapshot: () => ({ name, description, data: chart }) });
   const svg = useMemo(() => chartSvg(chart), [chart]);
   const round = chart.chart === 'pie' || chart.chart === 'donut';
 
@@ -84,6 +88,7 @@ export function ChartEditor({
 
   const close = () => {
     if (dirty && !busy && !confirm('Änderungen verwerfen?')) return;
+    draft.discard();
     onClose();
   };
   const submit = async () => {
@@ -94,11 +99,13 @@ export function ChartEditor({
       return;
     }
     if (!name.trim()) return setErr('Gib dem Diagramm einen Namen.');
-    if (await save(name, chartBlob(c), description)) onClose();
+    if (await save(name, chartBlob(c), description)) (draft.saved(), onClose());
   };
 
   return (
     <StudyScreen
+      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      onLockClose={onClose}
       editing={file}
       title={embedded ? 'Diagramm im Dokument' : file ? 'Diagramm bearbeiten' : 'Neues Diagramm'}
       onClose={close}

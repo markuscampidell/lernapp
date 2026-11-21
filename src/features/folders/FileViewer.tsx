@@ -13,6 +13,7 @@ import { DocPanel } from '../docs/DocPanel';
 import { ShareSheet } from '../share/ShareSheet';
 import { CommentsToggle } from '../comments/Comments';
 import { ChangesBanner } from '../changes/ChangesBanner';
+import { DraftBar } from '../drafts/DraftBar';
 import { cloudEnabled } from '../../cloud/supabase';
 import { ChartPanel } from '../charts/ChartPanel';
 import { WheelPanel } from '../wheel/WheelPanel';
@@ -200,6 +201,7 @@ export function FileViewer({ file: initial, onClose, openComments }: { file: Fil
             </p>
           </div>
         )}
+        <DraftBar file={file} />
         {file.shareId && <ChangesBanner file={file} />}
         {body}
       </div>

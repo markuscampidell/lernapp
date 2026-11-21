@@ -5,6 +5,9 @@ import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { MathText } from '../../components/MathText';
 import { StudyScreen } from '../study/StudyScreen';
+import { useDraft } from '../drafts/useDraft';
+import { DraftNotice } from '../drafts/DraftNotice';
+import type { Draft } from '../../storage/drafts';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
 import { emptyGaps, GAPS_EXT, GAPS_MIME, gapsBlob, gapsOf, MAX_DISTRACTORS, MAX_TEXT, segments, type GapsDoc } from './gaps';
@@ -16,22 +19,22 @@ export function GapsEditor({
   initial,
   initialName,
   initialDescription,
-  onClose,
+  restore, onClose,
 }: {
   file?: FileItem;
   folderId?: string;
   initial?: GapsDoc;
   initialName?: string;
   initialDescription?: string;
-  onClose: () => void;
+  restore?: Draft; onClose: () => void;
 }) {
-  const [name, setName] = useState(file?.name ?? initialName ?? '');
-  const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
+  const [name, setName] = useState(initialName ?? file?.name ?? '');
+  const [description, setDescription] = useState(initialDescription ?? file?.description ?? '');
   const [doc, setDoc] = useState<GapsDoc>(() => initial ?? emptyGaps());
   const [distractorText, setDistractorText] = useState(() => (initial?.distractors ?? []).join('\n'));
   const start = useRef(JSON.stringify({ name, description, doc }));
   const area = useRef<HTMLTextAreaElement>(null);
-  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: GAPS_EXT, mime: GAPS_MIME });
+  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: GAPS_EXT, mime: GAPS_MIME, base: restore ? restore.base ?? null : undefined, askOverwrite: !!restore });
 
   const set = (patch: Partial<GapsDoc>) => setDoc((d) => ({ ...d, ...patch }));
   const gaps = gapsOf(doc.text);
@@ -41,7 +44,8 @@ export function GapsEditor({
     .filter(Boolean)
     .slice(0, MAX_DISTRACTORS);
   const current = { ...doc, distractors };
-  const dirty = JSON.stringify({ name, description, doc: current }) !== start.current;
+  const dirty = !!restore || JSON.stringify({ name, description, doc: current }) !== start.current;
+  const draft = useDraft({ kind: 'gaps', file, folderId, restore, dirty, snapshot: () => ({ name, description, data: current }) });
 
   /** Markierten Text zur Lücke machen (bzw. leere Lücke einfügen). */
   const makeGap = () => {
@@ -65,17 +69,20 @@ export function GapsEditor({
 
   const close = () => {
     if (dirty && !busy && !confirm('Änderungen verwerfen?')) return;
+    draft.discard();
     onClose();
   };
   const submit = async () => {
     if (!name.trim()) return setErr('Gib dem Lückentext einen Namen.');
     if (!doc.text.trim()) return setErr('Schreib zuerst einen Text.');
     if (!gaps.length) return setErr('Mach mindestens ein Wort zur Lücke: markieren und auf „Lücke“ tippen.');
-    if (await save(name, gapsBlob(current), description)) onClose();
+    if (await save(name, gapsBlob(current), description)) (draft.saved(), onClose());
   };
 
   return (
     <StudyScreen
+      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      onLockClose={onClose}
       editing={file}
       title={file ? 'Lückentext bearbeiten' : 'Neuer Lückentext'}
       subtitle={`${gaps.length} ${gaps.length === 1 ? 'Lücke' : 'Lücken'}`}

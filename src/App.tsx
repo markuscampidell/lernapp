@@ -1,3 +1,4 @@
+import { DraftHost } from './features/drafts/DraftHost';
 import { useRef, useState } from 'react';
 import { Icon, type IconName } from './components/Icon';
 import { InstallBanner } from './components/InstallBanner';
@@ -97,6 +98,7 @@ export function App() {
         )}
       </main>
       <LightboxHost />
+      <DraftHost />
     </div>
   );
 }

@@ -4,6 +4,9 @@ import { TextLine } from '../../components/TextLine';
 import { Icon, type IconName } from '../../components/Icon';
 import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
+import { useDraft } from '../drafts/useDraft';
+import { DraftNotice } from '../drafts/DraftNotice';
+import type { Draft } from '../../storage/drafts';
 import { DetailsButton } from '../study/DetailsButton';
 import { isTouchDevice } from '../../lib/files';
 import { DOC_EXT, DOC_MIME, imageToDataUrl, normalizeBlocks, sanitizeHtml } from './sanitize';
@@ -97,7 +100,10 @@ export function DocEditor({
   initialDescription,
   onClose,
   mode = 'edit',
+  restore,
 }: {
+  /** Wiederhergestellter Entwurf (ungespeicherte Änderungen nach Neuladen/Absturz). */
+  restore?: Draft;
   file?: FileItem;
   folderId?: string;
   initial?: string;
@@ -119,9 +125,9 @@ export function DocEditor({
   const [penMode, setPenMode] = useState(drawOnly);
   const [fingerDraws, setFingerDraws] = useState(() => !penSeen());
   const [paperFor, setPaperFor] = useState<number | null>(null);
-  const [name, setName] = useState(file?.name ?? initialName ?? '');
-  const [description, setDescription] = useState(file?.description ?? initialDescription ?? '');
-  const [dirty, setDirty] = useState(false);
+  const [name, setName] = useState(initialName ?? file?.name ?? '');
+  const [description, setDescription] = useState(initialDescription ?? file?.description ?? '');
+  const [dirty, setDirty] = useState(!!restore);
   const [state, setState] = useState<Record<string, boolean>>({});
   // Angeklicktes Bild (zum Größe ändern / Ausrichten / Löschen).
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -130,7 +136,20 @@ export function DocEditor({
   const wrap = useRef<HTMLDivElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
-  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: DOC_EXT, mime: DOC_MIME });
+  const { save, busy, err, setErr } = useStudySave({ file, folderId, ext: DOC_EXT, mime: DOC_MIME, base: restore ? restore.base ?? null : undefined, askOverwrite: !!restore });
+  // Entwurf: Text aus dem Editor-Feld plus Handschrift. Ist das Feld schon weg (Schließen), nichts überschreiben.
+  const draft = useDraft({
+    kind: 'doc',
+    file,
+    folderId,
+    mode,
+    restore,
+    dirty,
+    snapshot: () => {
+      if (!editor.current) throw new Error('kein Editor');
+      return { name, description, data: joinDoc(sanitizeHtml(editor.current.innerHTML), pagesRef.current) };
+    },
+  });
   // Angeklickte Formel (wird in der Formel-Leiste bearbeitet).
   const [formula, setFormula] = useState<HTMLElement | null>(null);
   const [tex, setTex] = useState('');
@@ -1202,12 +1221,13 @@ export function DocEditor({
 
   const close = () => {
     if (dirty && !busy && !confirm('Änderungen verwerfen?')) return;
+    draft.discard();
     onClose();
   };
   const submit = async () => {
     if (!name.trim()) return setErr('Gib dem Dokument einen Namen.');
     const html = sanitizeHtml(editor.current?.innerHTML ?? '');
-    if (await save(name, new Blob([joinDoc(html, pagesRef.current)], { type: DOC_MIME }), description)) onClose();
+    if (await save(name, new Blob([joinDoc(html, pagesRef.current)], { type: DOC_MIME }), description)) (draft.saved(), onClose());
   };
 
   // ---------- Handschrift ----------
@@ -1405,6 +1425,8 @@ export function DocEditor({
 
   return (
     <StudyScreen
+      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      onLockClose={onClose}
       editing={file}
       title={drawOnly ? `Zeichnen: ${name || 'Dokument'}` : file ? 'Dokument bearbeiten' : 'Neues Text-Dokument'}
       onClose={close}

@@ -8,12 +8,15 @@ import { DescriptionField } from '../../components/DescriptionField';
 import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
+import { useDraft } from '../drafts/useDraft';
+import { DraftNotice } from '../drafts/DraftNotice';
+import type { Draft } from '../../storage/drafts';
 
 /** Größer als das wird eine Textdatei nicht im Editor geöffnet (sonst wird das Textfeld zäh). */
 export const MAX_NOTE_EDIT = 512 * 1024;
 
 /** Schnell eine Textnotiz als .txt-Datei im Ordner anlegen. */
-export function NoteSheet({ folderId, initialName, initialDescription, initialText, onClose }: { folderId: string; initialName?: string; initialDescription?: string; initialText?: string; onClose: () => void }) {
+export function NoteSheet({ folderId, initialName, initialDescription, initialText, restore, onClose }: { folderId: string; initialName?: string; initialDescription?: string; initialText?: string; restore?: Draft; onClose: () => void }) {
   const { addFiles } = useLibrary();
   const [name, setName] = useState(initialName ?? '');
   const [description, setDescription] = useState(initialDescription ?? '');
@@ -22,9 +25,11 @@ export function NoteSheet({ folderId, initialName, initialDescription, initialTe
   const [err, setErr] = useState<string | null>(null);
 
   // Versehentlich danebengetippt oder Zurück gedrückt: Geschriebenes nicht kommentarlos wegwerfen.
-  const dirty = text.trim() !== (initialText ?? '').trim() || name.trim() !== (initialName ?? '').trim();
+  const dirty = !!restore || text.trim() !== (initialText ?? '').trim() || name.trim() !== (initialName ?? '').trim();
+  const draft = useDraft({ kind: 'note', folderId, restore, dirty, snapshot: () => ({ name, description, data: text }) });
   const close = () => {
     if (dirty && !busy && !confirm('Notiz verwerfen?')) return;
+    draft.discard();
     onClose();
   };
 
@@ -35,6 +40,7 @@ export function NoteSheet({ folderId, initialName, initialDescription, initialTe
     const file = new File([text], `${title}.txt`, { type: 'text/plain' });
     try {
       await addFiles(folderId, [{ file, filename: file.name, name: title, description }]);
+      draft.saved();
       onClose();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.');
@@ -52,6 +58,7 @@ export function NoteSheet({ folderId, initialName, initialDescription, initialTe
         </button>
       }
     >
+      {draft.restored && <DraftNotice onDiscard={() => (draft.discard(), onClose())} />}
       <div className="field">
         <div className="field-label">
           <span>Name</span>
@@ -77,25 +84,29 @@ export function NoteSheet({ folderId, initialName, initialDescription, initialTe
 }
 
 /** Bestehende Notiz (Textdatei) bearbeiten. */
-export function NoteEditor({ file, initial, onClose }: { file: FileItem; initial: string; onClose: () => void }) {
-  const [name, setName] = useState(file.name);
-  const [description, setDescription] = useState(file.description ?? '');
+export function NoteEditor({ file, initial, initialName, initialDescription, restore, onClose }: { file: FileItem; initial: string; initialName?: string; initialDescription?: string; restore?: Draft; onClose: () => void }) {
+  const [name, setName] = useState(initialName ?? file.name);
+  const [description, setDescription] = useState(initialDescription ?? file.description ?? '');
   const [text, setText] = useState(initial);
   const start = useRef(JSON.stringify({ name, description, text }));
-  const { save, busy, err, setErr } = useStudySave({ file, ext: file.ext || 'txt', mime: file.mime || 'text/plain' });
-  const dirty = JSON.stringify({ name, description, text }) !== start.current;
+  const { save, busy, err, setErr } = useStudySave({ file, ext: file.ext || 'txt', mime: file.mime || 'text/plain', base: restore ? restore.base ?? null : undefined, askOverwrite: !!restore });
+  const dirty = !!restore || JSON.stringify({ name, description, text }) !== start.current;
+  const draft = useDraft({ kind: 'note', file, restore, dirty, snapshot: () => ({ name, description, data: text }) });
 
   const close = () => {
     if (dirty && !busy && !confirm('Änderungen verwerfen?')) return;
+    draft.discard();
     onClose();
   };
   const submit = async () => {
     if (!name.trim()) return setErr('Gib der Notiz einen Namen.');
-    if (await save(name, new Blob([text], { type: file.mime || 'text/plain' }), description)) onClose();
+    if (await save(name, new Blob([text], { type: file.mime || 'text/plain' }), description)) (draft.saved(), onClose());
   };
 
   return (
     <StudyScreen
+      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      onLockClose={onClose}
       editing={file}
       title="Notiz bearbeiten"
       onClose={close}
