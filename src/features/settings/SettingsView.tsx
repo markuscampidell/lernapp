@@ -12,6 +12,7 @@ import { serverUsage } from '../../cloud/remote';
 import { cacheLimit, cacheSize } from '../../storage/blobs';
 import { NotificationSetting } from '../notifications/NotificationSetting';
 import { BackgroundPicker } from '../background/BackgroundPicker';
+import { CardButtonsSetting } from './CardButtonsSetting';
 
 export function SettingsView() {
   const lib = useLibrary();
@@ -99,6 +100,8 @@ export function SettingsView() {
       <h2 className="settings-group">Auf diesem Gerät</h2>
 
       <BackgroundPicker />
+
+      <CardButtonsSetting />
 
       {cloudEnabled && <NotificationSetting />}
 

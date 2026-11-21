@@ -14,6 +14,7 @@ import { Sheet } from '../../components/Sheet';
 import { FolderPicker } from '../../components/FolderPicker';
 import { FileCard, FolderCard } from './Cards';
 import { AudioRecorder } from '../upload/AudioRecorder';
+import { useCardButtons } from '../../lib/cardButtons';
 import { FolderEditorSheet } from './FolderEditorSheet';
 import { FileViewer } from './FileViewer';
 import { MAX_NOTE_EDIT, NoteEditor, NoteSheet } from './NoteSheet';
@@ -86,6 +87,8 @@ function FolderPage({
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
+  // Welche Knöpfe an den Karten stehen (Einstellungen, pro Gerät).
+  const buttons = useCardButtons();
   // „Personen“ eines Eintrags in der Liste (Knopf an der Karte).
   const [peopleFor, setPeopleFor] = useState<{ folder?: Folder; file?: FileItem } | null>(null);
   const [sheet, setSheet] = useState<'menu' | 'audio' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps' | 'ai' | null>(null);
@@ -217,16 +220,17 @@ function FolderPage({
     selected: !!sel?.[kind].has(itemId),
     onClick: sel ? () => toggle(kind, itemId) : open,
     onLongPress: () => toggle(kind, itemId),
-    onPeople: cloudEnabled && !isOrphan(kind === 'folders' ? itemId : files.find((f) => f.id === itemId)?.folderId ?? '')
+    onPeople: buttons.people && cloudEnabled && !isOrphan(kind === 'folders' ? itemId : files.find((f) => f.id === itemId)?.folderId ?? '')
       ? () => setPeopleFor(kind === 'folders' ? { folder: folders.find((f) => f.id === itemId) } : { file: files.find((f) => f.id === itemId) })
       : undefined,
     onMove: (() => {
+      if (!buttons.move) return undefined;
       const ids: [string[], string[]] = kind === 'folders' ? [[itemId], []] : [[], [itemId]];
       // Nur anzeigen, wenn man den Eintrag überhaupt verschieben darf (Probe-Ziel: aktueller Ordner).
       if (moveProblem(ids[0], ids[1], folder?.id ?? null)) return undefined;
       return () => setMoving({ folders: ids[0], files: ids[1], fromSelection: false });
     })(),
-    onInfo: () => {
+    onInfo: !buttons.info ? undefined : () => {
       const item = kind === 'folders' ? folders.find((f) => f.id === itemId) : files.find((f) => f.id === itemId);
       if (!item) return;
       setEditing('folderId' in item ? { kind: 'file', file: item } : { kind: 'folder', folder: item });
