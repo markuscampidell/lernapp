@@ -4695,9 +4695,12 @@ div.sticky-bar:has(> .view-header) {
   }
 }
 
-/* Mehrere Knöpfe rechts an einer Karte (Bearbeiten, Verschieben, Details) eng beieinander */
+/* Knöpfe rechts an einer Karte (Bearbeiten, Verschieben, Details): etwas Abstand zueinander und zum Rand */
 .item-action + .item-action {
-  margin-left: -6px;
+  margin-left: 6px;
+}
+.item-card > .item-action:last-child {
+  margin-right: 10px;
 }
 
 /* ---------- Mit Hintergrund: Knöpfe klar vom Hintergrund abheben ----------
@@ -4760,4 +4763,12 @@ div.sticky-bar:has(> .view-header) {
 }
 .recorder-audio {
   width: 100%;
+}
+
+/* Mit Hintergrund: graue Nebentexte (z. B. Erklärungen in den Einstellungen) immer lesbar –
+   wie bei Ordner/Hochladen/Einstellungen in der Leiste: volle Textfarbe plus leichter Schein in der Hintergrundfarbe. */
+:root[data-bg] .main .muted,
+:root[data-bg] .viewer .muted {
+  color: var(--text);
+  text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg), 0 0 14px var(--bg);
 }
