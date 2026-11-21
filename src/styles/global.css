@@ -3794,10 +3794,7 @@ button.avatar-edit-badge {
     flex: 1 1 0;
     min-width: 0;
     max-height: var(--split-h, calc(100dvh - var(--sticky-top, 0px) - 120px));
-    padding: 10px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    /* Kein Kasten um die Spalte (wie am Handy) – Titel und Abstand trennen die beiden Bereiche. */
   }
   .split-pane .section-title {
     margin: 2px 4px 0;
@@ -4409,13 +4406,6 @@ div.sticky-bar:has(> .view-header) {
 :root[data-bg] .split-pane > .muted {
   text-shadow: 0 0 2px var(--bg), 0 0 8px var(--bg), 0 0 14px var(--bg);
 }
-@media (min-width: 900px) {
-  :root[data-bg] .split-pane {
-    background: color-mix(in srgb, var(--surface-2) 85%, transparent);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-  }
-}
 
 /* Auswahl in den Einstellungen */
 .bg-grid {
@@ -4539,15 +4529,6 @@ div.sticky-bar:has(> .view-header) {
 }
 
 /* ---------- Mit Hintergrund: leichte, durchscheinende Kästen (Milchglas) ---------- */
-/* PC: Bereiche „Meine Ordner“ / „Geteilt mit dir“ bzw. Unterordner / Dateien */
-@media (min-width: 900px) {
-  :root[data-bg] .split-pane {
-    background: color-mix(in srgb, var(--surface) 30%, transparent);
-    border-color: color-mix(in srgb, var(--line) 60%, transparent);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-  }
-}
 /* Auch die inneren Kästen (Ordner, Dateien, Suche, Karten in Dateien) durchscheinend */
 :root[data-bg] .main .card,
 :root[data-bg] .main .search {
@@ -4846,7 +4827,6 @@ div.sticky-bar:has(> .view-header) {
    ===================================================================== */
 :root[data-bg] .main .card,
 :root[data-bg] .main .search,
-:root[data-bg] .split-pane,
 :root[data-bg] .nav,
 :root[data-bg] .app-clock {
   -webkit-backdrop-filter: none;
@@ -4860,13 +4840,7 @@ div.sticky-bar:has(> .view-header) {
 :root[data-bg] .main .search:not(:focus-within) {
   border-color: transparent;
 }
-/* Großer Kasten um eine Spalte nur am PC (zwei Bereiche nebeneinander). Am Handy ist es eine normale Liste – ohne Kasten. */
-@media (min-width: 900px) {
-  :root[data-bg] .split-pane {
-    background: color-mix(in srgb, var(--surface) 22%, transparent);
-    border-color: transparent;
-  }
-}
+
 /* Feste Leisten liegen über dem scrollenden Inhalt: etwas deckender statt weichgezeichnet. */
 :root[data-bg] .nav {
   background: color-mix(in srgb, var(--surface) 72%, transparent);
