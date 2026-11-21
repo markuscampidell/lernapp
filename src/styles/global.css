@@ -4895,3 +4895,31 @@ div.sticky-bar:has(> .view-header) {
   inset: 0 0 auto 0;
   height: var(--bg-h, 100vh);
 }
+
+/* ---------- Bereichs-Titel („Meine Ordner“, „Geteilt mit dir“, „Unterordner“, „Dateien“) bleiben beim Scrollen oben ----------
+   Direkt unter den festen Leisten; der nächste Bereich schiebt den Titel des vorigen weg (wie Buchstaben im Telefonbuch). */
+.sticky-bar.pane-title {
+  top: var(--titles-top, 0px);
+  z-index: 3;
+  margin-top: 0;
+  padding: 8px 0 6px;
+}
+.split-pane .sticky-bar.pane-title {
+  margin: 0;
+}
+/* Mit eigenem Hintergrund (Handy): Titel-Leiste bis an den Bildschirmrand, Text bleibt bündig mit den Ordnern. */
+:root[data-bg] .split-pane .sticky-bar.pane-title {
+  margin-inline: calc(-1 * var(--main-px));
+  padding-inline: var(--main-px);
+}
+/* PC: zwei Spalten nebeneinander – der Titel darf nicht über die Nachbarspalte hinausreichen. */
+@media (min-width: 900px) {
+  .sticky-bar.pane-title {
+    box-shadow: none;
+    clip-path: none;
+  }
+  :root[data-bg] .split-pane .sticky-bar.pane-title {
+    margin-inline: 0;
+    padding-inline: 4px;
+  }
+}

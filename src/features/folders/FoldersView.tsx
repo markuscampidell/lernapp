@@ -268,11 +268,20 @@ function FolderPage({
   // Obere Leiste (Zurück, Pfad) und "Hinzufügen" bleiben beim Scrollen oben – die zweite sitzt direkt unter der ersten.
   const topBar = useRef<HTMLDivElement>(null);
   const [topH, setTopH] = useState(0);
+  // Darunter (nur in Ordnern): Hinzufügen/Unterordner und Suchen. Die Bereichs-Titel („Meine Ordner“, „Dateien“ …)
+  // kleben direkt unter beiden Leisten.
+  const secondBar = useRef<HTMLDivElement>(null);
+  const [secondH, setSecondH] = useState(0);
   useEffect(() => {
     const el = topBar.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setTopH(el.offsetHeight));
-    ro.observe(el);
+    const el2 = secondBar.current;
+    const ro = new ResizeObserver(() => {
+      setTopH(el?.offsetHeight ?? 0);
+      setSecondH(el2?.offsetHeight ?? 0);
+    });
+    if (el) ro.observe(el);
+    if (el2) ro.observe(el2);
+    if (!el2) setSecondH(0);
     return () => ro.disconnect();
   }, [!!folder]);
 
@@ -283,7 +292,7 @@ function FolderPage({
   );
 
   return (
-    <section className="view" style={{ '--sticky-top': `${topH}px` } as React.CSSProperties}>
+    <section className="view" style={{ '--sticky-top': `${topH}px`, '--titles-top': `${topH + secondH}px` } as React.CSSProperties}>
       {sel && (
         <SelectionBar
           count={sel.folders.size + sel.files.size}
@@ -337,7 +346,7 @@ function FolderPage({
             </div>
           </header>
           <SharedInfo folder={folder} onPeople={() => setSheet('share')} />
-          <div className="sticky-bar sticky-second sticky-stack">
+          <div className="sticky-bar sticky-second sticky-stack" ref={secondBar}>
           <div className="action-row">
             <button className="btn primary add-btn" onClick={() => setSheet('menu')} disabled={!canAdd}>
               <Icon name="plus" size={18} />
@@ -357,7 +366,7 @@ function FolderPage({
         </>
       ) : (
         <>
-          <div className="sticky-bar">
+          <div className="sticky-bar" ref={topBar}>
           <header className="view-header">
             <h1>Ordner</h1>
             <div className="view-header-actions">
@@ -424,7 +433,7 @@ function FolderPage({
             // Übersicht: „Meine Ordner“ und „Geteilt mit dir“ – am PC nebeneinander, am Handy untereinander.
             <div className="split">
               <section className="split-pane" aria-label="Meine Ordner">
-                <h3 className="section-title">Meine Ordner{subfolders.length > 0 && <span className="section-count">{subfolders.length}</span>}</h3>
+                <h3 className="section-title sticky-bar pane-title">Meine Ordner{subfolders.length > 0 && <span className="section-count">{subfolders.length}</span>}</h3>
                 {subfolders.length === 0 ? (
                   <p className="muted small">Noch keine Ordner. Lege oben mit „Neuer Ordner“ einen an, z. B. für ein Fach.</p>
                 ) : (
@@ -438,7 +447,7 @@ function FolderPage({
                 )}
               </section>
               <section className={`split-pane${me && sharedTops.length === 0 ? ' pc-only' : ''}`} aria-label="Geteilt mit dir">
-                <h3 className="section-title">Geteilt mit dir{sharedTops.length > 0 && <span className="section-count">{sharedTops.length}</span>}</h3>
+                <h3 className="section-title sticky-bar pane-title">Geteilt mit dir{sharedTops.length > 0 && <span className="section-count">{sharedTops.length}</span>}</h3>
                 {!me ? (
                   <p className="muted small">
                     Melde dich in den <button className="link" onClick={() => navigate('#einstellungen')}>Einstellungen</button> an, um Ordner mit anderen zu teilen.
@@ -460,10 +469,10 @@ function FolderPage({
               </section>
             </div>
           ) : folder && subfolders.length > 0 && ownFiles.length > 0 ? (
-            // Beides vorhanden: zwei Bereiche, die jeweils für sich scrollen (Handy: oben/unten, PC: nebeneinander).
+            // Beides vorhanden: zwei Bereiche (Handy: untereinander, PC: nebeneinander), Titel bleiben beim Scrollen oben.
             <div className="split">
               <section className="split-pane" aria-label="Unterordner">
-                <h3 className="section-title">Unterordner<span className="section-count">{subfolders.length}</span></h3>
+                <h3 className="section-title sticky-bar pane-title">Unterordner<span className="section-count">{subfolders.length}</span></h3>
                 <ul className="list">
                   {subfolders.map((f) => (
                     <li key={f.id}>
@@ -473,7 +482,7 @@ function FolderPage({
                 </ul>
               </section>
               <section className="split-pane" aria-label="Dateien">
-                <h3 className="section-title">Dateien<span className="section-count">{ownFiles.length}</span></h3>
+                <h3 className="section-title sticky-bar pane-title">Dateien<span className="section-count">{ownFiles.length}</span></h3>
                 <ul className="list">
                   {ownFiles.map((f) => (
                     <li key={f.id}>
