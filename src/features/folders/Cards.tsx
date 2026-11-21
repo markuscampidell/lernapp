@@ -15,6 +15,8 @@ export interface ItemCardProps {
   onEdit?: () => void;
   /** ⓘ Details: Name, Beschreibung, Ort, Rechte, Löschen. */
   onInfo?: () => void;
+  /** Personen (wer es sieht, teilen, Rechte). */
+  onPeople?: () => void;
   /** Verschieben (nur wenn erlaubt). */
   onMove?: () => void;
   /** Langes Drücken – mit Finger oder gedrückter Maustaste (startet den Auswahlmodus). */
@@ -26,14 +28,14 @@ export interface ItemCardProps {
   isNew?: boolean;
 }
 
-function ItemCard({ onClick, onEdit, onInfo, onMove, onLongPress, selecting, selected, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
+function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, selecting, selected, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
   const press = useLongPress(onLongPress);
   return (
     <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}`}>
       <button className="item-main" onClick={onClick} {...press} aria-pressed={selecting ? !!selected : undefined}>
         {thumb}
         <div className="card-main">{children}</div>
-        {chevron && !selecting && !onEdit && !onInfo && !onMove && (
+        {chevron && !selecting && !onEdit && !onInfo && !onMove && !onPeople && (
           <span className="item-chevron" aria-hidden="true">
             <Icon name="chevron" size={18} />
           </span>
@@ -47,6 +49,11 @@ function ItemCard({ onClick, onEdit, onInfo, onMove, onLongPress, selecting, sel
       {!selecting && onEdit && (
         <button className="icon-btn item-action item-edit" aria-label={`„${label}“ bearbeiten`} title="Bearbeiten" onClick={onEdit}>
           <Icon name="edit" size={19} />
+        </button>
+      )}
+      {!selecting && onPeople && (
+        <button className="icon-btn item-action item-people" aria-label={`Personen von „${label}“`} title="Personen" onClick={onPeople}>
+          <Icon name="users" size={19} />
         </button>
       )}
       {!selecting && onMove && (

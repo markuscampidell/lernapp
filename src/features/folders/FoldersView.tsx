@@ -86,6 +86,8 @@ function FolderPage({
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
+  // „Personen“ eines Eintrags in der Liste (Knopf an der Karte).
+  const [peopleFor, setPeopleFor] = useState<{ folder?: Folder; file?: FileItem } | null>(null);
   const [sheet, setSheet] = useState<'menu' | 'audio' | 'newFolder' | 'edit' | 'note' | 'add' | 'share' | 'cards' | 'quiz' | 'doc' | 'chart' | 'wheel' | 'gaps' | 'ai' | null>(null);
   // Ergebnis von „Mit KI erstellen“ – öffnet den passenden Editor mit dem Inhalt.
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
@@ -215,6 +217,9 @@ function FolderPage({
     selected: !!sel?.[kind].has(itemId),
     onClick: sel ? () => toggle(kind, itemId) : open,
     onLongPress: () => toggle(kind, itemId),
+    onPeople: cloudEnabled && !isOrphan(kind === 'folders' ? itemId : files.find((f) => f.id === itemId)?.folderId ?? '')
+      ? () => setPeopleFor(kind === 'folders' ? { folder: folders.find((f) => f.id === itemId) } : { file: files.find((f) => f.id === itemId) })
+      : undefined,
     onMove: (() => {
       const ids: [string[], string[]] = kind === 'folders' ? [[itemId], []] : [[], [itemId]];
       // Nur anzeigen, wenn man den Eintrag überhaupt verschieben darf (Probe-Ziel: aktueller Ordner).
@@ -579,6 +584,9 @@ function FolderPage({
       )}
       {sheet === 'doc' && folder && <DocEditor folderId={folder.id} onClose={() => setSheet(null)} />}
       {sheet === 'share' && folder && <ShareSheet folder={folder} onClose={() => setSheet(null)} />}
+      {peopleFor && (peopleFor.folder || peopleFor.file) && (
+        <ShareSheet folder={peopleFor.folder} file={peopleFor.file} onClose={() => setPeopleFor(null)} />
+      )}
       {sheet === 'newFolder' && (
         <FolderEditorSheet parentId={folder?.id ?? null} onClose={() => setSheet(null)} onCreated={(f) => afterBack(() => openFolder(f.id))} />
       )}
