@@ -1214,7 +1214,9 @@ textarea.text-line::-webkit-scrollbar {
   padding-right: 14px;
 }
 .item-main:active {
-  transform: scale(0.995);
+  /* Nur leicht abdunkeln – kein transform: das Verkleinern beim Gedrückthalten erzeugte mit eigenem Hintergrund
+     am Handy Flackern/Bildfehler (eigene Grafik-Ebene über dem durchscheinenden Kasten). */
+  background: color-mix(in srgb, var(--text) 7%, transparent);
 }
 .item-delete {
   margin-right: 6px;
