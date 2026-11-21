@@ -10,25 +10,21 @@ export const ACCESS_LABEL: Record<Access, string> = {
 const LEVELS: Access[] = ['read', 'edit', 'delete'];
 
 /**
- * Was andere Mitglieder mit einem geteilten Ordner bzw. einer geteilten Datei tun dürfen (in „Personen“, nur für den Besitzer).
- * Stufen: Nur lesen < Lesen und bearbeiten < Lesen, bearbeiten und löschen.
- * Weniger als der Ordner darüber wird nicht angeboten; die Stufe des Ordners darüber ist „wie der Ordner“ (value null = erben).
- * Speichert sofort beim Antippen.
+ * Was andere Mitglieder mit einem geteilten Ordner bzw. einer geteilten Datei tun dürfen (in „Personen“).
+ * Einstellen dürfen der Besitzer (alles) und Mitglieder (nur bei dem, was sie selbst erstellt haben) – jede Stufe, strenger oder lockerer.
+ * Die Stufe des Ordners darüber ist „wie der Ordner“ (value null = erben). Speichert sofort beim Antippen.
  */
 export function AccessPicker({ item }: { item: Folder | FileItem }) {
-  const { isOwner, inheritedAccessOf, isRoot, parentShareOf, setAccess, online } = useLibrary();
+  const { canSetAccess, inheritedAccessOf, isRoot, parentShareOf, setAccess, online } = useLibrary();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  if (!item.shareId || !isOwner(item.shareId)) return null;
+  if (!canSetAccess(item)) return null;
 
   const isFolder = !('folderId' in item);
   // Ganz oben (nicht in einem anderen geteilten Ordner): nichts darüber – Standard ist „Nur lesen“.
   const top = isFolder && isRoot(item as Folder) && !parentShareOf(item.shareId);
   const inherited: Access = top ? 'read' : inheritedAccessOf(item);
   const current: Access = item.access ?? inherited;
-  const base = LEVELS.indexOf(inherited);
-  // Ältere Einstellungen unter der Stufe des Ordners bleiben sichtbar, damit man sie hochstellen kann.
-  const options = LEVELS.filter((l, i) => i >= base || l === current);
 
   const pick = async (l: Access) => {
     const next = l === inherited ? null : l;
@@ -48,7 +44,7 @@ export function AccessPicker({ item }: { item: Folder | FileItem }) {
     <section className="people-group">
       <h3 className="people-group-title">Andere Mitglieder dürfen</h3>
       <div className="access-options" role="radiogroup">
-        {options.map((l) => (
+        {LEVELS.map((l) => (
           <button
             key={l}
             type="button"
