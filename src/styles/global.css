@@ -4772,3 +4772,18 @@ div.sticky-bar:has(> .view-header) {
   color: var(--text);
   text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg), 0 0 14px var(--bg);
 }
+/* Mit Hintergrund: Suchfeld (Lupe und Platzhalter „In … suchen“) genauso lesbar machen */
+:root[data-bg] .search {
+  color: var(--text);
+}
+:root[data-bg] .search svg {
+  filter: drop-shadow(0 0 2px var(--bg)) drop-shadow(0 0 6px var(--bg));
+}
+:root[data-bg] .search :is(input, textarea)::placeholder {
+  color: var(--text);
+  opacity: 0.85;
+  text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg), 0 0 14px var(--bg);
+}
+:root[data-bg] .search :is(input, textarea) {
+  text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg);
+}
