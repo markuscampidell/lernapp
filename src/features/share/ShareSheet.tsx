@@ -9,7 +9,7 @@ import { Icon } from '../../components/Icon';
 import { Avatar } from '../../components/Avatar';
 import { AccountCard } from '../account/AccountCard';
 import { UserPicker } from './UserPicker';
-import { AccessPicker } from './AccessPicker';
+import { AccessPicker, MEMBERS_MAY } from './AccessPicker';
 
 /**
  * „Personen“ eines Ordners oder einer Datei – überall gleich aufgebaut:
@@ -219,11 +219,12 @@ export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder;
   }
 
   const nobody = fromAbove.length === 0 && onlyHere.length === 0;
+  const showAccess = !nobody && !!(file ?? folder).shareId && lib.canSetAccess(file ?? folder);
   return (
     <Sheet
       title={`„${name}“ – Personen`}
       onClose={() => !busy && onClose()}
-      pinned={!nobody && (file ?? folder).shareId && lib.canSetAccess(file ?? folder) ? <AccessPicker item={file ?? folder} /> : undefined}
+      pinned={showAccess ? <AccessPicker item={file ?? folder} /> : undefined}
       footer={
         (amOwner && !busy) || footer ? (
           <div className="footer-stack">
@@ -283,11 +284,8 @@ export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder;
       {nobody && <p className="muted small">{file ? 'Nur du siehst diese Datei.' : 'Noch mit niemandem geteilt – nur du siehst diesen Ordner.'}</p>}
 
       {amOwner && addProblem && <p className="muted small">{addProblem}</p>}
-      <p className="muted small">
-        {amOwner
-          ? 'Mitglieder können Dateien und Unterordner hinzufügen und ihre eigenen Einträge ändern oder löschen. Du kannst alles ändern.'
-          : `Mitglieder können Dateien und Unterordner hinzufügen und ihre eigenen Einträge ändern oder löschen. Alles andere verwaltet ${lib.userName(ownerId)}.`}
-      </p>
+      {/* Ohne Rechte-Auswahl (die zeigt den Satz selbst): kurz sagen, was Mitglieder immer dürfen. */}
+      {!nobody && !showAccess && <p className="muted small">{MEMBERS_MAY}</p>}
       {!lib.online && <p className="notice warning">Offline – Änderungen sind gerade nicht möglich.</p>}
       {err && <p className="notice critical">{err}</p>}
     </Sheet>

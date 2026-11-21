@@ -8,6 +8,8 @@ export const ACCESS_LABEL: Record<Access, string> = {
   delete: 'Lesen, bearbeiten und löschen',
 };
 const LEVELS: Access[] = ['read', 'edit', 'delete'];
+/** Was Mitglieder immer dürfen (unabhängig von der Einstellung). */
+export const MEMBERS_MAY = 'Alle Mitglieder dürfen Neues hinzufügen und ihre eigenen Einträge bearbeiten und löschen.';
 
 /**
  * Was andere Mitglieder mit einem geteilten Ordner bzw. einer geteilten Datei tun dürfen (in „Personen“).
@@ -42,7 +44,7 @@ export function AccessPicker({ item }: { item: Folder | FileItem }) {
 
   return (
     <section className="people-group">
-      <h3 className="people-group-title">Andere Mitglieder dürfen</h3>
+      <h3 className="people-group-title">Mitglieder dürfen</h3>
       <div className="access-options" role="radiogroup">
         {LEVELS.map((l) => (
           <button
@@ -64,7 +66,7 @@ export function AccessPicker({ item }: { item: Folder | FileItem }) {
           </button>
         ))}
       </div>
-      <p className="muted small">Neues hinzufügen dürfen alle Mitglieder.</p>
+      <p className="muted small">{MEMBERS_MAY}</p>
       {err && <p className="notice critical">{err}</p>}
     </section>
   );
