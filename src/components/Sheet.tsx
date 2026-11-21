@@ -10,10 +10,12 @@ interface SheetProps {
   footer?: ReactNode;
   /** Optionales Element links vom Titel (z. B. Zurück-Knopf). */
   leading?: ReactNode;
+  /** Fest unter dem scrollenden Inhalt (über dem Fuß). Auf niedrigen Bildschirmen scrollt es mit. */
+  pinned?: ReactNode;
 }
 
 /** Unten aufklappendes Blatt auf Handys, zentrierter Dialog auf größeren Bildschirmen. */
-export function Sheet({ title, onClose, children, footer, leading }: SheetProps) {
+export function Sheet({ title, onClose, children, footer, leading, pinned }: SheetProps) {
   useBackToClose(onClose);
 
   useEffect(() => {
@@ -35,7 +37,14 @@ export function Sheet({ title, onClose, children, footer, leading }: SheetProps)
             <Icon name="close" />
           </button>
         </header>
-        <div className="sheet-body">{children}</div>
+        {pinned ? (
+          <div className="sheet-main">
+            <div className="sheet-body">{children}</div>
+            <div className="sheet-pinned">{pinned}</div>
+          </div>
+        ) : (
+          <div className="sheet-body">{children}</div>
+        )}
         {footer && <footer className="sheet-footer">{footer}</footer>}
       </div>
     </div>,

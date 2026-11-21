@@ -4787,3 +4787,45 @@ div.sticky-bar:has(> .view-header) {
 :root[data-bg] .search :is(input, textarea) {
   text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg);
 }
+
+/* ---------- Pop-ups: Verlauf oben/unten zeigt, dass man weiter scrollen kann (siehe lib/ui-helpers.ts) ---------- */
+.more-down { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 44px), transparent); }
+.more-up { -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to top, #000 calc(100% - 44px), transparent); }
+.more-up.more-down {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 44px, #000 calc(100% - 44px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 44px, #000 calc(100% - 44px), transparent);
+}
+
+/* ---------- Pop-up mit festem Bereich unten (z. B. „Andere Mitglieder dürfen“ in Personen) ---------- */
+.sheet-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sheet-main > .sheet-body {
+  min-height: 0;
+  padding-bottom: 12px;
+}
+.sheet-pinned {
+  flex: none;
+  padding: 12px 20px 14px;
+  border-top: 1px solid var(--border);
+}
+/* Niedriger Bildschirm: zu wenig Platz für einen festen Bereich – dann scrollt alles zusammen. */
+@media (max-height: 700px) {
+  .sheet-main {
+    overflow-y: auto;
+  }
+  .sheet-main > .sheet-body {
+    flex: none;
+    overflow: visible;
+  }
+  .sheet-pinned {
+    border-top: none;
+    padding-top: 0;
+  }
+}
+.sheet-pinned > .people-group {
+  margin-top: 0;
+}

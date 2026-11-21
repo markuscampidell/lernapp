@@ -96,10 +96,18 @@ function quickTooltips() {
   window.addEventListener('blur', hide);
 }
 
-/** Bereiche, die man seitlich scrollen kann, zeigen am Rand einen Verlauf, solange es dort weitergeht. */
-const HSCROLL = '.doc-toolbar, .math-display, .math-preview, .doc-content span.math, .doc-content .cols';
+/** Bereiche, die man seitlich (bzw. in Pop-ups nach unten) scrollen kann, zeigen am Rand einen Verlauf, solange es dort weitergeht. */
+const HSCROLL_ONLY = '.doc-toolbar, .math-display, .math-preview, .doc-content span.math, .doc-content .cols';
+const VSCROLL = '.sheet-body, .sheet-main';
+const HSCROLL = `${HSCROLL_ONLY}, ${VSCROLL}`;
 function scrollHints() {
   const update = (el: HTMLElement) => {
+    if (el.matches(VSCROLL)) {
+      const maxY = el.scrollHeight - el.clientHeight;
+      el.classList.toggle('more-up', maxY > 1 && el.scrollTop > 1);
+      el.classList.toggle('more-down', maxY > 1 && el.scrollTop < maxY - 1);
+      return;
+    }
     const max = el.scrollWidth - el.clientWidth;
     el.classList.toggle('more-left', max > 1 && el.scrollLeft > 1);
     el.classList.toggle('more-right', max > 1 && el.scrollLeft < max - 1);
