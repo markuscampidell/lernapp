@@ -4710,10 +4710,9 @@ div.sticky-bar:has(> .view-header) {
   box-shadow: 0 0 0 1px var(--line), 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 :where(:root[data-bg]) .icon-btn {
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  /* Bewusst ohne Weichzeichner (backdrop-filter): bei vielen Karten-Knöpfen ruckelt sonst das Scrollen am Handy. */
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
 }
 :where(:root[data-bg]) .icon-btn:not(.danger-icon, .item-action) {
   color: var(--text);
@@ -4770,7 +4769,12 @@ div.sticky-bar:has(> .view-header) {
 :root[data-bg] .main .muted,
 :root[data-bg] .viewer .muted {
   color: var(--text);
-  text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg), 0 0 14px var(--bg);
+  /* Zwei kleine Schatten statt drei großer: gleich lesbar, aber viel billiger beim Scrollen (sehr viele Texte). */
+  text-shadow: 0 0 2px var(--bg), 0 0 6px var(--bg);
+}
+/* Innerhalb der durchscheinenden Kästen reicht ein ganz leichter Schein. */
+:root[data-bg] .main .card .muted {
+  text-shadow: 0 0 3px var(--bg);
 }
 /* Mit Hintergrund: Suchfeld (Lupe und Platzhalter „In … suchen“) genauso lesbar machen */
 :root[data-bg] .search {
@@ -4836,4 +4840,17 @@ div.sticky-bar:has(> .view-header) {
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+/* ---------- Handy: kein Weichzeichner hinter den vielen Kästen ----------
+   backdrop-filter muss bei jedem Scroll-Bild für jeden Kasten neu gerechnet werden – am Handy ruckelt das.
+   Die Kästen bleiben durchscheinend, nur etwas deckender, damit Text darauf lesbar bleibt. */
+@media (pointer: coarse) {
+  :root[data-bg] .main .card,
+  :root[data-bg] .main .search,
+  :root[data-bg] .split-pane {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+  }
 }
