@@ -171,9 +171,21 @@ function clock() {
  */
 function stickyBackgrounds() {
   const known = new Map<HTMLElement, { io: IntersectionObserver; top: number }>();
+  // Höhe des Hintergrunds: die größte bisher gesehene Bildschirmhöhe bei dieser Breite. Öffnet sich die Tastatur,
+  // wird der Bildschirm niedriger – der Hintergrund soll dabei NICHT neu skaliert werden. Erst bei anderer Breite
+  // (Drehen, Fenster) wird neu gemessen.
+  let lastW = 0;
+  let maxH = 0;
   const setViewport = () => {
-    document.documentElement.style.setProperty('--vw', `${window.innerWidth}px`);
-    document.documentElement.style.setProperty('--vh', `${window.innerHeight}px`);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // Nur bei Touch-Geräten (Bildschirm-Tastatur); am PC folgt der Hintergrund der Fensterhöhe.
+    if (w !== lastW || !matchMedia('(pointer: coarse)').matches) {
+      lastW = w;
+      maxH = h;
+    } else maxH = Math.max(maxH, h);
+    document.documentElement.style.setProperty('--vw', `${w}px`);
+    document.documentElement.style.setProperty('--bg-h', `${maxH}px`);
   };
   const place = (bar: HTMLElement) => {
     const r = bar.getBoundingClientRect();

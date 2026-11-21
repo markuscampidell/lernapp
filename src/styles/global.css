@@ -4870,7 +4870,7 @@ div.sticky-bar:has(> .view-header) {
   left: calc(-1 * var(--bar-x, 0px));
   top: calc(-1 * var(--bar-y, 0px));
   width: var(--vw, 100vw);
-  height: var(--vh, 100vh);
+  height: var(--bg-h, 100vh);
   display: none;
 }
 :root[data-bg] .sticky-bar.stuck::before {
@@ -4887,4 +4887,11 @@ div.sticky-bar:has(> .view-header) {
 .app :is(.viewer, .study-screen, input, textarea, [contenteditable='true']) {
   -webkit-user-select: text;
   user-select: text;
+}
+
+/* Hintergrund bleibt beim Öffnen der Tastatur gleich groß (Höhe fest, siehe stickyBackgrounds in lib/ui-helpers.ts) */
+:root[data-bg] body::before,
+:root[data-bg] .viewer::before {
+  inset: 0 0 auto 0;
+  height: var(--bg-h, 100vh);
 }
