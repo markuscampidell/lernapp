@@ -3793,17 +3793,12 @@ button.avatar-edit-badge {
   .split-pane {
     flex: 1 1 0;
     min-width: 0;
-    max-height: var(--split-h, calc(100dvh - var(--sticky-top, 0px) - 120px));
-    /* Kein Kasten um die Spalte (wie am Handy) – Titel und Abstand trennen die beiden Bereiche. */
+    /* Kein Kasten und kein eigenes Scrollen: beide Spalten scrollen zusammen mit der Seite (wie am Handy). */
   }
   .split-pane .section-title {
     margin: 2px 4px 0;
   }
   .split-pane .list {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
     padding: 2px;
   }
 }

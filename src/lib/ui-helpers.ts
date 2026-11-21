@@ -96,9 +96,9 @@ function quickTooltips() {
   window.addEventListener('blur', hide);
 }
 
-/** Bereiche, die man seitlich (bzw. in Pop-ups und den PC-Spalten nach unten) scrollen kann, zeigen am Rand einen Verlauf, solange es dort weitergeht. */
+/** Bereiche, die man seitlich (bzw. in Pop-ups nach unten) scrollen kann, zeigen am Rand einen Verlauf, solange es dort weitergeht. */
 const HSCROLL_ONLY = '.doc-toolbar, .math-display, .math-preview, .doc-content span.math, .doc-content .cols';
-const VSCROLL = '.sheet-body, .sheet-main, .split-pane .list';
+const VSCROLL = '.sheet-body, .sheet-main';
 const HSCROLL = `${HSCROLL_ONLY}, ${VSCROLL}`;
 function scrollHints() {
   const update = (el: HTMLElement) => {
