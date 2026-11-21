@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import type { Access, FileItem } from '../../domain/types';
-import { AccessPicker } from '../share/AccessPicker';
+import type { FileItem } from '../../domain/types';
 import { DetailsLockNotice, useDetailsLock } from '../../cloud/editing';
 import { pathOf } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
@@ -15,8 +14,7 @@ import { fileKind, formatDate, formatSize, fullName, KIND_LABEL } from '../../li
  * Wer die Datei nicht ändern darf, sieht alles nur zum Lesen.
  */
 export function FileEditorSheet({ file, onClose, onDeleted }: { file: FileItem; onClose: () => void; onDeleted?: () => void }) {
-  const { folders, updateFile, deleteFile, deleteProblem, moveProblem, setAccess, canModify, canSetAccess, online, me, userName } = useLibrary();
-  const [access, setAccessValue] = useState<Access | null>(file.access ?? null);
+  const { folders, updateFile, deleteFile, deleteProblem, moveProblem, canModify, online, me, userName } = useLibrary();
   const [name, setName] = useState(file.name);
   const [description, setDescription] = useState(file.description ?? '');
   const [folderId, setFolderId] = useState(file.folderId);
@@ -24,10 +22,10 @@ export function FileEditorSheet({ file, onClose, onDeleted }: { file: FileItem; 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // Nur eine Person gleichzeitig bearbeitet die Details einer geteilten Datei.
-  const lock = useDetailsLock(file, (canModify(file) || canSetAccess(file)) && online);
+  const lock = useDetailsLock(file, canModify(file) && online);
   const editable = canModify(file) && (!file.shareId || online) && !lock.locked;
   const canDelete = !deleteProblem([], [file.id]) && !lock.locked;
-  const showSave = (editable || (canSetAccess(file) && online)) && !lock.locked;
+  const showSave = editable && !lock.locked;
   const kind = fileKind(file);
 
   const attempt = async (fn: () => Promise<void>, after?: () => void) => {
@@ -44,7 +42,6 @@ export function FileEditorSheet({ file, onClose, onDeleted }: { file: FileItem; 
   };
   const save = () =>
     attempt(async () => {
-      if (file.shareId && access !== (file.access ?? null)) await setAccess(file, access);
       if (editable) await updateFile(file, { name, description, folderId });
     });
   const remove = () => confirm(`„${fullName(file)}“ löschen?`) && attempt(() => deleteFile(file.id), onDeleted);
@@ -109,7 +106,6 @@ export function FileEditorSheet({ file, onClose, onDeleted }: { file: FileItem; 
             {editable && <span className="link">Verschieben</span>}
           </button>
         </div>
-        {file.shareId && <AccessPicker item={file} value={access} onChange={setAccessValue} disabled={lock.locked} />}
         <DetailsLockNotice {...lock} noun="dieser Datei" />
         {!editable && file.shareId && !lock.locked && (
           <p className="muted small">{online ? 'Du darfst diese Datei nur ansehen.' : 'Offline – Änderungen sind gerade nicht möglich.'}</p>

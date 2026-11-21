@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Folder } from '../../domain/types';
 import { pathOf, scopeOf, subtreeIds } from '../../domain/tree';
-import { SHARED_ROOT, type Access } from '../../domain/types';
-import { AccessPicker } from '../share/AccessPicker';
+import { SHARED_ROOT } from '../../domain/types';
 import { DetailsLockNotice, useDetailsLock } from '../../cloud/editing';
 import { useLibrary } from '../../state/Library';
 import { useBlobUrl } from '../../hooks/useBlobUrl';
@@ -24,8 +23,7 @@ interface Props {
 }
 
 export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated, onDeleted }: Props) {
-  const { folders, files, createFolder, updateFolder, deleteFolder, deleteProblem, moveProblem, isRoot, isOwner, canModify, setAccess, canEditFolder, canSetAccess, online } = useLibrary();
-  const [access, setAccessValue] = useState<Access | null>(folder?.access ?? null);
+  const { folders, files, createFolder, updateFolder, deleteFolder, deleteProblem, moveProblem, isRoot, isOwner, canModify, canEditFolder, online } = useLibrary();
   const [name, setName] = useState(folder?.name ?? '');
   const [description, setDescription] = useState(folder?.description ?? '');
   // undefined = unverändert, null = entfernt, Blob = neu gewählt
@@ -66,11 +64,11 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
     target === SHARED_ROOT ? 'Geteilt mit dir' : pathOf(folders, target).map((p) => p.name).join(' / ') || (scopeOf(folders, target) === 'mine' ? 'Meine Ordner' : 'Oberste Ebene');
   // Löschen/Verschieben nur, wenn erlaubt (geteilte Ordner: Besitzer oder eigene Einträge).
   // Nur eine Person gleichzeitig bearbeitet die Details eines geteilten Ordners.
-  const lock = useDetailsLock(folder, !!folder && (canEditFolder(folder) || canSetAccess(folder)) && online);
+  const lock = useDetailsLock(folder, !!folder && canEditFolder(folder) && online);
   const canDelete = !!folder && !deleteProblem([folder.id], []) && !lock.locked;
   // Details nur ansehen, wenn man den Ordner nicht ändern darf (bzw. offline in geteilten Ordnern).
   const editable = !folder || (canEditFolder(folder) && (!folder.shareId || online) && !lock.locked);
-  const showSave = (editable || (!!folder && canSetAccess(folder) && online)) && !lock.locked;
+  const showSave = editable && !lock.locked;
   const canMove = !!folder && (isRoot(folder) ? isOwner(folder.shareId) : canModify(folder)) && !lock.locked;
 
   const save = async () => {
@@ -78,7 +76,6 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
     setErr(null);
     try {
       if (folder) {
-        if (folder.shareId && access !== (folder.access ?? null)) await setAccess(folder, access);
         if (editable) await updateFolder(folder, { name, description, image, parentId: target });
         onClose();
       } else {
@@ -219,7 +216,6 @@ export function FolderEditorSheet({ folder, parentId = null, onClose, onCreated,
             </button>
           </div>
         )}
-        {folder?.shareId && <AccessPicker item={folder} value={access} onChange={setAccessValue} disabled={lock.locked} />}
         <DetailsLockNotice {...lock} noun="dieses Ordners" />
         {err && <p className="notice critical">{err}</p>}
       </Sheet>

@@ -381,7 +381,7 @@ function FolderPage({
         </>
       )}
       {(subfolders.length > 0 || sharedTops.length > 0 || ownFiles.length > 0 || query) && (
-        <SearchBox value={query} onChange={setQuery} placeholder={folder ? `In „${folder.name}“ suchen` : 'Alles durchsuchen'} />
+        <SearchBox value={query} onChange={setQuery} placeholder="Suchen" />
       )}
 
       {results ? (

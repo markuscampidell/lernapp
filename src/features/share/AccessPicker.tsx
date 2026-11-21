@@ -1,76 +1,75 @@
+import { useState } from 'react';
 import type { Access, FileItem, Folder } from '../../domain/types';
 import { useLibrary } from '../../state/Library';
 
 export const ACCESS_LABEL: Record<Access, string> = {
   read: 'Nur lesen',
-  edit: 'Lesen & bearbeiten',
-  delete: 'Lesen, bearbeiten & löschen',
+  edit: 'Lesen und bearbeiten',
+  delete: 'Lesen, bearbeiten und löschen',
 };
+const LEVELS: Access[] = ['read', 'edit', 'delete'];
 
 /**
- * Was andere Mitglieder mit einem geteilten Eintrag tun dürfen – mit kurzer Erklärung pro Möglichkeit.
- * value null = wie der übergeordnete Ordner. Nur sichtbar für Ersteller und Besitzer.
+ * Was andere Mitglieder mit einem geteilten Ordner bzw. einer geteilten Datei tun dürfen (in „Personen“, nur für den Besitzer).
+ * Stufen: Nur lesen < Lesen und bearbeiten < Lesen, bearbeiten und löschen.
+ * Weniger als der Ordner darüber wird nicht angeboten; die Stufe des Ordners darüber ist „wie der Ordner“ (value null = erben).
+ * Speichert sofort beim Antippen.
  */
-export function AccessPicker({ item, value, onChange, disabled = false }: { item: Folder | FileItem; value: Access | null; onChange: (v: Access | null) => void; disabled?: boolean }) {
-  const { canSetAccess, inheritedAccessOf, isRoot, parentShareOf, folders, online } = useLibrary();
-  if (!canSetAccess(item)) return null;
+export function AccessPicker({ item }: { item: Folder | FileItem }) {
+  const { isOwner, inheritedAccessOf, isRoot, parentShareOf, setAccess, online } = useLibrary();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!item.shareId || !isOwner(item.shareId)) return null;
+
   const isFolder = !('folderId' in item);
-  const root = isFolder && isRoot(item);
-  // Ganz oben (nicht in einem anderen geteilten Ordner): nichts darüber, von dem geerbt wird – Standard ist „Nur lesen“.
-  const top = root && !parentShareOf(item.shareId);
-  const inherited = inheritedAccessOf(item);
-  const parentId = isFolder ? (item as Folder).parentId : (item as FileItem).folderId;
-  const parentName = folders.find((f) => f.id === parentId)?.name ?? 'dem Ordner darüber';
-  const options: (Access | null)[] = top ? [null, 'edit', 'delete'] : [null, 'read', 'edit', 'delete'];
+  // Ganz oben (nicht in einem anderen geteilten Ordner): nichts darüber – Standard ist „Nur lesen“.
+  const top = isFolder && isRoot(item as Folder) && !parentShareOf(item.shareId);
+  const inherited: Access = top ? 'read' : inheritedAccessOf(item);
+  const current: Access = item.access ?? inherited;
+  const base = LEVELS.indexOf(inherited);
+  // Ältere Einstellungen unter der Stufe des Ordners bleiben sichtbar, damit man sie hochstellen kann.
+  const options = LEVELS.filter((l, i) => i >= base || l === current);
 
-  const label = (v: Access | null) => (v === null ? (top ? `${ACCESS_LABEL.read} (Standard)` : `Wie der Ordner (${ACCESS_LABEL[inherited]})`) : ACCESS_LABEL[v]);
-
-  /** Was die Möglichkeit konkret bedeutet. */
-  const explain = (v: Access | null): string => {
-    if (v === null && !top) return `Übernimmt die Einstellung von „${parentName}“ – ändert sie sich dort, ändert sie sich hier mit.`;
-    const a = v ?? 'read';
-    if (!isFolder) {
-      if (a === 'read') return 'Andere können die Datei ansehen, aber nicht ändern.';
-      if (a === 'edit') return 'Andere können die Datei auch bearbeiten und umbenennen.';
-      return 'Andere können die Datei auch bearbeiten, umbenennen und löschen.';
+  const pick = async (l: Access) => {
+    const next = l === inherited ? null : l;
+    if (next === (item.access ?? null)) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await setAccess(item, next);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.');
+    } finally {
+      setBusy(false);
     }
-    if (a === 'read') return 'Andere können alles ansehen und Neues hinzufügen, aber nichts von dir ändern.';
-    if (a === 'edit') return root ? 'Andere können auch deine Dateien und Unterordner darin bearbeiten und umbenennen.' : 'Andere können auch diesen Ordner und deine Dateien darin bearbeiten und umbenennen.';
-    return root ? 'Andere können deine Dateien und Unterordner darin auch bearbeiten, umbenennen und löschen.' : 'Andere können diesen Ordner und deine Einträge darin auch bearbeiten, umbenennen und löschen.';
   };
 
   return (
-    <div className="field">
-      <div className="field-label">
-        <span>Andere Mitglieder dürfen</span>
-      </div>
-      <span className="muted small">
-        {root
-          ? `Gilt nur für das, was in „${item.name}“ liegt. „${item.name}“ selbst (Name, Bild, Löschen) kann nur der Besitzer ändern.`
-          : isFolder
-          ? 'Gilt für diesen Ordner und alles darin, was du erstellt hast – außer du stellst es dort anders ein.'
-          : 'Gilt für diese Datei.'}
-      </span>
+    <section className="people-group">
+      <h3 className="people-group-title">Andere Mitglieder dürfen</h3>
       <div className="access-options" role="radiogroup">
-        {options.map((v) => (
+        {options.map((l) => (
           <button
-            key={v ?? 'inherit'}
+            key={l}
             type="button"
             role="radio"
-            aria-checked={value === v}
-            className={`access-option${value === v ? ' on' : ''}`}
-            onClick={() => onChange(v)}
-            disabled={!online || disabled}
+            aria-checked={current === l}
+            className={`access-option${current === l ? ' on' : ''}`}
+            onClick={() => pick(l)}
+            disabled={!online || busy}
           >
             <span className="radio-dot" aria-hidden="true" />
             <span className="access-text">
-              <span>{label(v)}</span>
-              <span className="access-desc">{explain(v)}</span>
+              <span>
+                {ACCESS_LABEL[l]}
+                {l === inherited && !top && <span className="muted"> (wie der Ordner)</span>}
+              </span>
             </span>
           </button>
         ))}
       </div>
-      <span className="muted small">Neues hinzufügen dürfen immer alle. Was andere erstellt haben, stellen sie selbst ein. Der Besitzer darf immer alles.</span>
-    </div>
+      <p className="muted small">Neues hinzufügen dürfen alle Mitglieder.</p>
+      {err && <p className="notice critical">{err}</p>}
+    </section>
   );
 }

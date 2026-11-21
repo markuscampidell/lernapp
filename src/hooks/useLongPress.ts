@@ -27,6 +27,7 @@ export function useLongPress(onLongPress: (() => void) | undefined, ms = 480) {
   const timer = useRef<number | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
   const fired = useRef(false);
+  const lastType = useRef('');
 
   const clear = () => {
     if (timer.current !== null) window.clearTimeout(timer.current);
@@ -38,6 +39,7 @@ export function useLongPress(onLongPress: (() => void) | undefined, ms = 480) {
 
   return {
     onPointerDown: (e: React.PointerEvent) => {
+      lastType.current = e.pointerType;
       if (e.pointerType === 'mouse' && e.button !== 0) return; // Maus: nur linke Taste
       fired.current = false;
       start.current = { x: e.clientX, y: e.clientY };
@@ -56,8 +58,13 @@ export function useLongPress(onLongPress: (() => void) | undefined, ms = 480) {
     onPointerUp: clear,
     onPointerCancel: clear,
     onPointerLeave: clear,
-    // Kein Kontextmenü / keine Textauswahl beim langen Drücken.
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    // Kein Kontextmenü / keine Textauswahl beim langen Drücken. Rechtsklick mit der Maus wirkt wie langes Drücken.
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (lastType.current !== 'mouse' || fired.current) return;
+      clear();
+      onLongPress();
+    },
     onClickCapture: (e: React.MouseEvent) => {
       if (fired.current) {
         fired.current = false;

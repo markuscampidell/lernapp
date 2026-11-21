@@ -9,6 +9,7 @@ import { Icon } from '../../components/Icon';
 import { Avatar } from '../../components/Avatar';
 import { AccountCard } from '../account/AccountCard';
 import { UserPicker } from './UserPicker';
+import { AccessPicker } from './AccessPicker';
 
 /**
  * „Personen“ eines Ordners oder einer Datei – überall gleich aufgebaut:
@@ -279,6 +280,8 @@ export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder;
       )}
 
       {nobody && <p className="muted small">{file ? 'Nur du siehst diese Datei.' : 'Noch mit niemandem geteilt – nur du siehst diesen Ordner.'}</p>}
+
+      {!nobody && (file ?? folder).shareId && <AccessPicker item={file ?? folder} />}
 
       {amOwner && addProblem && <p className="muted small">{addProblem}</p>}
       <p className="muted small">
