@@ -26,12 +26,14 @@ export interface ItemCardProps {
   path?: string;
   /** Seit dem letzten Öffnen des Ordners von jemand anderem hinzugefügt/geändert. */
   isNew?: boolean;
+  /** Gerade geschlossen: kurz umrahmen. */
+  flash?: boolean;
 }
 
-function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, selecting, selected, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
+function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, selecting, selected, flash, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
   const press = useLongPress(onLongPress);
   return (
-    <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}`}>
+    <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}${flash ? ' flash' : ''}`}>
       <button className="item-main" onClick={onClick} {...press} aria-pressed={selecting ? !!selected : undefined}>
         {thumb}
         <div className="card-main">{children}</div>

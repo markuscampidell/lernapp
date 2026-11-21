@@ -87,6 +87,20 @@ function FolderPage({
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
+  // Zuletzt geschlossene Datei kurz umrahmen (5 s sichtbar, 1 s ausblenden), damit man sieht, wo man war.
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const flashTimer = useRef(0);
+  const flashCard = (fileId: string) => {
+    window.clearTimeout(flashTimer.current);
+    setFlashId(null);
+    window.setTimeout(() => {
+      // Kein Fokus-Rahmen des Browsers zusätzlich (der ginge nur um einen Teil der Karte, durch die Knöpfe).
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      setFlashId(fileId);
+      flashTimer.current = window.setTimeout(() => setFlashId(null), 6000);
+    }, 30);
+  };
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
   // Welche Knöpfe an den Karten stehen (Einstellungen, pro Gerät).
   const buttons = useCardButtons();
   // „Personen“ eines Eintrags in der Liste (Knopf an der Karte).
@@ -218,6 +232,7 @@ function FolderPage({
   const itemProps = (kind: 'folders' | 'files', itemId: string, open: () => void) => ({
     selecting: !!sel,
     selected: !!sel?.[kind].has(itemId),
+    flash: kind === 'files' && flashId === itemId,
     onClick: sel ? () => toggle(kind, itemId) : open,
     onLongPress: () => toggle(kind, itemId),
     onPeople: buttons.people && cloudEnabled && !isOrphan(kind === 'folders' ? itemId : files.find((f) => f.id === itemId)?.folderId ?? '')
@@ -662,8 +677,10 @@ function FolderPage({
           file={viewing}
           openComments={viewing.id === commentsFor}
           onClose={() => {
+            const closedId = viewing.id;
             setViewing(null);
             setCommentsFor(null);
+            flashCard(closedId);
           }}
         />
       )}

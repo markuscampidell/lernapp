@@ -4923,3 +4923,19 @@ div.sticky-bar:has(> .view-header) {
     padding-inline: 4px;
   }
 }
+
+/* ---------- Gerade geschlossene Datei: Rahmen um die ganze Karte, 5 s sichtbar, dann 1 s ausblenden ---------- */
+.item-card.flash {
+  animation: card-flash 6s linear forwards;
+}
+@keyframes card-flash {
+  0%,
+  83.3% {
+    outline: 2px solid var(--info);
+    outline-offset: 2px;
+  }
+  100% {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+}
