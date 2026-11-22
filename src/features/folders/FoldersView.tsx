@@ -276,7 +276,7 @@ function FolderPage({
         {pick && (
           <button
             type="button"
-            className="link section-all"
+            className="btn primary small section-all"
             onClick={() =>
               setSel((prev) => {
                 const next: Selection = { folders: new Set(prev?.folders), files: new Set(prev?.files) };
