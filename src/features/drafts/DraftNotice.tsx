@@ -26,16 +26,18 @@ const when = (t: number) => {
 
 /**
  * Hinweise oben im Editor:
- * - wiederhergestellt → Verwerfen
+ * - automatisch wiederhergestellt (nach Neuladen/Absturz) → Verwerfen
  * - normal geöffnet, aber es warten noch ungespeicherte Änderungen von früher → diese laden oder verwerfen
  */
 export function DraftNotices({
   draft,
   onClose,
 }: {
-  draft: { restored: boolean; waiting?: Draft; discard: () => void; isDirty: () => boolean };
+  draft: { restored: boolean; chosen: boolean; waiting?: Draft; discard: () => void; isDirty: () => boolean };
   onClose: () => void;
 }) {
+  // Selbst gewählt: man weiß, dass es die eigenen Änderungen sind – kein Hinweis.
+  if (draft.restored && draft.chosen) return null;
   if (draft.restored) return <DraftNotice onDiscard={() => (draft.discard(), onClose())} />;
   const w = draft.waiting;
   if (!w) return null;

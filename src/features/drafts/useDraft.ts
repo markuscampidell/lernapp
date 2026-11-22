@@ -114,6 +114,8 @@ export function useDraft(opts: {
   };
   return {
     restored: !!opts.restore,
+    /** Selbst gewählt (nicht automatisch nach dem Neustart) – dann braucht es keinen Hinweis mehr. */
+    chosen: !!opts.restore?.chosen,
     /** Beim normalen Öffnen gab es schon ungespeicherte Änderungen von früher (noch nicht verworfen). */
     waiting,
     /** Hat der Editor gerade eigene, ungespeicherte Änderungen? */

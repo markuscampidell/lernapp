@@ -24,6 +24,8 @@ export interface Draft {
   savedAt: number;
   /** „Wartet“: nicht beim Start automatisch öffnen (z. B. nachdem man sich die fremde Version ansehen wollte). */
   parked?: boolean;
+  /** Nur im Speicher (nicht gespeichert): selbst gewählt („Meine weiter bearbeiten“, „Laden“) statt automatisch nach dem Neustart. */
+  chosen?: boolean;
 }
 
 export const draftKey = (fileId: string | undefined, folderId: string | undefined, kind: DraftKind) =>

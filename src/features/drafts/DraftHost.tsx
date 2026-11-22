@@ -84,7 +84,7 @@ export function DraftHost() {
   useEffect(() => {
     openFn = (d) => {
       setAsk(null);
-      setOpen({ draft: d });
+      setOpen({ draft: { ...d, chosen: true } });
     };
     return () => {
       openFn = null;
@@ -131,7 +131,7 @@ export function DraftHost() {
             >
               {ask.who === 'self' ? 'Gespeicherte Version ansehen' : `${genitive(ask.who)} Version ansehen`}
             </button>
-            <button className="btn primary" onClick={() => { const d = ask.draft; setAsk(null); afterBack(() => setOpen({ draft: d })); }}>
+            <button className="btn primary" onClick={() => { const d = ask.draft; setAsk(null); afterBack(() => setOpen({ draft: { ...d, chosen: true } })); }}>
               Meine weiter bearbeiten
             </button>
             <button
@@ -156,7 +156,7 @@ export function DraftHost() {
           </p>
           <div className="footer-stack">
             {ask.asNew && (
-              <button className="btn primary" onClick={() => { const d = ask.draft; setAsk(null); afterBack(() => setOpen({ draft: d, asNew: true })); }}>
+              <button className="btn primary" onClick={() => { const d = ask.draft; setAsk(null); afterBack(() => setOpen({ draft: { ...d, chosen: true }, asNew: true })); }}>
                 Als neue Datei öffnen
               </button>
             )}
