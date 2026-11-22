@@ -34,9 +34,19 @@ export interface ItemCardProps {
 
 function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, selecting, selected, blocked, flash, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
   const press = useLongPress(onLongPress);
+  // Steht der Cursor im Suchfeld, bleibt er dort, wenn man etwas auswählt (Antippen im Auswahlmodus, langes Drücken).
+  // Öffnet man dagegen einen Ordner/eine Datei, wird das Suchfeld verlassen (sonst bliebe die Tastatur offen).
+  const searchFocused = () => !!(document.activeElement instanceof HTMLElement && document.activeElement.closest('.search'));
+  const keepSearch = (e: React.MouseEvent) => {
+    if (searchFocused()) e.preventDefault();
+  };
+  const click = () => {
+    if (!selecting && searchFocused()) (document.activeElement as HTMLElement).blur();
+    onClick?.();
+  };
   return (
     <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}${selecting && blocked ? ' blocked' : ''}${flash ? ' flash' : ''}`}>
-      <button className="item-main" onClick={onClick} {...press} disabled={selecting && blocked} aria-pressed={selecting ? !!selected : undefined}>
+      <button className="item-main" onClick={click} onMouseDown={keepSearch} {...press} disabled={selecting && blocked} aria-pressed={selecting ? !!selected : undefined}>
         {thumb}
         <div className="card-main">{children}</div>
         {chevron && !selecting && !onEdit && !onInfo && !onMove && !onPeople && (
