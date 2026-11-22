@@ -146,6 +146,11 @@ textarea:focus {
 }
 textarea {
   resize: vertical;
+  /* Keine Scrollleiste mit Pfeilen – nur der Griff zum Größerziehen bleibt; scrollen geht weiter per Rad/Touch */
+  scrollbar-width: none;
+}
+textarea::-webkit-scrollbar {
+  display: none;
 }
 input[type='range'] {
   flex: 1;
