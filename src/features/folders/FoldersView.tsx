@@ -398,7 +398,8 @@ function FolderPage({
           <SharedInfo folder={folder} onPeople={() => setSheet('share')} />
           {/* Im Auswahlmodus: Hinzufügen/Unterordner ausblenden, Suche bleibt */}
           <div className="sticky-bar sticky-second sticky-stack" ref={secondBar}>
-          <div className="action-row" hidden={!!sel}>
+          <div className={`fold${sel ? ' folded' : ''}`} aria-hidden={!!sel || undefined}>
+          <div className="action-row">
             <button className="btn primary add-btn" onClick={() => setSheet('menu')} disabled={!canAdd}>
               <Icon name="plus" size={18} />
               <span className="add-btn-text">
@@ -411,6 +412,7 @@ function FolderPage({
               <Icon name="folderPlus" size={18} /> Unterordner
             </button>
           </div>
+          </div>
           {searchBox}
           </div>
           {!canSub && !sel && <p className="muted small">Maximale Ordnertiefe ({MAX_DEPTH} Ebenen) erreicht – hier sind keine weiteren Unterordner möglich.</p>}
@@ -420,7 +422,7 @@ function FolderPage({
           <div className="sticky-bar" ref={topBar}>
           <header className="view-header">
             <h1>Ordner</h1>
-            <div className="view-header-actions" hidden={!!sel}>
+            <div className={`view-header-actions fade${sel ? ' faded' : ''}`} aria-hidden={!!sel || undefined}>
               <NewsBell />
               <button className="btn primary" onClick={() => setSheet('newFolder')}>
                 <Icon name="plus" /> Ordner

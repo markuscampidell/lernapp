@@ -741,11 +741,9 @@ input.narrow {
     transform: translateX(-32px);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .main.slide-left,
-  .main.slide-right {
-    animation: none;
-  }
+:root[data-reduce-motion] .main.slide-left,
+:root[data-reduce-motion] .main.slide-right {
+  animation: none;
 }
 
 
@@ -1705,10 +1703,8 @@ span.gloss.selected {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-@media (prefers-reduced-motion: reduce) {
-  .flashcard-inner {
-    transition: none;
-  }
+:root[data-reduce-motion] .flashcard-inner {
+  transition: none;
 }
 .again-btn {
   color: var(--warning);
@@ -4971,4 +4967,46 @@ div.sticky-bar:has(> .view-header) {
   letter-spacing: 0;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+/* ---------- Im Auswahlmodus Knöpfe weich aus-/einblenden ---------- */
+/* Zeile (Hinzufügen/Unterordner): blendet aus und klappt dabei langsam zu – darunter gleitet alles nach oben. */
+.fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 0.28s ease, margin-bottom 0.28s ease, opacity 0.2s ease, visibility 0s;
+}
+.fold > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.fold.folded {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  /* Abstand der Leiste (gap) mit einklappen, sonst springt es am Ende */
+  margin-bottom: -8px;
+  transition: grid-template-rows 0.28s ease, margin-bottom 0.28s ease, opacity 0.2s ease, visibility 0s 0.28s;
+}
+/* Knöpfe im Kopf (Glocke, + Ordner): nur ausblenden, Platz bleibt – nichts verschiebt sich. */
+.fade {
+  opacity: 1;
+  transition: opacity 0.2s ease, visibility 0s;
+}
+.fade.faded {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0s 0.2s;
+}
+
+/* ---------- Weniger Bewegung (Einstellung; anfangs wie am Gerät) ---------- */
+:root[data-reduce-motion] *,
+:root[data-reduce-motion] *::before,
+:root[data-reduce-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
 }

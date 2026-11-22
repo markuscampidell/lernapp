@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '../../components/Icon';
 import { cleanWheel, discSvg, frameSvg, pick, SIZE, type Wheel, type WheelEntry } from './wheel';
 
-const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+import { reducedMotion } from '../../lib/motion';
 
 /**
  * Drehbares Glücksrad. Jede Person dreht für sich, nichts wird gespeichert.
@@ -17,7 +17,7 @@ export function WheelSpinner({ wheel, actions }: { wheel: Wheel; actions?: React
   const [result, setResult] = useState<WheelEntry | null>(null);
   const pending = useRef<WheelEntry | null>(null);
   const disc = useMemo(() => discSvg(active), [active]);
-  const duration = reduceMotion ? 0.6 : 4.2;
+  const duration = reducedMotion() ? 0.6 : 4.2;
 
   const spin = () => {
     if (spinning || active.length < 1) return;
@@ -39,7 +39,7 @@ export function WheelSpinner({ wheel, actions }: { wheel: Wheel; actions?: React
     setRotation((r) => {
       const now = ((r % 360) + 360) % 360;
       const target = (((360 - p.angle - now) % 360) + 360) % 360;
-      return r + (reduceMotion ? 360 : 360 * 5) + target;
+      return r + (reducedMotion() ? 360 : 360 * 5) + target;
     });
   };
 

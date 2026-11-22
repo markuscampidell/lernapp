@@ -13,6 +13,7 @@ import { cacheLimit, cacheSize } from '../../storage/blobs';
 import { NotificationSetting } from '../notifications/NotificationSetting';
 import { BackgroundPicker } from '../background/BackgroundPicker';
 import { CardButtonsSetting } from './CardButtonsSetting';
+import { MotionSetting } from './MotionSetting';
 
 export function SettingsView() {
   const lib = useLibrary();
@@ -102,6 +103,8 @@ export function SettingsView() {
       <BackgroundPicker />
 
       <CardButtonsSetting />
+
+      <MotionSetting />
 
       {cloudEnabled && <NotificationSetting />}
 

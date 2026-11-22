@@ -7,9 +7,12 @@ import { navigate } from './lib/router';
 import './styles/global.css';
 import { applyBackground, loadBackground } from './lib/background';
 import { initUiHelpers } from './lib/ui-helpers';
+import { initMotion } from './lib/motion';
 
 // Gewählten Hintergrund sofort setzen (kein Aufblitzen des Standard-Hintergrunds).
 applyBackground(loadBackground());
+// „Weniger Bewegung“ (eigene Wahl oder Geräte-Einstellung)
+initMotion();
 // Kein App-Zoom mit Strg+Mausrad, schnellere Tooltips, Hinweis bei seitlich scrollbaren Bereichen.
 initUiHelpers();
 
