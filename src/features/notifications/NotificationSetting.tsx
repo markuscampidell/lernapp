@@ -123,6 +123,12 @@ export function NotificationSetting() {
             Test-Benachrichtigung senden
           </button>
         )}
+        {state === 'on' && /Android/i.test(navigator.userAgent) && (
+          <p className="muted small">
+            Nur ein Ton, aber kein Pop-up? In den Handy-Einstellungen bei der Lernapp (bzw. bei Chrome → Websites) unter
+            Benachrichtigungen „Als Pop-up anzeigen“ einschalten.
+          </p>
+        )}
         {msg && <p className={`notice ${msg.kind}`}>{msg.text}</p>}
       </div>
     </>

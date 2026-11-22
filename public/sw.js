@@ -1,6 +1,6 @@
 // Offline-Unterstützung: Die App-Hülle wird zwischengespeichert, damit die installierte App ohne Netz startet.
 // VERSION erhöhen, damit Clients nach einem Deploy alte Caches verwerfen.
-const VERSION = 'v26';
+const VERSION = 'v27';
 const CACHE = `lernapp-${VERSION}`;
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
@@ -116,18 +116,32 @@ self.addEventListener('push', (event) => {
     data = { body: event.data ? event.data.text() : '' };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Lernapp', {
-      body: data.body || '',
-      icon: './icons/icon-192.png',
-      tag: data.tag,
-      data: { url: data.url || '#ordner' },
-    }),
+    self.registration
+      .showNotification(data.title || 'Lernapp', {
+        body: data.body || '',
+        icon: './icons/icon-192.png',
+        tag: data.tag,
+        data: { url: data.url || '#ordner' },
+      })
+      .then(updateBadge),
   );
 });
+
+// Zahl am App-Symbol (installierte App; PC, Mac, iPhone – Android zeigt stattdessen einen Punkt):
+// so viele, wie gerade Benachrichtigungen offen sind. Die App setzt sie beim Öffnen auf die ungelesenen Neuigkeiten.
+function updateBadge() {
+  if (!('setAppBadge' in self.navigator)) return;
+  return self.registration
+    .getNotifications()
+    .then((list) => (list.length ? self.navigator.setAppBadge(list.length) : self.navigator.clearAppBadge()))
+    .catch(() => {});
+}
+self.addEventListener('notificationclose', (event) => event.waitUntil(updateBadge() || Promise.resolve()));
 
 // Antippen: offene App nach vorne holen und dorthin wechseln – sonst die App neu öffnen.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  updateBadge();
   let hash = (event.notification.data && event.notification.data.url) || '#ordner';
   // Kommentar-Benachrichtigung: Datei gleich mit offenen Kommentaren zeigen.
   if (String(event.notification.tag || '').startsWith('comment-') && /^#ordner\/[^/]+\/[^/]+$/.test(hash)) hash += '/kommentare';

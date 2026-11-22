@@ -55,8 +55,17 @@ export function NewsBell() {
 
   useEffect(() => setSeen(me ? readSeen(me.id) : 0), [me]);
 
-  if (!cloudEnabled || !me) return null;
   const unread = (items ?? []).filter((n) => Date.parse(n.createdAt) > seen).length;
+  // Zahl am App-Symbol = ungelesene Neuigkeiten (nur installierte App, wo der Browser das kann).
+  useEffect(() => {
+    if (!items || !me) return;
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    (unread ? nav.setAppBadge?.(unread) : nav.clearAppBadge?.())?.catch(() => {});
+    // Gelesen: auch die Benachrichtigungen in der Leiste wegräumen.
+    if (!unread) void navigator.serviceWorker?.getRegistration().then((r) => r?.getNotifications().then((l) => l.forEach((n) => n.close())));
+  }, [unread, items, me]);
+
+  if (!cloudEnabled || !me) return null;
 
   const show = () => {
     setSeenAtOpen(seen);
