@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FileItem } from '../../domain/types';
 import { isRemoteBlob, remotePath } from '../../storage/blobs';
-import { deleteDraft, draftKey, findDraft, parkDraft, putDraft, type Draft, type DraftKind } from '../../storage/drafts';
+import { deleteDraft, draftKey, findDraft, parkDraft, putDraft, useDrafts, type Draft, type DraftKind } from '../../storage/drafts';
 
 /** Stand einer Datei, von dem aus bearbeitet wird (zum Erkennen, ob jemand anderes inzwischen gespeichert hat). */
 export const baseOf = (file: FileItem) => (isRemoteBlob(file.blobId) ? remotePath(file.blobId) : file.blobId);
@@ -35,10 +35,19 @@ export function useDraft(opts: {
   // das Dokument hat seinen eigenen.
   // Gibt es für diese Datei schon einen wartenden Entwurf (und dieser Editor wurde normal geöffnet), bleibt der unangetastet –
   // er lässt sich über die Leiste in der Datei-Ansicht weiter bearbeiten.
-  const [off] = useState(() => (!opts.file && !opts.folderId && !opts.restore) || (!opts.restore && !!findDraft(key)));
+  const [waitingAtStart] = useState(() => !opts.restore && !!(opts.file || opts.folderId) && !!findDraft(key));
+  // Der wartende Entwurf (solange es ihn gibt) – der Editor zeigt dann oben einen Hinweis, um ihn zu laden.
+  // Wird er verworfen, sichert dieser Editor ab dann seine eigenen Änderungen.
+  const drafts = useDrafts();
+  const released = useRef(!waitingAtStart);
+  const waiting = released.current ? undefined : drafts.find((d) => d.key === key);
+  // Einmal weg (verworfen), bleibt er weg – später gespeicherte Entwürfe sind die dieses Editors.
+  if (!waiting) released.current = true;
+  const offRef = useRef(false);
+  offRef.current = (!opts.file && !opts.folderId && !opts.restore) || !!waiting;
 
   const flush = () => {
-    if (done.current || off) return;
+    if (done.current || offRef.current) return;
     const o = latest.current;
     if (!o.dirty) {
       // Alles zurückgenommen: kein Entwurf nötig.
@@ -91,7 +100,7 @@ export function useDraft(opts: {
       window.removeEventListener('pagehide', flush);
       window.removeEventListener('beforeunload', onLeave);
       // Anders geschlossen (nicht gespeichert, nicht verworfen): Entwurf aufheben und warten lassen.
-      if (!done.current && !off && latest.current.dirty) {
+      if (!done.current && !offRef.current && latest.current.dirty) {
         flush();
         done.current = true;
         void parkDraft(key);
@@ -101,10 +110,14 @@ export function useDraft(opts: {
 
   const finish = () => {
     done.current = true;
-    if (!off) void deleteDraft(key);
+    if (!offRef.current) void deleteDraft(key);
   };
   return {
     restored: !!opts.restore,
+    /** Beim normalen Öffnen gab es schon ungespeicherte Änderungen von früher (noch nicht verworfen). */
+    waiting,
+    /** Hat der Editor gerade eigene, ungespeicherte Änderungen? */
+    isDirty: () => latest.current.dirty,
     /** Nach erfolgreichem Speichern. */
     saved: finish,
     /** Änderungen verworfen. */

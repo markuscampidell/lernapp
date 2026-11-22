@@ -5,7 +5,7 @@ import { Icon, type IconName } from '../../components/Icon';
 import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
 import { useDraft } from '../drafts/useDraft';
-import { DraftNotice } from '../drafts/DraftNotice';
+import { DraftNotices } from '../drafts/DraftNotice';
 import type { Draft } from '../../storage/drafts';
 import { DetailsButton } from '../study/DetailsButton';
 import { isTouchDevice } from '../../lib/files';
@@ -1438,7 +1438,7 @@ export function DocEditor({
 
   return (
     <StudyScreen
-      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      notice={<DraftNotices draft={draft} onClose={onClose} />}
       onLockClose={onClose}
       editing={file}
       title={drawOnly ? `Zeichnen: ${name || 'Dokument'}` : file ? 'Dokument bearbeiten' : 'Neues Text-Dokument'}

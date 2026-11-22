@@ -9,7 +9,7 @@ import { StudyScreen } from '../study/StudyScreen';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
 import { useDraft } from '../drafts/useDraft';
-import { DraftNotice } from '../drafts/DraftNotice';
+import { DraftNotices } from '../drafts/DraftNotice';
 import type { Draft } from '../../storage/drafts';
 
 /** Größer als das wird eine Textdatei nicht im Editor geöffnet (sonst wird das Textfeld zäh). */
@@ -58,7 +58,7 @@ export function NoteSheet({ folderId, initialName, initialDescription, initialTe
         </button>
       }
     >
-      {draft.restored && <DraftNotice onDiscard={() => (draft.discard(), onClose())} />}
+      <DraftNotices draft={draft} onClose={onClose} />
       <div className="field">
         <div className="field-label">
           <span>Name</span>
@@ -105,7 +105,7 @@ export function NoteEditor({ file, initial, initialName, initialDescription, res
 
   return (
     <StudyScreen
-      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      notice={<DraftNotices draft={draft} onClose={onClose} />}
       onLockClose={onClose}
       editing={file}
       title="Notiz bearbeiten"

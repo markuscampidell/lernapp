@@ -6,7 +6,7 @@ import { Icon } from '../../components/Icon';
 import { Pager, StudyScreen } from './StudyScreen';
 import { newAnswer, newQuestion, questionProblem, QUIZ_EXT, QUIZ_MIME, quizBlob, type Answer, type Question } from './format';
 import { useDraft } from '../drafts/useDraft';
-import { DraftNotice } from '../drafts/DraftNotice';
+import { DraftNotices } from '../drafts/DraftNotice';
 import type { Draft } from '../../storage/drafts';
 import { useStudySave } from './useStudySave';
 import { DetailsButton } from './DetailsButton';
@@ -68,7 +68,7 @@ export function QuizEditor({ file, folderId, initial, initialName, initialDescri
 
   return (
     <StudyScreen
-      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      notice={<DraftNotices draft={draft} onClose={onClose} />}
       onLockClose={onClose}
       editing={file}
       title={file ? 'Quiz bearbeiten' : 'Neues Quiz'}

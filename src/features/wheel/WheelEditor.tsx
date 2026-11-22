@@ -5,7 +5,7 @@ import { DescriptionField } from '../../components/DescriptionField';
 import { Icon } from '../../components/Icon';
 import { StudyScreen } from '../study/StudyScreen';
 import { useDraft } from '../drafts/useDraft';
-import { DraftNotice } from '../drafts/DraftNotice';
+import { DraftNotices } from '../drafts/DraftNotice';
 import type { Draft } from '../../storage/drafts';
 import { useStudySave } from '../study/useStudySave';
 import { DetailsButton } from '../study/DetailsButton';
@@ -88,7 +88,7 @@ export function WheelEditor({
 
   return (
     <StudyScreen
-      notice={draft.restored ? <DraftNotice onDiscard={() => (draft.discard(), onClose())} /> : undefined}
+      notice={<DraftNotices draft={draft} onClose={onClose} />}
       onLockClose={onClose}
       editing={file}
       title={embedded ? 'Glücksrad im Dokument' : file ? 'Glücksrad bearbeiten' : 'Neues Glücksrad'}
