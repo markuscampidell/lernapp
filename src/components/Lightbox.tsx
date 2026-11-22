@@ -157,7 +157,17 @@ function Lightbox({ item, onClose }: { item: LightboxItem; onClose: () => void }
     }
     const g = gesture.current;
     if (g.moved > 8) return;
-    // Tippen: doppelt = zoomen, einmal neben das Bild = schließen
+    const onImage = (() => {
+      const r = img.current?.getBoundingClientRect();
+      return !!r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    })();
+    // Maus: ein Klick aufs Bild zoomt hinein (an der Stelle), ein Klick im Zoom wieder heraus; daneben = schließen
+    if (e.pointerType === 'mouse') {
+      if (latest.current.s > 1 || onImage) toggleZoom(e.clientX, e.clientY);
+      else onClose();
+      return;
+    }
+    // Finger/Stift: doppelt tippen = zoomen, einmal neben das Bild = schließen
     const now = Date.now();
     if (now - g.lastTap < 320 && Math.hypot(e.clientX - g.lastX, e.clientY - g.lastY) < 30) {
       g.lastTap = 0;
@@ -167,10 +177,6 @@ function Lightbox({ item, onClose }: { item: LightboxItem; onClose: () => void }
     g.lastTap = now;
     g.lastX = e.clientX;
     g.lastY = e.clientY;
-    const onImage = (() => {
-      const r = img.current?.getBoundingClientRect();
-      return !!r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-    })();
     if (!onImage && latest.current.s === 1) setTimeout(() => gesture.current.lastTap === now && onClose(), 330);
   };
 
@@ -193,7 +199,7 @@ function Lightbox({ item, onClose }: { item: LightboxItem; onClose: () => void }
           alt={item.alt ?? ''}
           draggable={false}
           className={item.round ? 'round' : undefined}
-          style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})`, cursor: view.s > 1 ? 'grab' : 'zoom-in' }}
+          style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})`, cursor: view.s > 1 ? 'zoom-out' : 'zoom-in' }}
           onLoad={() => setView((v) => clamp(v))}
         />
       </div>
