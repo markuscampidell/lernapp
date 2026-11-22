@@ -341,8 +341,7 @@ function FolderPage({
 
 
   // Suchfeld: bleibt beim Scrollen oben (in der festen Leiste).
-  // Im Auswahlmodus ausgeblendet – außer es läuft gerade eine Suche (sonst wüsste man nicht mehr, wonach gefiltert ist).
-  const searchBox = (!sel || query) && (subfolders.length > 0 || sharedTops.length > 0 || ownFiles.length > 0 || query) && (
+  const searchBox = (subfolders.length > 0 || sharedTops.length > 0 || ownFiles.length > 0 || query) && (
     <SearchBox value={query} onChange={setQuery} placeholder="Suchen" />
   );
 
@@ -397,8 +396,8 @@ function FolderPage({
             </div>
           </header>
           <SharedInfo folder={folder} onPeople={() => setSheet('share')} />
-          {/* Im Auswahlmodus: Hinzufügen/Unterordner (und Suche ohne Suchbegriff) ausblenden */}
-          <div className="sticky-bar sticky-second sticky-stack" ref={secondBar} hidden={!!sel && !query}>
+          {/* Im Auswahlmodus: Hinzufügen/Unterordner ausblenden, Suche bleibt */}
+          <div className="sticky-bar sticky-second sticky-stack" ref={secondBar}>
           <div className="action-row" hidden={!!sel}>
             <button className="btn primary add-btn" onClick={() => setSheet('menu')} disabled={!canAdd}>
               <Icon name="plus" size={18} />
