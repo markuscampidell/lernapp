@@ -182,9 +182,6 @@ function FolderPage({
     return { folders: fs, files: fi };
   }, [query, folders, files, folder, id, subfolders, sharedTops]);
 
-  // Aktuell sichtbare Einträge (für "Alle auswählen").
-  const visibleFolders = results ? results.folders.map((r) => r.f) : [...subfolders, ...sharedTops];
-  const visibleFiles = results ? results.files.map((r) => r.f) : ownFiles;
 
   /** Fragt nach und löscht. Nennt mitgelöschte Unterordner/Dateien. */
   const confirmAndDelete = async (folderIds: string[], fileIds: string[]) => {
@@ -267,6 +264,34 @@ function FolderPage({
   });
   const newProp = (item: Folder | FileItem) => ({ isNew: isNewSince(item, since) });
 
+  /** Rechts im Bereichs-Titel: Anzahl und – im Auswahlmodus, nur in einem Ordner – „Alle“/„Keine“ für genau diesen Bereich. */
+  const sectionEnd = (kind: 'folders' | 'files', items: { id: string }[], showCount = true) => {
+    const ids = items.map((x) => x.id).filter((x) => !isBlocked(kind, x));
+    const pick = !!sel && !!folder && ids.length >= 2;
+    const all = pick && ids.every((x) => sel![kind].has(x));
+    if (!pick && !showCount) return null;
+    return (
+      <span className="section-end">
+        {showCount && <span className="section-count">{items.length}</span>}
+        {pick && (
+          <button
+            type="button"
+            className="link section-all"
+            onClick={() =>
+              setSel((prev) => {
+                const next: Selection = { folders: new Set(prev?.folders), files: new Set(prev?.files) };
+                ids.forEach((x) => (all ? next[kind].delete(x) : next[kind].add(x)));
+                return next.folders.size + next.files.size === 0 ? null : next;
+              })
+            }
+          >
+            {all ? 'Keine' : 'Alle'}
+          </button>
+        )}
+      </span>
+    );
+  };
+
   /** Karteikarten/Quiz/Dokumente/Diagramme öffnen direkt den Inhalts-Editor, andere Dateien Name/Beschreibung/Ort. */
   const startEdit = async (item: Folder | FileItem) => {
     if (!('folderId' in item)) return setEditing({ kind: 'folder', folder: item });
@@ -325,11 +350,6 @@ function FolderPage({
       {sel && (
         <SelectionBar
           count={sel.folders.size + sel.files.size}
-          showAll={!!folder}
-          allSelected={visibleFolders.every((f) => sel.folders.has(f.id)) && visibleFiles.every((f) => sel.files.has(f.id))}
-          onAll={(all) =>
-            setSel(all ? { folders: new Set(visibleFolders.map((f) => f.id)), files: new Set(visibleFiles.map((f) => f.id)) } : null)
-          }
           onDelete={async () => {
             if (await confirmAndDelete([...sel.folders], [...sel.files])) setSel(null);
           }}
@@ -418,7 +438,7 @@ function FolderPage({
           <>
             {results.folders.length > 0 && (
               <>
-                <h3 className="section-title">Ordner</h3>
+                <h3 className="section-title">Ordner{sectionEnd('folders', results.folders.map((r) => r.f), false)}</h3>
                 <ul className="list">
                   {results.folders.map(({ f, path }) => (
                     <li key={f.id}>
@@ -430,7 +450,7 @@ function FolderPage({
             )}
             {results.files.length > 0 && (
               <>
-                <h3 className="section-title">Dateien</h3>
+                <h3 className="section-title">Dateien{sectionEnd('files', results.files.map((r) => r.f), false)}</h3>
                 <ul className="list">
                   {results.files.map(({ f, path }) => (
                     <li key={f.id}>
@@ -502,7 +522,7 @@ function FolderPage({
             // Beides vorhanden: zwei Bereiche (Handy: untereinander, PC: nebeneinander), Titel bleiben beim Scrollen oben.
             <div className="split">
               <section className="split-pane" aria-label="Unterordner">
-                <h3 className="section-title sticky-bar pane-title">Unterordner<span className="section-count">{subfolders.length}</span></h3>
+                <h3 className="section-title sticky-bar pane-title">Unterordner{sectionEnd('folders', subfolders)}</h3>
                 <ul className="list">
                   {subfolders.map((f) => (
                     <li key={f.id}>
@@ -512,7 +532,7 @@ function FolderPage({
                 </ul>
               </section>
               <section className="split-pane" aria-label="Dateien">
-                <h3 className="section-title sticky-bar pane-title">Dateien<span className="section-count">{ownFiles.length}</span></h3>
+                <h3 className="section-title sticky-bar pane-title">Dateien{sectionEnd('files', ownFiles)}</h3>
                 <ul className="list">
                   {ownFiles.map((f) => (
                     <li key={f.id}>
@@ -526,7 +546,7 @@ function FolderPage({
           <>
           {subfolders.length > 0 && (
             <>
-              {folder && <h3 className="section-title">Unterordner</h3>}
+              {folder && <h3 className="section-title">Unterordner{sectionEnd('folders', subfolders, false)}</h3>}
               <ul className="list">
                 {subfolders.map((f) => (
                   <li key={f.id}>
@@ -538,7 +558,7 @@ function FolderPage({
           )}
           {ownFiles.length > 0 && (
             <>
-              <h3 className="section-title">Dateien</h3>
+              <h3 className="section-title">Dateien{sectionEnd('files', ownFiles, false)}</h3>
               <ul className="list">
                 {ownFiles.map((f) => (
                   <li key={f.id}>
@@ -778,18 +798,11 @@ function AddFilesSheet({
 
 function SelectionBar({
   count,
-  showAll,
-  allSelected,
-  onAll,
   onDelete,
   onMove,
   onClose,
 }: {
   count: number;
-  /** „Alle/Keine“ nur in einem Ordner – auf der Übersicht wählt niemand alle Ordner. */
-  showAll: boolean;
-  allSelected: boolean;
-  onAll: (all: boolean) => void;
   onDelete: () => void;
   onMove: () => void;
   onClose: () => void;
@@ -802,11 +815,6 @@ function SelectionBar({
         <Icon name="close" />
       </button>
       <strong className="grow">{count} ausgewählt</strong>
-      {showAll && (
-        <button className="btn ghost small" onClick={() => onAll(!allSelected)}>
-          {allSelected ? 'Keine' : 'Alle'}
-        </button>
-      )}
       <button className="icon-btn" aria-label="Verschieben" title="Verschieben" onClick={onMove}>
         <Icon name="move" />
       </button>

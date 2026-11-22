@@ -4953,3 +4953,18 @@ div.sticky-bar:has(> .view-header) {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Bereichs-Titel rechts: Anzahl und im Auswahlmodus „Alle“/„Keine“ für diesen Bereich */
+.section-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.section-all {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 2px 4px;
+}
