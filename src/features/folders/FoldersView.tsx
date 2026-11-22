@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FileItem, Folder } from '../../domain/types';
 import { MAX_DEPTH, SHARED_ROOT } from '../../domain/types';
-import { childFolders, depthOf, filesIn, pathOf, subtreeIds } from '../../domain/tree';
+import { childFolders, depthOf, filesIn, pathOf, scopeOf, subtreeIds } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
 import { afterBack, folderHash, goUp, navigate, openFolder, replace, useBackToClose } from '../../lib/router';
 import { DOCUMENT_ACCEPT, fileKind, fullName, isTouchDevice, KIND_LABEL } from '../../lib/files';
@@ -221,9 +221,22 @@ function FolderPage({
     }
   };
 
+  // Auswahl nie gemischt aus „Meine Ordner“ und „Geteilt mit dir“ (z. B. auf der Übersicht oder in Suchergebnissen).
+  const scopeOfItem = (kind: 'folders' | 'files', itemId: string) =>
+    scopeOf(folders, kind === 'folders' ? itemId : files.find((f) => f.id === itemId)?.folderId ?? null);
+  const selScope = (() => {
+    if (!sel) return null;
+    const f = sel.folders.values().next();
+    if (!f.done) return scopeOfItem('folders', f.value);
+    const fi = sel.files.values().next();
+    return fi.done ? null : scopeOfItem('files', fi.value);
+  })();
+  const isBlocked = (kind: 'folders' | 'files', itemId: string) => !!selScope && scopeOfItem(kind, itemId) !== selScope;
+
   const toggle = (kind: 'folders' | 'files', itemId: string) =>
     setSel((prev) => {
       const next: Selection = { folders: new Set(prev?.folders), files: new Set(prev?.files) };
+      if (!next[kind].has(itemId) && isBlocked(kind, itemId)) return prev;
       if (next[kind].has(itemId)) next[kind].delete(itemId);
       else next[kind].add(itemId);
       return next.folders.size + next.files.size === 0 ? null : next;
@@ -232,6 +245,7 @@ function FolderPage({
   const itemProps = (kind: 'folders' | 'files', itemId: string, open: () => void) => ({
     selecting: !!sel,
     selected: !!sel?.[kind].has(itemId),
+    blocked: isBlocked(kind, itemId),
     flash: kind === 'files' && flashId === itemId,
     onClick: sel ? () => toggle(kind, itemId) : open,
     onLongPress: () => toggle(kind, itemId),
@@ -311,6 +325,7 @@ function FolderPage({
       {sel && (
         <SelectionBar
           count={sel.folders.size + sel.files.size}
+          showAll={!!folder}
           allSelected={visibleFolders.every((f) => sel.folders.has(f.id)) && visibleFiles.every((f) => sel.files.has(f.id))}
           onAll={(all) =>
             setSel(all ? { folders: new Set(visibleFolders.map((f) => f.id)), files: new Set(visibleFiles.map((f) => f.id)) } : null)
@@ -763,6 +778,7 @@ function AddFilesSheet({
 
 function SelectionBar({
   count,
+  showAll,
   allSelected,
   onAll,
   onDelete,
@@ -770,6 +786,8 @@ function SelectionBar({
   onClose,
 }: {
   count: number;
+  /** „Alle/Keine“ nur in einem Ordner – auf der Übersicht wählt niemand alle Ordner. */
+  showAll: boolean;
   allSelected: boolean;
   onAll: (all: boolean) => void;
   onDelete: () => void;
@@ -784,9 +802,11 @@ function SelectionBar({
         <Icon name="close" />
       </button>
       <strong className="grow">{count} ausgewählt</strong>
-      <button className="btn ghost small" onClick={() => onAll(!allSelected)}>
-        {allSelected ? 'Keine' : 'Alle'}
-      </button>
+      {showAll && (
+        <button className="btn ghost small" onClick={() => onAll(!allSelected)}>
+          {allSelected ? 'Keine' : 'Alle'}
+        </button>
+      )}
       <button className="icon-btn" aria-label="Verschieben" title="Verschieben" onClick={onMove}>
         <Icon name="move" />
       </button>

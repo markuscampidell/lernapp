@@ -23,6 +23,8 @@ export interface ItemCardProps {
   onLongPress?: () => void;
   selecting?: boolean;
   selected?: boolean;
+  /** Im Auswahlmodus nicht wählbar (z. B. geteilter Ordner, während eigene ausgewählt sind). */
+  blocked?: boolean;
   path?: string;
   /** Seit dem letzten Öffnen des Ordners von jemand anderem hinzugefügt/geändert. */
   isNew?: boolean;
@@ -30,11 +32,11 @@ export interface ItemCardProps {
   flash?: boolean;
 }
 
-function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, selecting, selected, flash, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
+function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, selecting, selected, blocked, flash, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
   const press = useLongPress(onLongPress);
   return (
-    <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}${flash ? ' flash' : ''}`}>
-      <button className="item-main" onClick={onClick} {...press} aria-pressed={selecting ? !!selected : undefined}>
+    <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}${selecting && blocked ? ' blocked' : ''}${flash ? ' flash' : ''}`}>
+      <button className="item-main" onClick={onClick} {...press} disabled={selecting && blocked} aria-pressed={selecting ? !!selected : undefined}>
         {thumb}
         <div className="card-main">{children}</div>
         {chevron && !selecting && !onEdit && !onInfo && !onMove && !onPeople && (
@@ -42,7 +44,7 @@ function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, sele
             <Icon name="chevron" size={18} />
           </span>
         )}
-        {selecting && (
+        {selecting && !blocked && (
           <span className={`tick${selected ? ' on' : ''}`} aria-hidden="true">
             {selected && <Icon name="check" size={16} />}
           </span>
