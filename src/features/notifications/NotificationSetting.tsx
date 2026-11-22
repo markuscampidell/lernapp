@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../cloud/auth';
-import { disablePush, enablePush, pushState, sendTestPush, type PushState } from '../../cloud/push';
+import { disablePush, enablePush, loadNotifyPrefs, pushState, saveNotifyPrefs, sendTestPush, type NotifyPrefs, type PushState } from '../../cloud/push';
 import { useLibrary } from '../../state/Library';
 
 /** Benachrichtigungen auf diesem Gerät ein-/ausschalten (gehört zum angemeldeten Konto). */
@@ -10,6 +10,15 @@ export function NotificationSetting() {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'good' | 'critical'; text: string } | null>(null);
+  const [prefs, setPrefs] = useState<NotifyPrefs | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (user) void loadNotifyPrefs().then((p) => alive && setPrefs(p));
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     let alive = true;
@@ -56,6 +65,27 @@ export function NotificationSetting() {
   };
   const available = state === 'on' || state === 'off';
 
+  const setPref = async (key: keyof NotifyPrefs, on: boolean) => {
+    if (!prefs) return;
+    const before = prefs;
+    const next = { ...prefs, [key]: on };
+    setPrefs(next);
+    setMsg(null);
+    try {
+      await saveNotifyPrefs(next);
+    } catch (e) {
+      setPrefs(before);
+      setMsg({ kind: 'critical', text: e instanceof Error ? e.message : 'Das hat nicht geklappt.' });
+    }
+  };
+  const KINDS: [keyof NotifyPrefs, string, string][] = [
+    ['new_items', 'Neues in geteilten Ordnern', 'Jemand legt eine Datei oder einen Ordner an'],
+    ['own_changes', 'Änderungen an deinen Einträgen', 'Jemand ändert, verschiebt oder benennt etwas von dir um'],
+    ['other_changes', 'Änderungen an anderen Dateien', 'Jemand überarbeitet eine Datei in einem geteilten Ordner'],
+    ['comments', 'Kommentare und Antworten', 'Zu deinen Dateien und in Gesprächen, bei denen du mitschreibst'],
+    ['shares', 'Neue geteilte Ordner', 'Jemand teilt einen Ordner mit dir'],
+  ];
+
   return (
     <>
       <h3 className="section-title">Benachrichtigungen</h3>
@@ -63,7 +93,7 @@ export function NotificationSetting() {
         <div className="toggle-row">
           <span>
             Benachrichtigungen auf diesem Gerät
-            <span className="muted small block">Kommentare, Antworten, geteilte Ordner – auch bei geschlossener App.</span>
+            <span className="muted small block">Auch bei geschlossener App – worüber, wählst du unten.</span>
           </span>
           <input
             type="checkbox"
@@ -74,6 +104,20 @@ export function NotificationSetting() {
           />
         </div>
         {hint[state] && <p className="notice warning">{hint[state]}</p>}
+        {prefs && (
+          <div className="stack notify-kinds">
+            <span className="muted small">Benachrichtigen bei (gilt auf allen deinen Geräten und für die Glocke):</span>
+            {KINDS.map(([key, label, sub]) => (
+              <div key={key} className="toggle-row">
+                <span>
+                  {label}
+                  <span className="muted small block">{sub}</span>
+                </span>
+                <input type="checkbox" className="switch" aria-label={label} checked={prefs[key]} disabled={!online} onChange={(e) => void setPref(key, e.target.checked)} />
+              </div>
+            ))}
+          </div>
+        )}
         {state === 'on' && (
           <button className="link" onClick={test} disabled={busy || !online}>
             Test-Benachrichtigung senden

@@ -107,3 +107,28 @@ export async function sendTestPush(): Promise<void> {
   if (!supabase) return;
   check(await supabase.rpc('send_test_push'));
 }
+
+// ---------- Worüber benachrichtigen? (fürs Konto, gilt auf allen Geräten und für die Glocke) ----------
+export interface NotifyPrefs {
+  new_items: boolean;
+  own_changes: boolean;
+  other_changes: boolean;
+  comments: boolean;
+  shares: boolean;
+}
+export const DEFAULT_PREFS: NotifyPrefs = { new_items: true, own_changes: true, other_changes: false, comments: true, shares: true };
+
+/** null = auf dem Server noch nicht eingerichtet (015_benachrichtigungen_alle.sql fehlt). */
+export async function loadNotifyPrefs(): Promise<NotifyPrefs | null> {
+  if (!supabase) return null;
+  const res = await supabase.from('notification_prefs').select('new_items, own_changes, other_changes, comments, shares').maybeSingle();
+  if (res.error) return null;
+  return { ...DEFAULT_PREFS, ...((res.data ?? {}) as Partial<NotifyPrefs>) };
+}
+
+export async function saveNotifyPrefs(p: NotifyPrefs): Promise<void> {
+  if (!supabase) return;
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) throw new Error('Nicht angemeldet.');
+  check(await supabase.from('notification_prefs').upsert({ user_id: data.user.id, ...p, updated_at: new Date().toISOString() }));
+}

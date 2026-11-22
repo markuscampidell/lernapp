@@ -44,7 +44,9 @@ Installierbar als App (PWA) auf Handy und PC, funktioniert offline. Alle Daten b
 - **Was hat sich geändert?** Speichert jemand eine geteilte Datei, sehen die anderen beim nächsten Öffnen einmal, wer was geändert hat
   (stark vereinfacht, z. B. „+120 Wörter, −1 Bild“) – auch in der Liste unter dem Namen. Haben es alle gesehen, wird es gelöscht.
 - **Benachrichtigungen** (Einstellungen → Auf diesem Gerät): Mitteilung aufs Handy/den PC, auch bei geschlossener App, wenn jemand
-  eine eigene Datei kommentiert oder auf einen Kommentar antwortet, einen Ordner mit einem teilt oder einem Ordner übergibt.
+  eine eigene Datei kommentiert oder auf einen Kommentar antwortet, einen Ordner mit einem teilt oder einem Ordner übergibt,
+  etwas Neues in einen geteilten Ordner legt oder eigene Einträge ändert. Was man bekommt, wählt jede Person selbst
+  (z. B. auch „Änderungen an anderen Dateien“, anfangs aus).
   Antippen öffnet die Datei bzw. den Ordner. Auf iPhone/iPad nur in der zum Home-Bildschirm hinzugefügten App (ab iOS 16.4).
 - **Einstellungen**: Speicherbelegung, Backup als ZIP exportieren/importieren, alles löschen.
 
@@ -83,7 +85,8 @@ Eigene Ordner bleiben auf dem Gerät. Nur geteilte Ordner und Konten liegen in [
    , `supabase/011_speicher.sql` (belegten Server-Speicher anzeigen und vor Uploads prüfen)
    , `supabase/012_benachrichtigungen.sql` (Push-Benachrichtigungen, siehe unten)
    , `supabase/013_sicherheit.sql` (Sicherheits-Update: Funktionen und Dateien besser geschützt)
-   und `supabase/014_mehr_benachrichtigungen.sql` (Benachrichtigung bei Neuem in eigenen Ordnern und Änderungen an eigenen Einträgen).
+   , `supabase/014_mehr_benachrichtigungen.sql` (Benachrichtigung bei Neuem in eigenen Ordnern und Änderungen an eigenen Einträgen)
+   und `supabase/015_benachrichtigungen_alle.sql` (Neues an alle Mitglieder, eigene Auswahl in den Einstellungen).
 4. Projekt-URL und *publishable/anon key* in `src/cloud/supabase.ts` eintragen.
 
 Ohne Eintrag in `src/cloud/supabase.ts` funktioniert die App wie bisher, nur ohne Teilen.

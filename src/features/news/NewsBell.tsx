@@ -17,7 +17,7 @@ const readSeen = (userId: string) => {
   }
 };
 
-const ICON: Record<string, IconName> = { comment: 'comment', share: 'users', handover: 'folder', new_item: 'plus', change: 'edit' };
+const ICON: Record<string, IconName> = { comment: 'comment', share: 'users', handover: 'folder', new_item: 'plus', change: 'edit', update: 'edit' };
 
 /** Kommentar-Neuigkeiten öffnen die Datei gleich mit offenen Kommentaren. */
 const target = (n: NewsItem) => (n.kind === 'comment' && /^#ordner\/[^/]+\/[^/]+$/.test(n.url) ? `${n.url}/kommentare` : n.url);

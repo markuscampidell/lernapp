@@ -5,7 +5,8 @@ import { Sheet } from '../../components/Sheet';
 import { Icon } from '../../components/Icon';
 
 // Pro Gerät einmal fragen, ob man Benachrichtigungen möchte (danach nur noch über die Einstellungen).
-const ASKED_KEY = 'lernapp-push-asked';
+// v2: mit „Neues in geteilten Ordnern“ fragen wir alle, die noch nicht eingeschaltet haben, noch einmal.
+const ASKED_KEY = 'lernapp-push-asked-v2';
 
 const asked = () => {
   try {
@@ -25,7 +26,7 @@ const markAsked = () => {
 /** Beim ersten Öffnen (angemeldet, Benachrichtigungen möglich, aber aus): einmal fragen. */
 export function NotificationPrompt() {
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<false | 'ask' | 'install'>(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -35,7 +36,9 @@ export function NotificationPrompt() {
     // Nur fragen, wenn Einschalten hier überhaupt geht (nicht blockiert, nicht iPhone-Browser ohne Installation usw.).
     pushState().then((s) => {
       if (!alive) return;
-      if (s === 'off') setOpen(true);
+      if (s === 'off') setOpen('ask');
+      // iPhone/iPad im Browser: Einschalten geht erst in der installierten App – einmal erklären, wie.
+      else if (s === 'ios-install') setOpen('install');
       else if (s === 'on' || s === 'denied') markAsked();
     });
     return () => {
@@ -64,6 +67,25 @@ export function NotificationPrompt() {
     }
   };
 
+  if (open === 'install')
+    return (
+      <Sheet
+        title="Benachrichtigungen"
+        onClose={close}
+        footer={
+          <button className="btn primary grow" onClick={close}>
+            Verstanden
+          </button>
+        }
+      >
+        <p>Damit du mitbekommst, wenn in euren Ordnern etwas Neues ist, kann dir die Lernapp Benachrichtigungen schicken.</p>
+        <p>
+          Auf iPhone und iPad geht das nur in der installierten App: unten auf <strong>Teilen</strong> tippen →{' '}
+          <strong>„Zum Home-Bildschirm“</strong>, dann die Lernapp von dort öffnen. Dort wirst du noch einmal gefragt.
+        </p>
+      </Sheet>
+    );
+
   return (
     <Sheet
       title="Benachrichtigungen"
@@ -83,11 +105,11 @@ export function NotificationPrompt() {
     >
       <p>Möchtest du auf diesem Gerät benachrichtigt werden, wenn</p>
       <ul>
-        <li>jemand deine Dateien kommentiert oder dir antwortet,</li>
-        <li>jemand einen Ordner mit dir teilt,</li>
-        <li>dir jemand Ordner übergibt?</li>
+        <li>jemand etwas Neues in einen eurer Ordner legt (z. B. eine Zusammenfassung oder Infos),</li>
+        <li>jemand deine Dateien ändert, kommentiert oder dir antwortet,</li>
+        <li>jemand einen Ordner mit dir teilt?</li>
       </ul>
-      <p className="muted small">Auch wenn die App geschlossen ist. Du kannst das jederzeit unter Einstellungen → Benachrichtigungen ändern.</p>
+      <p className="muted small">Auch wenn die App geschlossen ist. Worüber genau, kannst du jederzeit unter Einstellungen → Benachrichtigungen auswählen.</p>
       {err && <p className="notice critical">{err}</p>}
     </Sheet>
   );
