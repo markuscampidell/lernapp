@@ -28,7 +28,7 @@ import { joinDoc, newPage, splitDoc, type InkPage, type Stroke } from './pages/i
 import { reorderPages } from './pages/paginate';
 import { CONTENT_H, PAGE_W, typesText } from './pages/geometry';
 import { glossLabel, MAX_GLOSS } from './gloss';
-import { isBlankPageTarget, placeCaretNear } from './caret';
+import { extendSelectionNear, isBlankPageTarget, placeCaretNear } from './caret';
 
 /** Lage eines Spalten-Blocks, seiner Spalten und Zeilen (für die Knöpfe oben und links). */
 interface ColBox {
@@ -281,7 +281,7 @@ export function DocEditor({
       const ed = editor.current;
       const area = wrap.current?.closest('.paged');
       if (!area || !(e.target instanceof Node) || !area.contains(e.target)) return null;
-      return !!ed && ed.isContentEditable && e.button === 0 && !e.shiftKey && isBlankPageTarget(ed, e.target) ? ed : null;
+      return !!ed && e.button === 0 && !e.shiftKey && isBlankPageTarget(ed, e.target) ? ed : null;
     };
     const onPointer = (e: PointerEvent) => {
       kind = e.pointerType;
@@ -293,6 +293,19 @@ export function DocEditor({
       if (!ed) return;
       e.preventDefault();
       placeCaretNear(ed, e.clientX, e.clientY);
+      // Weiterziehen: Auswahl bis zur nächstgelegenen Textstelle – auch wenn auf leerer Fläche begonnen
+      // (der Browser selbst wählt dann nichts aus, weil wir sein mousedown oben verhindert haben)
+      const onMove = (m: MouseEvent) => {
+        if (!(m.buttons & 1)) return stop();
+        m.preventDefault();
+        extendSelectionNear(ed, m.clientX, m.clientY);
+      };
+      const stop = () => {
+        window.removeEventListener('mousemove', onMove, true);
+        window.removeEventListener('mouseup', stop, true);
+      };
+      window.addEventListener('mousemove', onMove, true);
+      window.addEventListener('mouseup', stop, true);
     };
     // Finger/Stift: erst beim Tippen (Klick) – Wischen zum Scrollen bleibt unberührt
     const onClick = (e: MouseEvent) => {

@@ -75,37 +75,45 @@ function caretFromPoint(x: number, y: number): { node: Node; offset: number } | 
   return null;
 }
 
-/** Cursor in die Zeile setzen, die (x, y) am nächsten ist, und den Editor fokussieren. */
-export function placeCaretNear(root: HTMLElement, x: number, y: number) {
-  const sel = window.getSelection();
-  if (!sel) return;
-  root.focus({ preventScroll: true });
-  const range = document.createRange();
+/** Textstelle, die (x, y) am nächsten ist (Zeile zuerst, dann Position in der Zeile). */
+function boundaryNear(root: HTMLElement, x: number, y: number): { node: Node; offset: number } {
   const hit = nearestLine(root, x, y);
   if (!hit) {
     // Leeres Dokument: an den Anfang
     const first = root.querySelector('p, h1, h2, h3, li, blockquote, div') ?? root;
-    range.setStart(first, 0);
-  } else {
-    const r = hit.rect;
-    const px = Math.min(Math.max(x, r.left + 1), r.right - 1);
-    const py = (r.top + r.bottom) / 2;
-    const pos = caretFromPoint(px, py);
-    if (pos && root.contains(pos.node) && !(pos.node instanceof Element && pos.node.closest(ATOMIC))) {
-      range.setStart(pos.node, pos.offset);
-    } else if (hit.node.nodeType === Node.TEXT_NODE) {
-      const after = y > r.bottom || x > r.right;
-      range.setStart(hit.node, after ? (hit.node.textContent?.length ?? 0) : 0);
-    } else if ((hit.node as Element).tagName === 'BR') {
-      range.setStartBefore(hit.node);
-    } else {
-      if (x > r.left + r.width / 2) range.setStartAfter(hit.node);
-      else range.setStartBefore(hit.node);
-    }
+    return { node: first, offset: 0 };
   }
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
+  const r = hit.rect;
+  const px = Math.min(Math.max(x, r.left + 1), r.right - 1);
+  const py = (r.top + r.bottom) / 2;
+  const pos = caretFromPoint(px, py);
+  if (pos && root.contains(pos.node) && !(pos.node instanceof Element && pos.node.closest(ATOMIC))) return pos;
+  const node = hit.node;
+  if (node.nodeType === Node.TEXT_NODE) {
+    const after = y > r.bottom || x > r.right;
+    return { node, offset: after ? (node.textContent?.length ?? 0) : 0 };
+  }
+  const parent = node.parentNode!;
+  const idx = Array.prototype.indexOf.call(parent.childNodes, node) as number;
+  if ((node as Element).tagName === 'BR') return { node: parent, offset: idx };
+  return { node: parent, offset: x > r.left + r.width / 2 ? idx + 1 : idx };
+}
+
+/** Cursor in die Zeile setzen, die (x, y) am nächsten ist, und den Editor fokussieren. */
+export function placeCaretNear(root: HTMLElement, x: number, y: number) {
+  const sel = window.getSelection();
+  if (!sel) return;
+  if (root.isContentEditable) root.focus({ preventScroll: true });
+  const { node, offset } = boundaryNear(root, x, y);
+  sel.collapse(node, offset);
+}
+
+/** Auswahl vom Anker bis zur Textstelle ziehen, die (x, y) am nächsten ist (Ziehen mit gedrückter Maus). */
+export function extendSelectionNear(root: HTMLElement, x: number, y: number) {
+  const sel = window.getSelection();
+  if (!sel || !sel.anchorNode || !root.contains(sel.anchorNode)) return;
+  const { node, offset } = boundaryNear(root, x, y);
+  sel.extend(node, offset);
 }
 
 /** Leere Stelle der Seite, auf der ein Klick den Cursor setzen soll (nicht Text, Knöpfe, Bilder usw.). */
