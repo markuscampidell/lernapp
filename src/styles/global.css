@@ -5010,3 +5010,11 @@ div.sticky-bar:has(> .view-header) {
   transition-delay: 0s !important;
   scroll-behavior: auto !important;
 }
+
+/* Mehrzeilige Textfelder: kürzerer Verlauf als bei Pop-ups (die Felder sind oft nur 2–3 Zeilen hoch) */
+textarea.more-down { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent); }
+textarea.more-up { -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(to top, #000 calc(100% - 22px), transparent); }
+textarea.more-up.more-down {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}

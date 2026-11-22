@@ -98,7 +98,8 @@ function quickTooltips() {
 
 /** Bereiche, die man seitlich (bzw. in Pop-ups nach unten) scrollen kann, zeigen am Rand einen Verlauf, solange es dort weitergeht. */
 const HSCROLL_ONLY = '.doc-toolbar, .math-display, .math-preview, .doc-content span.math, .doc-content .cols';
-const VSCROLL = '.sheet-body, .sheet-main';
+// Mehrzeilige Textfelder haben keine Scrollleiste (global.css) – der Verlauf zeigt, dass es weitergeht.
+const VSCROLL = '.sheet-body, .sheet-main, textarea:not(.text-line)';
 const HSCROLL = `${HSCROLL_ONLY}, ${VSCROLL}`;
 function scrollHints() {
   const update = (el: HTMLElement) => {
@@ -123,6 +124,15 @@ function scrollHints() {
       update(el);
     });
   };
+  // Tippen/Einfügen ändert die Textlänge, ohne dass sich die Größe des Felds ändert.
+  document.addEventListener(
+    'input',
+    (e) => {
+      const el = e.target;
+      if (el instanceof HTMLTextAreaElement && el.matches(VSCROLL)) update(el);
+    },
+    true,
+  );
   document.addEventListener(
     'scroll',
     (e) => {
