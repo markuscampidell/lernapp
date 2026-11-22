@@ -228,7 +228,14 @@ function FolderPage({
     const fi = sel.files.values().next();
     return fi.done ? null : scopeOfItem('files', fi.value);
   })();
-  const isBlocked = (kind: 'folders' | 'files', itemId: string) => !!selScope && scopeOfItem(kind, itemId) !== selScope;
+  // Was darf man mit einer Auswahl tun? (Verschieben: mit dem aktuellen Ordner als Probe-Ziel; das echte Ziel wird erst gewählt.)
+  const ids = (kind: 'folders' | 'files', itemId: string): [string[], string[]] => (kind === 'folders' ? [[itemId], []] : [[], [itemId]]);
+  const mayMove = (folderIds: string[], fileIds: string[]) => !moveProblem(folderIds, fileIds, folder?.id ?? null);
+  const mayDelete = (folderIds: string[], fileIds: string[]) => !deleteProblem(folderIds, fileIds);
+  // Auswählbar ist nur, womit man etwas tun darf (z. B. nicht „Geteilt mit dir“ auf der Übersicht – die kann man nur verlassen).
+  const selectable = (kind: 'folders' | 'files', itemId: string) => mayMove(...ids(kind, itemId)) || mayDelete(...ids(kind, itemId));
+  const isBlocked = (kind: 'folders' | 'files', itemId: string) =>
+    (!!selScope && scopeOfItem(kind, itemId) !== selScope) || !selectable(kind, itemId);
 
   const toggle = (kind: 'folders' | 'files', itemId: string) =>
     setSel((prev) => {
@@ -245,7 +252,7 @@ function FolderPage({
     blocked: isBlocked(kind, itemId),
     flash: kind === 'files' && flashId === itemId,
     onClick: sel ? () => toggle(kind, itemId) : open,
-    onLongPress: () => toggle(kind, itemId),
+    onLongPress: selectable(kind, itemId) ? () => toggle(kind, itemId) : undefined,
     onPeople: buttons.people && cloudEnabled && !isOrphan(kind === 'folders' ? itemId : files.find((f) => f.id === itemId)?.folderId ?? '')
       ? () => setPeopleFor(kind === 'folders' ? { folder: folders.find((f) => f.id === itemId) } : { file: files.find((f) => f.id === itemId) })
       : undefined,
@@ -349,6 +356,8 @@ function FolderPage({
     <section className="view" style={{ '--sticky-top': `${topH}px`, '--titles-top': `${topH + secondH}px` } as React.CSSProperties}>
       {sel && (
         <SelectionBar
+          canMove={mayMove([...sel.folders], [...sel.files])}
+          canDelete={mayDelete([...sel.folders], [...sel.files])}
           count={sel.folders.size + sel.files.size}
           onDelete={async () => {
             if (await confirmAndDelete([...sel.folders], [...sel.files])) setSel(null);
@@ -801,11 +810,16 @@ function AddFilesSheet({
 
 function SelectionBar({
   count,
+  canMove,
+  canDelete,
   onDelete,
   onMove,
   onClose,
 }: {
   count: number;
+  /** Knöpfe nur, wenn für die ganze Auswahl erlaubt. */
+  canMove: boolean;
+  canDelete: boolean;
   onDelete: () => void;
   onMove: () => void;
   onClose: () => void;
@@ -818,12 +832,17 @@ function SelectionBar({
         <Icon name="close" />
       </button>
       <strong className="grow">{count} ausgewählt</strong>
-      <button className="icon-btn" aria-label="Verschieben" title="Verschieben" onClick={onMove}>
-        <Icon name="move" />
-      </button>
-      <button className="icon-btn danger-icon" aria-label="Löschen" title="Löschen" onClick={onDelete}>
-        <Icon name="trash" />
-      </button>
+      {canMove && (
+        <button className="icon-btn" aria-label="Verschieben" title="Verschieben" onClick={onMove}>
+          <Icon name="move" />
+        </button>
+      )}
+      {canDelete && (
+        <button className="icon-btn danger-icon" aria-label="Löschen" title="Löschen" onClick={onDelete}>
+          <Icon name="trash" />
+        </button>
+      )}
+      {!canMove && !canDelete && <span className="muted small">Zusammen nicht möglich</span>}
     </div>
   );
 }
