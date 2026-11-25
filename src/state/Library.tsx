@@ -74,6 +74,10 @@ interface LibraryValue {
   accessOf: (item: Item) => Access;
   /** Vererbter Wert, falls der Eintrag selbst nichts eingestellt hat. */
   inheritedAccessOf: (item: Item) => Access;
+  /** Stammt der Ordner direkt darüber von derselben Person (dann gilt „wie der Ordner“)? */
+  inheritsFromFolder: (item: Item) => boolean;
+  /** Dürfen andere Mitglieder den Eintrag löschen? */
+  othersMayDelete: (item: Item) => boolean;
   /** Darf ich die Rechte des Eintrags einstellen (Ersteller oder Besitzer)? */
   canSetAccess: (item: Item) => boolean;
   setAccess: (item: Item, access: Access | null) => Promise<void>;
@@ -447,21 +451,46 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     },
     [byId],
   );
+  /** Dateien kennen nur „Nur lesen“ und „Lesen und bearbeiten“ – „löschen“ (vom Ordner) zählt bei ihnen als „bearbeiten“. */
   const inheritedAccessOf = useCallback(
     (item: Item): Access => {
-      if ('folderId' in item) return inheritFrom(item.folderId, item.createdBy);
+      if ('folderId' in item) {
+        const a = inheritFrom(item.folderId, item.createdBy);
+        return a === 'delete' ? 'edit' : a;
+      }
       return inheritFrom(item.parentId, item.createdBy);
     },
     [inheritFrom],
   );
-  const accessOf = useCallback((item: Item): Access => item.access ?? inheritedAccessOf(item), [inheritedAccessOf]);
+  /** Stammt der Ordner direkt darüber von derselben Person? Nur dann gilt ohne Einstellung wirklich „wie der Ordner“. */
+  const inheritsFromFolder = useCallback(
+    (item: Item): boolean => {
+      const id = 'folderId' in item ? item.folderId : item.parentId;
+      const f = id ? byId.get(id) : undefined;
+      return !!f?.shareId && f.createdBy === item.createdBy;
+    },
+    [byId],
+  );
+  const accessOf = useCallback(
+    (item: Item): Access => {
+      const a = item.access ?? inheritedAccessOf(item);
+      return 'folderId' in item && a === 'delete' ? 'edit' : a;
+    },
+    [inheritedAccessOf],
+  );
+  /** Dürfen andere Mitglieder den Eintrag löschen? Bei Dateien entscheidet der Ordner (außer die Datei steht auf „Nur lesen“). */
+  const othersMayDelete = useCallback(
+    (item: Item): boolean =>
+      'folderId' in item ? item.access !== 'read' && inheritFrom(item.folderId, item.createdBy) === 'delete' : accessOf(item) === 'delete',
+    [inheritFrom, accessOf],
+  );
   const mine = useCallback((item: Item) => !item.shareId || isOwner(item.shareId) || (!!me && item.createdBy === me), [isOwner, me]);
   // Den obersten Ordner eines geteilten Ordners (Name, Bild) ändert nur der Besitzer – die Rechte gelten nur für den Inhalt.
   const canModify = useCallback(
     (item: Item) => mine(item) || (accessOf(item) !== 'read' && !('parentId' in item && isRoot(item))),
     [mine, accessOf, isRoot],
   );
-  const canDeleteItem = useCallback((item: Item) => mine(item) || (accessOf(item) === 'delete' && !('parentId' in item && isRoot(item))), [mine, accessOf, isRoot]);
+  const canDeleteItem = useCallback((item: Item) => mine(item) || (othersMayDelete(item) && !('parentId' in item && isRoot(item))), [mine, othersMayDelete, isRoot]);
   const canEditFolder = canModify;
   const canSetAccess = useCallback((item: Item) => !!item.shareId && !!me && (isOwner(item.shareId) || item.createdBy === me), [isOwner, me]);
   const canAddIn = useCallback(
@@ -1286,6 +1315,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       canDeleteItem,
       accessOf,
       inheritedAccessOf,
+      inheritsFromFolder,
+      othersMayDelete,
       canSetAccess,
       setAccess,
       canAddIn,
@@ -1318,7 +1349,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready, error, folders, files, createFolder, updateFolder, deleteFolder, addFiles, updateFile, deleteFile, replaceFileContent, deleteMany, moveMany, reload,
-      user, online, snap, userName, avatarOf, commentInfo, markCommentsRead, changesFor, markChangesSeen, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
+      user, online, snap, userName, avatarOf, commentInfo, markCommentsRead, changesFor, markChangesSeen, shareOf, isRoot, isOwner, isOrphan, canModify, canEditFolder, canDeleteItem, accessOf, inheritedAccessOf, inheritsFromFolder, othersMayDelete, canSetAccess, setAccess, canAddIn, deleteProblem, moveProblem,
       shareProblem, unread, seenAt, isNewSince, markSeen, shareFolder, shareFileProblem, shareFile, stopSharing, addMembers, removeMember, leaveShare, refreshRemote, parentShareOf, peopleOf,
       handovers, rawSnap, handoverStats, claimHandover, declineHandover, ownedRoots, deleteAccount, sync, retrySync,
     ],

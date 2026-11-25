@@ -96,8 +96,8 @@ function ByChip({ id }: { id: string | null | undefined }) {
 
 /** Zeigt, wenn andere mehr als nur lesen dürfen. */
 function AccessChip({ item }: { item: Folder | FileItem }) {
-  const { accessOf } = useLibrary();
-  const a = accessOf(item);
+  const { accessOf, othersMayDelete } = useLibrary();
+  const a = othersMayDelete(item) ? 'delete' : accessOf(item);
   if (a === 'read') return null;
   return (
     <span className="chip access-chip" title={a === 'delete' ? 'Alle dürfen bearbeiten und löschen' : 'Alle dürfen bearbeiten'}>

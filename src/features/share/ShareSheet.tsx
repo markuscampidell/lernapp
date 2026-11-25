@@ -9,7 +9,7 @@ import { Icon } from '../../components/Icon';
 import { Avatar } from '../../components/Avatar';
 import { AccountCard } from '../account/AccountCard';
 import { UserPicker } from './UserPicker';
-import { AccessPicker, MEMBERS_MAY } from './AccessPicker';
+import { AccessNote, AccessPicker, MEMBERS_MAY } from './AccessPicker';
 
 /**
  * „Personen“ eines Ordners oder einer Datei – überall gleich aufgebaut:
@@ -219,12 +219,15 @@ export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder;
   }
 
   const nobody = fromAbove.length === 0 && onlyHere.length === 0;
-  const showAccess = !nobody && !!(file ?? folder).shareId && lib.canSetAccess(file ?? folder);
+  const shared = !nobody && !!(file ?? folder).shareId;
+  const showAccess = shared && lib.canSetAccess(file ?? folder);
+  // Wer die Rechte nicht einstellen darf, sieht nur, was er selbst darf.
+  const showNote = shared && !showAccess;
   return (
     <Sheet
       title={`„${name}“ – Personen`}
       onClose={() => !busy && onClose()}
-      pinned={showAccess ? <AccessPicker item={file ?? folder} /> : undefined}
+      pinned={showAccess ? <AccessPicker item={file ?? folder} /> : showNote ? <AccessNote item={file ?? folder} /> : undefined}
       footer={
         (amOwner && !busy) || footer ? (
           <div className="footer-stack">
