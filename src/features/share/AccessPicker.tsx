@@ -72,14 +72,7 @@ export function AccessPicker({ item }: { item: Folder | FileItem }) {
           </button>
         ))}
       </div>
-      {!top && !fromFolder && (
-        <p className="muted small">
-          {isFolder ? 'Dieser Ordner' : 'Diese Datei'} stammt nicht von der Person, die den Ordner darüber erstellt hat – die Einstellung des
-          Ordners gilt hier deshalb nicht. Standard ist „Nur lesen“.
-        </p>
-      )}
-      {!isFolder && <p className="muted small">Ob andere die Datei löschen dürfen, wird beim Ordner eingestellt.</p>}
-      <p className="muted small">{MEMBERS_MAY}</p>
+      {isFolder && <p className="muted small">{MEMBERS_MAY}</p>}
       {err && <p className="notice critical">{err}</p>}
     </section>
   );

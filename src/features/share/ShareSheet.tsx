@@ -288,7 +288,7 @@ export function ShareSheet({ folder: target, file, onClose }: { folder?: Folder;
 
       {amOwner && addProblem && <p className="muted small">{addProblem}</p>}
       {/* Ohne Rechte-Auswahl (die zeigt den Satz selbst): kurz sagen, was Mitglieder immer dürfen. */}
-      {!nobody && !showAccess && <p className="muted small">{MEMBERS_MAY}</p>}
+      {!nobody && !showAccess && !file && <p className="muted small">{MEMBERS_MAY}</p>}
       {!lib.online && <p className="notice warning">Offline – Änderungen sind gerade nicht möglich.</p>}
       {err && <p className="notice critical">{err}</p>}
     </Sheet>
