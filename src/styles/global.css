@@ -5084,9 +5084,11 @@ textarea.more-up.more-down {
 .bell-trail-btn:active {
   transform: scale(0.96);
 }
-/* Beim Bearbeiten und solange ein Fenster offen ist (Details, Personen …) stört sie nur */
+/* Beim Bearbeiten und solange ein Fenster (Details, Personen …) oder die Kommentare offen sind, stört sie nur
+   (sie läge über Kommentartext bzw. dem Eingabefeld) */
 body[data-editing] .bell-trail,
-body:has(.sheet-backdrop) .bell-trail {
+body:has(.sheet-backdrop) .bell-trail,
+body:has(.comment-panel) .bell-trail {
   display: none;
 }
 /* Über Leisten unten in Dateien (Quiz, Zoom) hinweg */
