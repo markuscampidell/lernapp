@@ -604,7 +604,7 @@ export interface NewsItem {
   url: string;
   createdAt: string;
 }
-/** Eigene Benachrichtigungen der letzten 30 Tage (dieselben wie die Push-Nachrichten), neueste zuerst. */
+/** Eigene Benachrichtigungen der letzten 30 Tage (höchstens 100, siehe supabase/017) (dieselben wie die Push-Nachrichten), neueste zuerst. */
 export async function fetchNews(): Promise<NewsItem[]> {
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const res = await sb()
@@ -613,7 +613,7 @@ export async function fetchNews(): Promise<NewsItem[]> {
     .neq('kind', 'test')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
-    .limit(60);
+    .limit(100);
   if (res.error) throw new Error(res.error.message);
   return ((res.data ?? []) as Row[]).map((r) => ({
     id: String(r.id),
