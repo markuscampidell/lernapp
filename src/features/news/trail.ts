@@ -24,6 +24,8 @@ const folderOf = (url: string) => decodeURIComponent(url.replace(/^#/, '').split
 const KEY = 'lernapp-glocke-weg';
 const EVENT = 'lernapp:glocke-weg';
 const OPEN = 'lernapp:glocke-oeffnen';
+/** Ziel der zuletzt angetippten Neuigkeit – der Ordner hebt das Erwähnte dann kurz orange hervor. */
+let arrival: string | null = null;
 
 function read(): Trail | null {
   try {
@@ -42,7 +44,10 @@ function write(t: Trail | null) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-export const startTrail = (url: string, rest: TrailStop[], since: number) => write({ folder: folderOf(url), rest, since });
+export function startTrail(url: string, rest: TrailStop[], since: number) {
+  arrival = url;
+  write({ folder: folderOf(url), rest, since });
+}
 export const trailSince = () => read()?.since;
 export const trailFolder = () => read()?.folder ?? null;
 export const endTrail = () => read() && write(null);
@@ -58,6 +63,7 @@ export function takeNext(): string | null {
   const [next, ...rest] = remaining();
   const t = read();
   if (!next || !t) return null;
+  arrival = next.url;
   write({ ...t, folder: folderOf(next.url), rest });
   return next.url;
 }
@@ -72,4 +78,15 @@ export function onOpenBell(fn: () => void) {
 export function onTrailChange(fn: () => void) {
   window.addEventListener(EVENT, fn);
   return () => window.removeEventListener(EVENT, fn);
+}
+
+/**
+ * Kam man gerade über die Glocke in diesen Ordner? Gibt dann die erwähnte Datei zurück (fileId, bei Neuigkeiten zu
+ * einer Datei) bzw. {} (bei Neuigkeiten zum Ordner selbst) – nur einmal.
+ */
+export function consumeArrival(folderId: string): { fileId?: string } | null {
+  if (!arrival || folderOf(arrival) !== folderId) return null;
+  const file = arrival.replace(/^#/, '').split('/')[2];
+  arrival = null;
+  return file ? { fileId: decodeURIComponent(file) } : {};
 }

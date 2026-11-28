@@ -28,8 +28,8 @@ export interface ItemCardProps {
   path?: string;
   /** Seit dem letzten Öffnen des Ordners von jemand anderem hinzugefügt/geändert. */
   isNew?: boolean;
-  /** Gerade geschlossen: kurz umrahmen. */
-  flash?: boolean;
+  /** Kurz umrahmen: blau gerade geschlossen, orange von einer Neuigkeit erwähnt. */
+  flash?: 'info' | 'bell';
 }
 
 function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, selecting, selected, blocked, flash, thumb, children, label, chevron }: ItemCardProps & { thumb: ReactNode; children: ReactNode; label: string; chevron?: boolean }) {
@@ -45,7 +45,7 @@ function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, sele
     onClick?.();
   };
   return (
-    <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}${selecting && blocked ? ' blocked' : ''}${flash ? ' flash' : ''}`}>
+    <div className={`card item-card${selecting ? ' selecting' : ''}${selected ? ' selected' : ''}${selecting && blocked ? ' blocked' : ''}${flash ? ` flash${flash === 'bell' ? ' flash-bell' : ''}` : ''}`}>
       <button className="item-main" onClick={click} onMouseDown={keepSearch} {...press} disabled={selecting && blocked} aria-pressed={selecting ? !!selected : undefined}>
         {thumb}
         <div className="card-main">{children}</div>

@@ -37,6 +37,7 @@ import type { IconName } from '../../components/Icon';
 import { cloudEnabled } from '../../cloud/supabase';
 import { NewsBell } from '../news/NewsBell';
 import { fileVisitPath, markVisited } from '../news/visits';
+import { consumeArrival } from '../news/trail';
 
 const norm = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -88,19 +89,23 @@ function FolderPage({
   const [query, setQuery] = useState('');
   // Auswahlmodus (nur Touch: durch langes Drücken). null = aus.
   const [sel, setSel] = useState<Selection | null>(null);
-  // Zuletzt geschlossene Datei kurz umrahmen (5 s sichtbar, 1 s ausblenden), damit man sieht, wo man war.
-  const [flashId, setFlashId] = useState<string | null>(null);
+  // Kurz umrahmen (3 s sichtbar, 1 s ausblenden): blau die zuletzt geschlossene Datei, damit man sieht, wo man war;
+  // orange, was eine Neuigkeit aus der Glocke erwähnt.
+  const [flash, setFlash] = useState<{ ids: ReadonlySet<string>; tone: 'info' | 'bell' } | null>(null);
   const flashTimer = useRef(0);
-  const flashCard = (fileId: string) => {
+  const flashCards = (ids: string[], tone: 'info' | 'bell' = 'info') => {
     window.clearTimeout(flashTimer.current);
-    setFlashId(null);
+    setFlash(null);
+    if (!ids.length) return;
     window.setTimeout(() => {
       // Kein Fokus-Rahmen des Browsers zusätzlich (der ginge nur um einen Teil der Karte, durch die Knöpfe).
       (document.activeElement as HTMLElement | null)?.blur?.();
-      setFlashId(fileId);
-      flashTimer.current = window.setTimeout(() => setFlashId(null), 6000);
+      setFlash({ ids: new Set(ids), tone });
+      flashTimer.current = window.setTimeout(() => setFlash(null), 4000);
     }, 30);
   };
+  // Datei, die über die Glocke geöffnet wurde: beim Schließen orange statt blau.
+  const bellFile = useRef<string | null>(null);
   useEffect(() => () => window.clearTimeout(flashTimer.current), []);
   // Welche Knöpfe an den Karten stehen (Einstellungen, pro Gerät).
   const buttons = useCardButtons();
@@ -162,6 +167,15 @@ function FolderPage({
   useEffect(() => {
     if (remoteId) markSeen(remoteId);
   }, [remoteId, hasNewDirect, markSeen]);
+  // Über die Glocke hergekommen: bei einer Datei diese merken (orange beim Schließen),
+  // bei „Neu in …“ die neuen Einträge hier kurz orange umrahmen.
+  useEffect(() => {
+    if (!folder) return;
+    const a = consumeArrival(folder.id);
+    if (!a) return;
+    if (a.fileId) bellFile.current = a.fileId;
+    else flashCards([...subfolders, ...ownFiles].filter((x) => isNewSince(x, since)).map((x) => x.id), 'bell');
+  }, [folder?.id, openFileId]); // eslint-disable-line react-hooks/exhaustive-deps
   // Ordner geöffnet: passende Neuigkeiten in der Glocke („Neu in …“, neu geteilt) gelten als gelesen.
   useEffect(() => {
     if (folder?.shareId) markVisited(folderHash(folder.id));
@@ -262,7 +276,7 @@ function FolderPage({
     selecting: !!sel,
     selected: !!sel?.[kind].has(itemId),
     blocked: isBlocked(kind, itemId),
-    flash: kind === 'files' && flashId === itemId,
+    flash: flash?.ids.has(itemId) ? flash.tone : undefined,
     onClick: sel ? () => toggle(kind, itemId) : open,
     onLongPress: selectable(kind, itemId) ? () => toggle(kind, itemId) : undefined,
     onPeople: buttons.people && cloudEnabled && !isOrphan(kind === 'folders' ? itemId : files.find((f) => f.id === itemId)?.folderId ?? '')
@@ -739,7 +753,8 @@ function FolderPage({
             const closedId = viewing.id;
             setViewing(null);
             setCommentsFor(null);
-            flashCard(closedId);
+            flashCards([closedId], bellFile.current === closedId ? 'bell' : 'info');
+            bellFile.current = null;
           }}
         />
       )}

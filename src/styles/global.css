@@ -4936,13 +4936,18 @@ div.sticky-bar:has(> .view-header) {
 }
 
 /* ---------- Gerade geschlossene Datei: Rahmen um die ganze Karte, 5 s sichtbar, dann 1 s ausblenden ---------- */
+/* 3 s sichtbar, 1 s ausblenden. Blau: zuletzt geschlossen. Orange: von einer Neuigkeit (Glocke) erwähnt. */
 .item-card.flash {
-  animation: card-flash 6s linear forwards;
+  --flash: var(--info);
+  animation: card-flash 4s linear forwards;
+}
+.item-card.flash-bell {
+  --flash: #f08a24;
 }
 @keyframes card-flash {
   0%,
-  83.3% {
-    outline: 2px solid var(--info);
+  75% {
+    outline: 2px solid var(--flash);
     outline-offset: 2px;
   }
   100% {
