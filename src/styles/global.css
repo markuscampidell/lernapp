@@ -4944,6 +4944,15 @@ div.sticky-bar:has(> .view-header) {
 .item-card.flash-bell {
   --flash: #f08a24;
 }
+/* Kommentar aus einer Neuigkeit: kurz orange umrahmt (die Liste hat dafür etwas Rand, damit nichts abgeschnitten wird) */
+.comment.flash-bell {
+  --flash: #f08a24;
+  border-radius: 10px;
+  animation: card-flash 4s linear forwards;
+}
+.comments-list {
+  padding: 4px;
+}
 @keyframes card-flash {
   0%,
   75% {

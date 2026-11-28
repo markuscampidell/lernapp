@@ -37,7 +37,7 @@ import type { IconName } from '../../components/Icon';
 import { cloudEnabled } from '../../cloud/supabase';
 import { NewsBell } from '../news/NewsBell';
 import { fileVisitPath, markVisited } from '../news/visits';
-import { consumeArrival, onTrailChange } from '../news/trail';
+import { consumeArrival, endTrail, onTrailChange } from '../news/trail';
 
 const norm = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -768,8 +768,11 @@ function FolderPage({
             const closedId = viewing.id;
             setViewing(null);
             setCommentsFor(null);
-            flashCards([closedId], bellFile.current === closedId ? 'bell' : 'info');
+            const fromBell = bellFile.current === closedId;
+            flashCards([closedId], fromBell ? 'bell' : 'info');
             bellFile.current = null;
+            // Die Glocke hat genau diese Datei geöffnet: mit dem Schließen ist man dort fertig – „Neuigkeiten“ unten weg.
+            if (fromBell) endTrail();
           }}
         />
       )}

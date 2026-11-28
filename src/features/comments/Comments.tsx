@@ -8,6 +8,7 @@ import { addComment, deleteComment, fetchComments, type Comment } from '../../cl
 import { useBackToClose } from '../../lib/router';
 import { cloudEnabled } from '../../cloud/supabase';
 import { fileVisitPath, markVisited } from '../news/visits';
+import { clearPendingComment, onTrailChange, pendingCommentAt } from '../news/trail';
 
 const MAX = 4000;
 
@@ -70,6 +71,26 @@ export function Comments({ file, onClose }: { file: FileItem; onClose: () => voi
     };
   }, [file.id, load]);
 
+  // Über eine Kommentar-Neuigkeit hergekommen: den gemeinten Kommentar (von jemand anderem, zur Zeit der Neuigkeit)
+  // kurz orange umrahmen und hinscrollen.
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const [trailTick, setTrailTick] = useState(0);
+  useEffect(() => onTrailChange(() => setTrailTick((t) => t + 1)), []);
+  useEffect(() => {
+    const at = list && pendingCommentAt(file.id);
+    if (!at || !list) return;
+    clearPendingComment();
+    const t = Date.parse(at);
+    const best = list
+      .filter((c) => c.userId !== me?.id && Math.abs(Date.parse(c.createdAt) - t) < 60_000)
+      .sort((a, b) => Math.abs(Date.parse(a.createdAt) - t) - Math.abs(Date.parse(b.createdAt) - t))[0];
+    if (!best) return;
+    setFlashId(best.id);
+    setTimeout(() => document.getElementById(`comment-${best.id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+    const timer = setTimeout(() => setFlashId(null), 4000);
+    return () => clearTimeout(timer);
+  }, [list, file.id, me?.id, trailTick]);
+
   const threads = useMemo(() => {
     const all = list ?? [];
     const top = all.filter((c) => !c.parentId || !all.some((p) => p.id === c.parentId));
@@ -106,7 +127,7 @@ export function Comments({ file, onClose }: { file: FileItem; onClose: () => voi
   };
 
   const item = (c: Comment, reply = false) => (
-    <div key={c.id} className={`comment${reply ? ' reply' : ''}`}>
+    <div key={c.id} id={`comment-${c.id}`} className={`comment${reply ? ' reply' : ''}${flashId === c.id ? ' flash-bell' : ''}`}>
       <Avatar id={c.userId} expand />
       <div className="comment-main">
         <div className="comment-head">

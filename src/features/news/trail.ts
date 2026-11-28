@@ -26,6 +26,13 @@ const EVENT = 'lernapp:glocke-weg';
 const OPEN = 'lernapp:glocke-oeffnen';
 /** Ziel der zuletzt angetippten Neuigkeit – der Ordner hebt das Erwähnte dann kurz orange hervor. */
 let arrival: TrailStop | null = null;
+/** Kommentar-Neuigkeit: Datei und Zeitpunkt – die Kommentar-Leiste umrahmt den gemeinten Kommentar kurz orange. */
+let pendingComment: { fileId: string; createdAt: string } | null = null;
+function arrive(stop: TrailStop) {
+  arrival = stop;
+  const [, , file, extra] = stop.url.replace(/^#/, '').split('/');
+  pendingComment = file && extra === 'kommentare' ? { fileId: decodeURIComponent(file), createdAt: stop.createdAt } : null;
+}
 
 function read(): Trail | null {
   try {
@@ -45,7 +52,7 @@ function write(t: Trail | null) {
 }
 
 export function startTrail(stop: TrailStop, rest: TrailStop[], since: number) {
-  arrival = stop;
+  arrive(stop);
   write({ folder: folderOf(stop.url), rest, since });
 }
 export const trailSince = () => read()?.since;
@@ -63,7 +70,7 @@ export function takeNext(): string | null {
   const [next, ...rest] = remaining();
   const t = read();
   if (!next || !t) return null;
-  arrival = next;
+  arrive(next);
   write({ ...t, folder: folderOf(next.url), rest });
   return next.url;
 }
@@ -92,3 +99,9 @@ export function consumeArrival(folderId: string): { fileId?: string; createdAt: 
   arrival = null;
   return file ? { fileId: decodeURIComponent(file), createdAt } : { createdAt };
 }
+
+/** Zeitpunkt der Kommentar-Neuigkeit zu dieser Datei (falls man gerade über die Glocke hier ist). */
+export const pendingCommentAt = (fileId: string) => (pendingComment?.fileId === fileId ? pendingComment.createdAt : null);
+export const clearPendingComment = () => {
+  pendingComment = null;
+};
