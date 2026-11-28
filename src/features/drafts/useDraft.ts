@@ -8,6 +8,18 @@ export const baseOf = (file: FileItem) => (isRemoteBlob(file.blobId) ? remotePat
 
 const EVERY = 3000;
 
+/** Wie viele Editoren gerade offen sind – solange einer offen ist, trägt <body> data-editing (z. B. blendet das „Neuigkeiten“ unten aus). */
+let openEditors = 0;
+function useEditingFlag() {
+  useEffect(() => {
+    openEditors++;
+    document.body.dataset.editing = '';
+    return () => {
+      if (--openEditors === 0) delete document.body.dataset.editing;
+    };
+  }, []);
+}
+
 /**
  * Hält ungespeicherte Änderungen eines Editors als Entwurf auf diesem Gerät fest (alle paar Sekunden, beim Wegwechseln
  * und vor dem Neuladen). Zurück kommen: `saved()` nach erfolgreichem Speichern, `discard()` beim Verwerfen – beides löscht
@@ -24,6 +36,7 @@ export function useDraft(opts: {
   dirty: boolean;
   snapshot: () => { name: string; description: string; data: unknown };
 }) {
+  useEditingFlag();
   const key = opts.restore?.key ?? draftKey(opts.file?.id, opts.folderId, opts.kind);
   const base = useRef(opts.restore ? opts.restore.base ?? null : opts.file ? baseOf(opts.file) : null);
   const last = useRef<string | null>(opts.restore ? JSON.stringify({ name: opts.restore.name, description: opts.restore.description, data: opts.restore.data }) : null);

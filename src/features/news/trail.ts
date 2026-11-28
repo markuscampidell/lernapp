@@ -10,9 +10,14 @@ export interface TrailStop {
   createdAt: string;
 }
 interface Trail {
+  /** Ordner, in den die aktuelle Neuigkeit geführt hat – geht man woandershin, endet der Weg. */
+  folder: string;
   /** Die noch nicht besuchten ungelesenen Neuigkeiten nach der aktuellen, in der Reihenfolge der Glocke. */
   rest: TrailStop[];
 }
+
+/** #ordner/<ordner>[/<datei>[/kommentare]] → <ordner> */
+const folderOf = (url: string) => decodeURIComponent(url.replace(/^#/, '').split('/')[1] ?? '');
 
 const KEY = 'lernapp-glocke-weg';
 const EVENT = 'lernapp:glocke-weg';
@@ -35,7 +40,8 @@ function write(t: Trail | null) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-export const startTrail = (rest: TrailStop[]) => write({ rest });
+export const startTrail = (url: string, rest: TrailStop[]) => write({ folder: folderOf(url), rest });
+export const trailFolder = () => read()?.folder ?? null;
 export const endTrail = () => read() && write(null);
 export const hasTrail = () => !!read();
 
@@ -48,7 +54,7 @@ export function remaining(): TrailStop[] {
 export function takeNext(): string | null {
   const [next, ...rest] = remaining();
   if (!next) return null;
-  write({ rest });
+  write({ folder: folderOf(next.url), rest });
   return next.url;
 }
 

@@ -107,7 +107,7 @@ export function NewsBell() {
       .map((x) => ({ url: target(x), createdAt: x.createdAt }));
     setOpen(false);
     afterBack(() => {
-      startTrail(rest);
+      startTrail(target(n), rest);
       navigate(target(n));
     });
   };

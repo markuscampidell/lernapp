@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../../components/Icon';
 import { navigate, useRoute } from '../../lib/router';
-import { endTrail, hasTrail, onTrailChange, remaining, requestBellOpen, takeNext } from './trail';
+import { endTrail, hasTrail, onTrailChange, remaining, requestBellOpen, takeNext, trailFolder } from './trail';
 import { onVisited } from './visits';
 
 /**
@@ -21,11 +21,11 @@ export function BellTrail() {
     };
   }, []);
 
-  // Wieder in der Übersicht (oder in einem anderen Bereich): der Weg ist zu Ende.
-  const away = route.tab !== 'ordner' || !route.folderId;
+  // Woandershin gegangen (Übersicht, anderer Ordner/Unterordner, anderer Bereich): der Weg ist zu Ende.
+  const away = route.tab !== 'ordner' || !route.folderId || route.folderId !== trailFolder();
   useEffect(() => {
     if (away) endTrail();
-  }, [away]);
+  }, [route.tab, route.folderId]); // eslint-disable-line react-hooks/exhaustive-deps
   if (away || !hasTrail()) return null;
 
   const more = remaining().length;
