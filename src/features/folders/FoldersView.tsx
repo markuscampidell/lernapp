@@ -174,7 +174,16 @@ function FolderPage({
     const a = consumeArrival(folder.id);
     if (!a) return;
     if (a.fileId) bellFile.current = a.fileId;
-    else flashCards([...subfolders, ...ownFiles].filter((x) => isNewSince(x, since)).map((x) => x.id), 'bell');
+    else {
+      // „Neu in …“ sagt nur den Ordner. Gemeint ist, was andere ab da hinzugefügt haben – weitere Einträge innerhalb
+      // von 15 Minuten lösen keine eigene Neuigkeit aus (siehe supabase/014). Klappt auch, wenn schon gelesen.
+      const t = Date.parse(a.createdAt);
+      const meant = (x: Folder | FileItem) => {
+        const c = Date.parse(x.createdAt);
+        return x.createdBy !== lib.me?.id && c >= t - 60_000 && c <= t + 15 * 60_000;
+      };
+      flashCards([...subfolders, ...ownFiles].filter(meant).map((x) => x.id), 'bell');
+    }
   }, [folder?.id, openFileId]); // eslint-disable-line react-hooks/exhaustive-deps
   // Ordner geöffnet: passende Neuigkeiten in der Glocke („Neu in …“, neu geteilt) gelten als gelesen.
   useEffect(() => {

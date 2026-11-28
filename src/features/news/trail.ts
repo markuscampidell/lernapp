@@ -25,7 +25,7 @@ const KEY = 'lernapp-glocke-weg';
 const EVENT = 'lernapp:glocke-weg';
 const OPEN = 'lernapp:glocke-oeffnen';
 /** Ziel der zuletzt angetippten Neuigkeit – der Ordner hebt das Erwähnte dann kurz orange hervor. */
-let arrival: string | null = null;
+let arrival: TrailStop | null = null;
 
 function read(): Trail | null {
   try {
@@ -44,9 +44,9 @@ function write(t: Trail | null) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-export function startTrail(url: string, rest: TrailStop[], since: number) {
-  arrival = url;
-  write({ folder: folderOf(url), rest, since });
+export function startTrail(stop: TrailStop, rest: TrailStop[], since: number) {
+  arrival = stop;
+  write({ folder: folderOf(stop.url), rest, since });
 }
 export const trailSince = () => read()?.since;
 export const trailFolder = () => read()?.folder ?? null;
@@ -63,7 +63,7 @@ export function takeNext(): string | null {
   const [next, ...rest] = remaining();
   const t = read();
   if (!next || !t) return null;
-  arrival = next.url;
+  arrival = next;
   write({ ...t, folder: folderOf(next.url), rest });
   return next.url;
 }
@@ -81,12 +81,14 @@ export function onTrailChange(fn: () => void) {
 }
 
 /**
- * Kam man gerade über die Glocke in diesen Ordner? Gibt dann die erwähnte Datei zurück (fileId, bei Neuigkeiten zu
- * einer Datei) bzw. {} (bei Neuigkeiten zum Ordner selbst) – nur einmal.
+ * Kam man gerade über die Glocke in diesen Ordner? Nur einmal. Gibt zurück:
+ * - fileId bei Neuigkeiten zu einer Datei,
+ * - sonst createdAt der Neuigkeit (bei „Neu in …“: daran erkennt der Ordner, welche Einträge gemeint sind).
  */
-export function consumeArrival(folderId: string): { fileId?: string } | null {
-  if (!arrival || folderOf(arrival) !== folderId) return null;
-  const file = arrival.replace(/^#/, '').split('/')[2];
+export function consumeArrival(folderId: string): { fileId?: string; createdAt: string } | null {
+  if (!arrival || folderOf(arrival.url) !== folderId) return null;
+  const file = arrival.url.replace(/^#/, '').split('/')[2];
+  const { createdAt } = arrival;
   arrival = null;
-  return file ? { fileId: decodeURIComponent(file) } : {};
+  return file ? { fileId: decodeURIComponent(file), createdAt } : { createdAt };
 }

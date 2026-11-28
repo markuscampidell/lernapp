@@ -108,7 +108,7 @@ export function NewsBell({ headless = false }: { headless?: boolean }) {
       .map((x) => ({ url: target(x), createdAt: x.createdAt }));
     setOpen(false);
     afterBack(() => {
-      startTrail(target(n), rest, seenAtOpen);
+      startTrail({ url: target(n), createdAt: n.createdAt }, rest, seenAtOpen);
       navigate(target(n));
     });
   };
