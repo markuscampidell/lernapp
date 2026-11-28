@@ -6,6 +6,7 @@ import { HandoverBanner } from './features/account/HandoverBanner';
 import { NotificationPrompt } from './features/notifications/NotificationPrompt';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LightboxHost } from './components/Lightbox';
+import { BellTrail } from './features/news/BellTrail';
 import { FoldersView } from './features/folders/FoldersView';
 import { UploadView } from './features/upload/UploadView';
 import { SettingsView } from './features/settings/SettingsView';
@@ -97,6 +98,7 @@ export function App() {
           </ErrorBoundary>
         )}
       </main>
+      <BellTrail />
       <LightboxHost />
       <DraftHost />
     </div>

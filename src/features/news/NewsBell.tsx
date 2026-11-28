@@ -7,6 +7,7 @@ import { afterBack, navigate } from '../../lib/router';
 import { useLibrary } from '../../state/Library';
 import { ago } from '../comments/Comments';
 import { onVisited, visitedAt } from './visits';
+import { consumeBellRequest, startTrail } from './trail';
 
 /** Wann die Glocke zuletzt geöffnet wurde (pro Konto, auf diesem Gerät). */
 const seenKey = (userId: string) => `lernapp-neuigkeiten-gesehen-${userId}`;
@@ -76,9 +77,8 @@ export function NewsBell() {
     if (!unread) void navigator.serviceWorker?.getRegistration().then((r) => r?.getNotifications().then((l) => l.forEach((n) => n.close())));
   }, [unread, items, me]);
 
-  if (!cloudEnabled || !me) return null;
-
-  const show = () => {
+  const show = useCallback(() => {
+    if (!me) return;
     setSeenAtOpen(seen);
     setOpen(true);
     load();
@@ -89,6 +89,27 @@ export function NewsBell() {
     } catch {
       /* egal */
     }
+  }, [me, seen, load]);
+
+  // Über „Neuigkeiten“ unten (nach dem Antippen einer Neuigkeit) zurückgekommen: Glocke gleich öffnen.
+  useEffect(() => {
+    if (me && consumeBellRequest()) show();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+
+  if (!cloudEnabled || !me) return null;
+
+  /** Antippen: hinspringen und unten „Neuigkeiten“/„Nächste“ anbieten (die übrigen ungelesenen, in dieser Reihenfolge). */
+  const openItem = (n: NewsItem, i: number) => {
+    const rest = (items ?? [])
+      .slice(i + 1)
+      .filter((x) => x.url !== '#ordner' && isUnread(x, seenAtOpen))
+      .map((x) => ({ url: target(x), createdAt: x.createdAt }));
+    setOpen(false);
+    afterBack(() => {
+      startTrail(rest);
+      navigate(target(n));
+    });
   };
 
   return (
@@ -104,14 +125,11 @@ export function NewsBell() {
           {items && items.length === 0 && <p className="muted">Noch keine Neuigkeiten.</p>}
           {items && items.length > 0 && (
             <ul className="list news-list">
-              {items.map((n) => (
+              {items.map((n, i) => (
                 <li key={n.id}>
                   <button
                     className={`card card-btn news-item${isUnread(n, seenAtOpen) ? ' new' : ''}`}
-                    onClick={() => {
-                      setOpen(false);
-                      afterBack(() => navigate(target(n)));
-                    }}
+                    onClick={() => openItem(n, i)}
                   >
                     <span className="news-icon">
                       <Icon name={ICON[n.kind] ?? 'bell'} size={18} />

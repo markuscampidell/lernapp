@@ -5028,3 +5028,57 @@ textarea.more-up.more-down {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
 }
+
+/* ---------- Weg aus der Glocke: „Neuigkeiten“ / „Nächste“ unten in der Mitte (siehe news/BellTrail.tsx) ---------- */
+.bell-trail {
+  position: fixed;
+  z-index: 60; /* über geöffneten Dateien */
+  left: 50%;
+  transform: translateX(-50%);
+  /* eine Reihe über der Uhr, damit sie sich nicht überdecken */
+  bottom: calc(var(--nav-h) + 52px + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  animation: fade 0.15s ease-out;
+}
+.bell-trail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bell-trail-btn.next {
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding-right: 10px;
+}
+.bell-trail-btn:active {
+  transform: scale(0.96);
+}
+/* Über Leisten unten in Dateien (Quiz, Zoom) hinweg */
+body:has(.study-footer) .bell-trail {
+  bottom: calc(150px + env(safe-area-inset-bottom));
+}
+body:has(.zoom-ctl) .bell-trail {
+  bottom: calc(130px + env(safe-area-inset-bottom));
+}
+@media (min-width: 900px) {
+  .bell-trail {
+    bottom: 16px;
+  }
+}
