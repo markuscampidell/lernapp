@@ -18,17 +18,23 @@ export const MEMBERS_MAY = 'Alle Mitglieder dürfen Neues hinzufügen und ihre e
  * Einstellen dürfen der Besitzer (alles) und Mitglieder (nur bei dem, was sie selbst erstellt haben) – jede Stufe, strenger oder lockerer.
  * Die Stufe des Ordners darüber ist „wie der Ordner“ (value null = erben). Speichert sofort beim Antippen.
  */
-export function AccessPicker({ item }: { item: Folder | FileItem }) {
-  const { canSetAccess, inheritedAccessOf, inheritsFromFolder, isRoot, parentShareOf, setAccess, online } = useLibrary();
+export function AccessPicker({ item: given }: { item: Folder | FileItem }) {
+  const { canSetAccess, inheritedAccessOf, inheritsFromFolder, isRoot, parentShareOf, setAccess, online, files, folders } = useLibrary();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Gerade angetippte Stufe – sofort als ausgewählt zeigen, bis gespeichert ist.
+  const [pending, setPending] = useState<Access | null>(null);
+  // Immer den aktuellen Stand aus der Bibliothek nehmen (das übergebene Objekt ist eine Momentaufnahme vom Öffnen).
+  const item: Folder | FileItem =
+    ('folderId' in given ? files.find((f) => f.id === given.id) : folders.find((f) => f.id === given.id)) ?? given;
   if (!canSetAccess(item)) return null;
 
   const isFolder = !('folderId' in item);
   // Ganz oben (nicht in einem anderen geteilten Ordner): nichts darüber – Standard ist „Nur lesen“.
   const top = isFolder && isRoot(item as Folder) && !parentShareOf(item.shareId);
   const inherited: Access = top ? 'read' : inheritedAccessOf(item);
-  const current: Access = !isFolder && item.access === 'delete' ? 'edit' : item.access ?? inherited;
+  const saved: Access = !isFolder && item.access === 'delete' ? 'edit' : item.access ?? inherited;
+  const current: Access = pending ?? saved;
   const levels = isFolder ? FOLDER_LEVELS : FILE_LEVELS;
   // Nur wenn der Ordner darüber von derselben Person stammt, übernimmt der Eintrag dessen Einstellung.
   const fromFolder = !top && inheritsFromFolder(item);
@@ -39,11 +45,13 @@ export function AccessPicker({ item }: { item: Folder | FileItem }) {
     if (next === (item.access ?? null)) return;
     setBusy(true);
     setErr(null);
+    setPending(l);
     try {
       await setAccess(item, next);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.');
     } finally {
+      setPending(null);
       setBusy(false);
     }
   };
