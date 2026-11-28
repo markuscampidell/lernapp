@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import type { FileItem, Folder } from '../../domain/types';
 import { counts, plural } from '../../domain/tree';
 import { useLibrary } from '../../state/Library';
@@ -84,6 +84,27 @@ function ItemCard({ onClick, onEdit, onInfo, onPeople, onMove, onLongPress, sele
   );
 }
 
+/**
+ * Name mit Umbruchstellen vor „.“, „_“, „-“: Lange Namen wie „Photosynthese.txt“ brechen dann
+ * vor der Endung um („Photosynthese“ / „.txt“) statt mitten im Wort.
+ */
+function Name({ text }: { text: string }) {
+  const parts = text.split(/(?=[._-])/);
+  return (
+    <>
+      {parts.map((p, i) => (
+        <Fragment key={i}>
+          {i > 0 && <wbr />}
+          {p}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+/** Größe nur zeigen, wo sie etwas aussagt: bei großen hochgeladenen Dateien (ab 1 MB). */
+const showSize = (file: FileItem) => file.size >= 1024 * 1024 && shownName(file) !== file.name;
+
 /** "von Anna" bei geteilten Einträgen. */
 function ByChip({ id }: { id: string | null | undefined }) {
   const { me, userName } = useLibrary();
@@ -130,7 +151,9 @@ export function FolderCard({ folder, path, isNew, ...rest }: ItemCardProps & { f
   );
   return (
     <ItemCard {...rest} thumb={thumb} label={folder.name} chevron>
-      <strong className="wrap-text">{folder.name}</strong>
+      <strong className="wrap-text">
+        <Name text={folder.name} />
+      </strong>
       {path && <span className="muted small wrap-text">{path}</span>}
       {folder.description && <span className="muted small wrap-text">{folder.description}</span>}
       <span className="muted small">
@@ -155,7 +178,9 @@ export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file:
   const changes = changesFor(file.id);
   return (
     <ItemCard {...rest} thumb={<FileThumb file={file} expand={!rest.selecting} />} label={shownName(file)}>
-      <strong className="wrap-text">{shownName(file)}</strong>
+      <strong className="wrap-text">
+        <Name text={shownName(file)} />
+      </strong>
       {path && <span className="muted small wrap-text">{path}</span>}
       {file.description && <span className="muted small wrap-text">{file.description}</span>}
       {changes.length > 0 && (
@@ -166,7 +191,7 @@ export function FileCard({ file, path, isNew, ...rest }: ItemCardProps & { file:
       <span className="chips">
         {isNew && <span className="chip new-chip">Neu</span>}
         <span className={`chip kind-chip kind-${kind}`}>{KIND_LABEL[kind]}</span>
-        <span className="chip">{formatSize(file.size)}</span>
+        {showSize(file) && <span className="chip">{formatSize(file.size)}</span>}
         {file.shareId && <ByChip id={file.createdBy} />}
         {file.shareId && <AccessChip item={file} />}
         {comments.count > 0 && (

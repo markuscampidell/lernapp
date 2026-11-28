@@ -1057,6 +1057,10 @@ input.narrow {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+}
+/* Nur der Inhalt blendet ein, der Hintergrund ist sofort deckend – sonst schien der Ordner beim Öffnen durch
+   und dessen Text lag kurz über dem der Datei. */
+.viewer > * {
   animation: fade 0.15s ease-out;
 }
 .viewer-header {
@@ -2486,6 +2490,8 @@ textarea.text-line.doc-title {
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: normal;
+  /* Lange Wörter lieber mit Trennstrich umbrechen als mitten drin ohne */
+  hyphens: auto;
 }
 .card-main .muted.wrap-text {
   display: block;
@@ -4087,6 +4093,10 @@ div.sticky-bar:has(> .view-header) {
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--text-2);
+}
+/* Übersicht: Zahl direkt neben dem Titel – am PC stand sie sonst am rechten Rand und wirkte wie die Zahl der Spalte daneben */
+.pane-title {
+  justify-content: flex-start;
 }
 /* Suche */
 .search {

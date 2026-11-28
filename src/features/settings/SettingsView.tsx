@@ -133,7 +133,7 @@ export function SettingsView() {
               <div className="meter-fill" style={{ width: `${Math.min(100, (usage.used / usage.quota) * 100).toFixed(1)}%` }} />
             </div>
             <p className="muted small">
-              {formatSize(usage.used)} von ca. {formatSize(usage.quota)} auf diesem Gerät belegt
+              Insgesamt mit der App selbst: {formatSize(usage.used)} von ca. {formatSize(usage.quota)} auf diesem Gerät belegt
             </p>
           </div>
         )}

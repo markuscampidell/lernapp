@@ -89,10 +89,11 @@ const APP_KINDS: string[] = ['flashcards', 'quiz', 'richtext', 'chart', 'wheel',
 
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB'];
+  const units = ['KB', 'MB', 'GB', 'TB'];
   let v = bytes / 1024;
   let u = 0;
-  while (v >= 1024 && u < units.length - 1) {
+  // Ab 1000 schon die nächste Einheit – sonst stünde z. B. „1.006 KB“ da (sieht im Deutschen wie gut 1 KB aus).
+  while (v >= 1000 && u < units.length - 1) {
     v /= 1024;
     u++;
   }
