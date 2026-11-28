@@ -36,6 +36,7 @@ import { loadBlob } from '../../storage/blobs';
 import type { IconName } from '../../components/Icon';
 import { cloudEnabled } from '../../cloud/supabase';
 import { NewsBell } from '../news/NewsBell';
+import { fileVisitPath, markVisited } from '../news/visits';
 
 const norm = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -111,6 +112,13 @@ function FolderPage({
   const cameraInput = useRef<HTMLInputElement>(null);
   const videoInput = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState<FileItem | null>(null);
+  // In diesem Besuch schon geöffnete Dateien: verlieren gleich ihr „Neu“ (nicht erst beim nächsten Betreten des Ordners).
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    if (!viewing) return;
+    setOpened((s) => (s.has(viewing.id) ? s : new Set(s).add(viewing.id)));
+    markVisited(fileVisitPath(viewing.folderId, viewing.id));
+  }, [viewing?.id]);
   // Datei, die mit offenen Kommentaren aufgeht (aus den Neuigkeiten).
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   // Bearbeiten direkt aus der Liste (ohne die Datei zu öffnen).
@@ -154,6 +162,10 @@ function FolderPage({
   useEffect(() => {
     if (remoteId) markSeen(remoteId);
   }, [remoteId, hasNewDirect, markSeen]);
+  // Ordner geöffnet: passende Neuigkeiten in der Glocke („Neu in …“, neu geteilt) gelten als gelesen.
+  useEffect(() => {
+    if (folder?.shareId) markVisited(folderHash(folder.id));
+  }, [folder?.id, folder?.shareId]);
 
   // Suche: auf oberster Ebene alles, in einem Ordner nur darin (inkl. aller Unterordner).
   const results = useMemo(() => {
@@ -269,7 +281,7 @@ function FolderPage({
       setEditing('folderId' in item ? { kind: 'file', file: item } : { kind: 'folder', folder: item });
     },
   });
-  const newProp = (item: Folder | FileItem) => ({ isNew: isNewSince(item, since) });
+  const newProp = (item: Folder | FileItem) => ({ isNew: !opened.has(item.id) && isNewSince(item, since) });
 
   /** Rechts im Bereichs-Titel: Anzahl und – im Auswahlmodus, nur in einem Ordner – „Alle“/„Keine“ für genau diesen Bereich. */
   const sectionEnd = (kind: 'folders' | 'files', items: { id: string }[], showCount = true) => {

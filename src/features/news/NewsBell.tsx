@@ -6,6 +6,7 @@ import { cloudEnabled } from '../../cloud/supabase';
 import { afterBack, navigate } from '../../lib/router';
 import { useLibrary } from '../../state/Library';
 import { ago } from '../comments/Comments';
+import { onVisited, visitedAt } from './visits';
 
 /** Wann die Glocke zuletzt geöffnet wurde (pro Konto, auf diesem Gerät). */
 const seenKey = (userId: string) => `lernapp-neuigkeiten-gesehen-${userId}`;
@@ -21,6 +22,12 @@ const ICON: Record<string, IconName> = { comment: 'comment', share: 'users', han
 
 /** Kommentar-Neuigkeiten öffnen die Datei gleich mit offenen Kommentaren. */
 const target = (n: NewsItem) => (n.kind === 'comment' && /^#ordner\/[^/]+\/[^/]+$/.test(n.url) ? `${n.url}/kommentare` : n.url);
+
+/**
+ * Schon selbst geöffnet (Ordner, Datei bzw. deren Kommentare), nachdem die Neuigkeit entstand?
+ * Die Übergabe (#ordner) zählt nie – die muss man in der Glocke sehen.
+ */
+const visited = (n: NewsItem) => n.url !== '#ordner' && visitedAt(target(n)) >= Date.parse(n.createdAt);
 
 /** Glocke in der Ordner-Übersicht: neue Kommentare, neu geteilte Ordner, Neues in eigenen Ordnern, Änderungen an eigenen Einträgen, Übergaben. */
 export function NewsBell() {
@@ -54,8 +61,12 @@ export function NewsBell() {
   }, [me, online, load]);
 
   useEffect(() => setSeen(me ? readSeen(me.id) : 0), [me]);
+  // Beim Öffnen von Ordnern/Dateien neu zählen.
+  const [, setVisits] = useState(0);
+  useEffect(() => onVisited(() => setVisits((v) => v + 1)), []);
 
-  const unread = (items ?? []).filter((n) => Date.parse(n.createdAt) > seen).length;
+  const isUnread = (n: NewsItem, since: number) => Date.parse(n.createdAt) > since && !visited(n);
+  const unread = (items ?? []).filter((n) => isUnread(n, seen)).length;
   // Zahl am App-Symbol = ungelesene Neuigkeiten (nur installierte App, wo der Browser das kann).
   useEffect(() => {
     if (!items || !me) return;
@@ -96,7 +107,7 @@ export function NewsBell() {
               {items.map((n) => (
                 <li key={n.id}>
                   <button
-                    className={`card card-btn news-item${Date.parse(n.createdAt) > seenAtOpen ? ' new' : ''}`}
+                    className={`card card-btn news-item${isUnread(n, seenAtOpen) ? ' new' : ''}`}
                     onClick={() => {
                       setOpen(false);
                       afterBack(() => navigate(target(n)));

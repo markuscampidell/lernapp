@@ -7,6 +7,7 @@ import { supabase } from '../../cloud/supabase';
 import { addComment, deleteComment, fetchComments, type Comment } from '../../cloud/remote';
 import { useBackToClose } from '../../lib/router';
 import { cloudEnabled } from '../../cloud/supabase';
+import { fileVisitPath, markVisited } from '../news/visits';
 
 const MAX = 4000;
 
@@ -205,6 +206,10 @@ export function CommentsToggle({ file, initialOpen = false }: { file: FileItem; 
     window.addEventListener(EDIT_START, close);
     return () => window.removeEventListener(EDIT_START, close);
   }, []);
+  // Kommentare gesehen: passende Neuigkeiten in der Glocke gelten als gelesen.
+  useEffect(() => {
+    if (open) markVisited(fileVisitPath(file.folderId, file.id, true));
+  }, [open, file.folderId, file.id]);
   if (!cloudEnabled || !file.shareId || !me || isOrphan(file.folderId)) return null;
   if (open) return <Comments file={file} onClose={() => setOpen(false)} />;
   const info = commentInfo(file.id);
