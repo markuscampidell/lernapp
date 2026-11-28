@@ -37,7 +37,7 @@ import type { IconName } from '../../components/Icon';
 import { cloudEnabled } from '../../cloud/supabase';
 import { NewsBell } from '../news/NewsBell';
 import { fileVisitPath, markVisited } from '../news/visits';
-import { consumeArrival } from '../news/trail';
+import { consumeArrival, onTrailChange } from '../news/trail';
 
 const norm = (s: string) => s.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -168,8 +168,8 @@ function FolderPage({
     if (remoteId) markSeen(remoteId);
   }, [remoteId, hasNewDirect, markSeen]);
   // Über die Glocke hergekommen: bei einer Datei diese merken (orange beim Schließen),
-  // bei „Neu in …“ die neuen Einträge hier kurz orange umrahmen.
-  useEffect(() => {
+  // bei „Neu in …“ die gemeinten Einträge hier kurz orange umrahmen.
+  const onArrival = () => {
     if (!folder) return;
     const a = consumeArrival(folder.id);
     if (!a) return;
@@ -184,7 +184,13 @@ function FolderPage({
       };
       flashCards([...subfolders, ...ownFiles].filter(meant).map((x) => x.id), 'bell');
     }
-  }, [folder?.id, openFileId]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
+  const onArrivalRef = useRef(onArrival);
+  onArrivalRef.current = onArrival;
+  useEffect(() => onArrivalRef.current(), [folder?.id, openFileId]);
+  // Neuigkeit zu genau dem Ordner, in dem man schon ist: die Adresse ändert sich dann nicht – daher auch direkt
+  // auf das Antippen in der Glocke reagieren.
+  useEffect(() => onTrailChange(() => onArrivalRef.current()), []);
   // Ordner geöffnet: passende Neuigkeiten in der Glocke („Neu in …“, neu geteilt) gelten als gelesen.
   useEffect(() => {
     if (folder?.shareId) markVisited(folderHash(folder.id));
