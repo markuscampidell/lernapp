@@ -14,6 +14,8 @@ interface Trail {
   folder: string;
   /** Die noch nicht besuchten ungelesenen Neuigkeiten nach der aktuellen, in der Reihenfolge der Glocke. */
   rest: TrailStop[];
+  /** Stand „zuletzt gelesen“ beim ersten Öffnen der Glocke – damit beim Wiederöffnen dieselben als neu markiert sind. */
+  since: number;
 }
 
 /** #ordner/<ordner>[/<datei>[/kommentare]] → <ordner> */
@@ -21,7 +23,7 @@ const folderOf = (url: string) => decodeURIComponent(url.replace(/^#/, '').split
 
 const KEY = 'lernapp-glocke-weg';
 const EVENT = 'lernapp:glocke-weg';
-let openBellRequested = false;
+const OPEN = 'lernapp:glocke-oeffnen';
 
 function read(): Trail | null {
   try {
@@ -40,7 +42,8 @@ function write(t: Trail | null) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-export const startTrail = (url: string, rest: TrailStop[]) => write({ folder: folderOf(url), rest });
+export const startTrail = (url: string, rest: TrailStop[], since: number) => write({ folder: folderOf(url), rest, since });
+export const trailSince = () => read()?.since;
 export const trailFolder = () => read()?.folder ?? null;
 export const endTrail = () => read() && write(null);
 export const hasTrail = () => !!read();
@@ -53,19 +56,17 @@ export function remaining(): TrailStop[] {
 /** Nächste Neuigkeit: gibt ihr Ziel zurück und rückt den Weg weiter. */
 export function takeNext(): string | null {
   const [next, ...rest] = remaining();
-  if (!next) return null;
-  write({ folder: folderOf(next.url), rest });
+  const t = read();
+  if (!next || !t) return null;
+  write({ ...t, folder: folderOf(next.url), rest });
   return next.url;
 }
 
-/** Die Glocke soll aufgehen, sobald die Übersicht da ist. */
-export function requestBellOpen() {
-  openBellRequested = true;
-}
-export function consumeBellRequest() {
-  const r = openBellRequested;
-  openBellRequested = false;
-  return r;
+/** Die Neuigkeiten gleich hier öffnen (ohne zur Übersicht zu wechseln). */
+export const openBellHere = () => window.dispatchEvent(new Event(OPEN));
+export function onOpenBell(fn: () => void) {
+  window.addEventListener(OPEN, fn);
+  return () => window.removeEventListener(OPEN, fn);
 }
 
 export function onTrailChange(fn: () => void) {

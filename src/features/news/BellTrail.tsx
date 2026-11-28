@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../../components/Icon';
 import { navigate, useRoute } from '../../lib/router';
-import { endTrail, hasTrail, onTrailChange, remaining, requestBellOpen, takeNext, trailFolder } from './trail';
+import { NewsBell } from './NewsBell';
+import { endTrail, hasTrail, onTrailChange, remaining, openBellHere, takeNext, trailFolder } from './trail';
 import { onVisited } from './visits';
 
 /**
  * Kleine Leiste unten in der Mitte, solange man über die Glocke irgendwohin gekommen ist:
- * „Neuigkeiten“ führt zurück und öffnet die Glocke, „Nächste“ springt gleich zur nächsten ungelesenen.
+ * „Neuigkeiten“ öffnet die Glocke gleich hier, „Nächste“ springt gleich zur nächsten ungelesenen.
  */
 export function BellTrail() {
   const route = useRoute();
@@ -26,31 +27,31 @@ export function BellTrail() {
   useEffect(() => {
     if (away) endTrail();
   }, [route.tab, route.folderId]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (away || !hasTrail()) return null;
-
-  const more = remaining().length;
+  const show = !away && hasTrail();
+  const more = show ? remaining().length : 0;
   return (
-    <div className="bell-trail" role="navigation" aria-label="Neuigkeiten">
-      <button
-        className="bell-trail-btn"
-        onClick={() => {
-          requestBellOpen();
-          navigate('#ordner');
-        }}
-      >
-        <Icon name="bell" size={17} /> Neuigkeiten
-      </button>
-      {more > 0 && (
-        <button
-          className="bell-trail-btn next"
-          onClick={() => {
-            const url = takeNext();
-            if (url) navigate(url);
-          }}
-        >
-          Nächste ({more}) <Icon name="chevron" size={16} />
-        </button>
+    <>
+      {/* Die Neuigkeiten selbst (ohne Glocken-Knopf): gehen hier auf, wo man gerade ist. Immer an derselben Stelle,
+          damit die offene Liste beim Wechseln nicht neu aufgebaut wird. */}
+      <NewsBell headless />
+      {show && (
+        <div className="bell-trail" role="navigation" aria-label="Neuigkeiten">
+          <button className="bell-trail-btn" onClick={openBellHere}>
+            <Icon name="bell" size={17} /> Neuigkeiten
+          </button>
+          {more > 0 && (
+            <button
+              className="bell-trail-btn next"
+              onClick={() => {
+                const url = takeNext();
+                if (url) navigate(url);
+              }}
+            >
+              Nächste ({more}) <Icon name="chevron" size={16} />
+            </button>
+          )}
+        </div>
       )}
-    </div>
+    </>
   );
 }

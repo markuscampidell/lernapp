@@ -7,7 +7,7 @@ import { afterBack, navigate } from '../../lib/router';
 import { useLibrary } from '../../state/Library';
 import { ago } from '../comments/Comments';
 import { onVisited, visitedAt } from './visits';
-import { consumeBellRequest, startTrail } from './trail';
+import { onOpenBell, startTrail, trailSince } from './trail';
 
 /** Wann die Glocke zuletzt geöffnet wurde (pro Konto, auf diesem Gerät). */
 const seenKey = (userId: string) => `lernapp-neuigkeiten-gesehen-${userId}`;
@@ -30,8 +30,12 @@ const target = (n: NewsItem) => (n.kind === 'comment' && /^#ordner\/[^/]+\/[^/]+
  */
 const visited = (n: NewsItem) => n.url !== '#ordner' && visitedAt(target(n)) >= Date.parse(n.createdAt);
 
-/** Glocke in der Ordner-Übersicht: neue Kommentare, neu geteilte Ordner, Neues in eigenen Ordnern, Änderungen an eigenen Einträgen, Übergaben. */
-export function NewsBell() {
+/**
+ * headless: ohne Knopf und ohne regelmäßiges Nachladen – nur die Liste, die über „Neuigkeiten“ unten (siehe BellTrail)
+ * dort aufgeht, wo man gerade ist.
+ *
+ * Glocke in der Ordner-Übersicht: neue Kommentare, neu geteilte Ordner, Neues in eigenen Ordnern, Änderungen an eigenen Einträgen, Übergaben. */
+export function NewsBell({ headless = false }: { headless?: boolean }) {
   const { me, online } = useLibrary();
   const [items, setItems] = useState<NewsItem[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -50,7 +54,7 @@ export function NewsBell() {
   }, []);
 
   useEffect(() => {
-    if (!me || !online) return;
+    if (!me || !online || headless) return;
     load();
     const onFocus = () => document.visibilityState === 'visible' && load();
     document.addEventListener('visibilitychange', onFocus);
@@ -59,7 +63,7 @@ export function NewsBell() {
       document.removeEventListener('visibilitychange', onFocus);
       clearInterval(timer);
     };
-  }, [me, online, load]);
+  }, [me, online, load, headless]);
 
   useEffect(() => setSeen(me ? readSeen(me.id) : 0), [me]);
   // Beim Öffnen von Ordnern/Dateien neu zählen.
@@ -70,16 +74,16 @@ export function NewsBell() {
   const unread = (items ?? []).filter((n) => isUnread(n, seen)).length;
   // Zahl am App-Symbol = ungelesene Neuigkeiten (nur installierte App, wo der Browser das kann).
   useEffect(() => {
-    if (!items || !me) return;
+    if (!items || !me || headless) return;
     const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
     (unread ? nav.setAppBadge?.(unread) : nav.clearAppBadge?.())?.catch(() => {});
     // Gelesen: auch die Benachrichtigungen in der Leiste wegräumen.
     if (!unread) void navigator.serviceWorker?.getRegistration().then((r) => r?.getNotifications().then((l) => l.forEach((n) => n.close())));
-  }, [unread, items, me]);
+  }, [unread, items, me, headless]);
 
-  const show = useCallback(() => {
+  const show = useCallback((since?: number) => {
     if (!me) return;
-    setSeenAtOpen(seen);
+    setSeenAtOpen(since ?? readSeen(me.id));
     setOpen(true);
     load();
     const now = Date.now();
@@ -89,13 +93,10 @@ export function NewsBell() {
     } catch {
       /* egal */
     }
-  }, [me, seen, load]);
+  }, [me, load]);
 
-  // Über „Neuigkeiten“ unten (nach dem Antippen einer Neuigkeit) zurückgekommen: Glocke gleich öffnen.
-  useEffect(() => {
-    if (me && consumeBellRequest()) show();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me]);
+  // „Neuigkeiten“ unten: dieselben wie beim ersten Öffnen als neu markieren (nicht nur, was seitdem dazukam).
+  useEffect(() => (headless ? onOpenBell(() => show(trailSince())) : undefined), [headless, show]);
 
   if (!cloudEnabled || !me) return null;
 
@@ -107,17 +108,17 @@ export function NewsBell() {
       .map((x) => ({ url: target(x), createdAt: x.createdAt }));
     setOpen(false);
     afterBack(() => {
-      startTrail(target(n), rest);
+      startTrail(target(n), rest, seenAtOpen);
       navigate(target(n));
     });
   };
 
   return (
     <>
-      <button className="icon-btn badge-btn bell-btn" aria-label={unread ? `Neuigkeiten (${unread} neu)` : 'Neuigkeiten'} title="Neuigkeiten" onClick={show}>
+      {!headless && <button className="icon-btn badge-btn bell-btn" aria-label={unread ? `Neuigkeiten (${unread} neu)` : 'Neuigkeiten'} title="Neuigkeiten" onClick={() => show()}>
         <Icon name="bell" size={24} />
         {unread > 0 && <span className="count-badge unread">{unread > 9 ? '9+' : unread}</span>}
-      </button>
+      </button>}
       {open && (
         <Sheet title="Neuigkeiten" onClose={() => setOpen(false)}>
           {err && <p className="notice warning">{err}</p>}
